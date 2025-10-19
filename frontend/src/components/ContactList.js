@@ -7,7 +7,8 @@ export default function ContactList({lang='ru'}){
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   const [search, setSearch] = useState('');
-  const [newContact, setNewContact] = useState({uid:'',full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
+  const [uidFilter, setUidFilter] = useState('');
+  const [newContact, setNewContact] = useState({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -29,10 +30,31 @@ export default function ContactList({lang='ru'}){
     return ()=> window.removeEventListener('refresh-contacts', handler);
   },[]);
 
+  const applyFilters = (q, uidQ)=>{
+    const ql = (q||'').toLowerCase();
+    const ul = (uidQ||'').toLowerCase();
+    let base = contacts.filter(c =>
+      (c.full_name||'').toLowerCase().includes(ql) ||
+      (c.email||'').toLowerCase().includes(ql) ||
+      (c.phone||'').toLowerCase().includes(ql) ||
+      (c.company||'').toLowerCase().includes(ql) ||
+      (c.comment||'').toLowerCase().includes(ql) ||
+      (c.website||'').toLowerCase().includes(ql)
+    );
+    if (ul) base = base.filter(c => (c.uid||'').toLowerCase().includes(ul));
+    setFiltered(base);
+  };
+
   const handleSearch = (e)=>{
-    const q = e.target.value.toLowerCase();
+    const q = e.target.value;
     setSearch(q);
-    setFiltered(contacts.filter(c => (c.full_name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q) || (c.comment||'').toLowerCase().includes(q) || (c.website||'').toLowerCase().includes(q)));
+    applyFilters(q, uidFilter);
+  };
+
+  const handleUidFilter = (e)=>{
+    const val = e.target.value;
+    setUidFilter(val);
+    applyFilters(search, val);
   };
 
   const toggle = (id)=> setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]);
@@ -72,7 +94,10 @@ export default function ContactList({lang='ru'}){
   return (
     <div style={{marginTop:20}}>
       <h2>{lang==='ru' ? '📇 Контакты' : '📇 Contacts'}</h2>
-      <input placeholder={lang==='ru' ? '🔍 Поиск...' : '🔍 Search...'} value={search} onChange={handleSearch} style={{width:'100%', padding:8, marginBottom:10}} />
+      <div style={{display:'flex', gap:8, marginBottom:10}}>
+        <input placeholder={lang==='ru' ? '🔍 Поиск...' : '🔍 Search...'} value={search} onChange={handleSearch} style={{flex:1, padding:8}} />
+        <input placeholder="UID" value={uidFilter} onChange={handleUidFilter} style={{width:200, padding:8}} />
+      </div>
       <div style={{marginBottom:10}}>
         <button onClick={deleteSelected}>🗑️ {lang==='ru' ? 'Удалить выбранные' : 'Delete selected'}</button>
         <button style={{marginLeft:8}} onClick={()=>setShowBulkEdit(!showBulkEdit)}>✏️ {lang==='ru' ? 'Массовое редактирование' : 'Bulk edit'}</button>
@@ -109,7 +134,7 @@ export default function ContactList({lang='ru'}){
           ))}
           <tr style={{background:'#f7f7f7'}}>
             <td></td>
-            <td><input value={newContact.uid} onChange={(e)=>setNewContact({...newContact, uid:e.target.value})} placeholder="UID" /></td>
+            <td style={{color:'#555'}}>{lang==='ru' ? 'Авто' : 'Auto'}</td>
             <td><input value={newContact.full_name} onChange={(e)=>setNewContact({...newContact, full_name:e.target.value})} placeholder={lang==='ru' ? 'Имя' : 'Name'} /></td>
             <td><input value={newContact.company} onChange={(e)=>setNewContact({...newContact, company:e.target.value})} placeholder={lang==='ru' ? 'Компания' : 'Company'} /></td>
             <td><input value={newContact.position} onChange={(e)=>setNewContact({...newContact, position:e.target.value})} placeholder={lang==='ru' ? 'Должность' : 'Position'} /></td>
