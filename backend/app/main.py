@@ -9,53 +9,58 @@ from typing import Optional
 from .database import engine, Base, get_db
 from .models import Contact, AppSetting
 from .ocr_utils import ocr_image_fileobj, ocr_parsio
-import io, csv, tempfile, pandas as pd, os, uuid, json, requests
+import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
 
-# Create tables if they don't exist
-try:
-    Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully")
-except Exception as e:
-    print(f"Database connection failed: {e}")
-    # Don't exit, let the application start and retry on first request
-    
-# Ensure new columns exist (lightweight migration)
-try:
-    with engine.connect() as conn:
-        conn.execute(text("""
-            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS comment VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS uid VARCHAR UNIQUE;
-        """))
-        conn.execute(text("""
-            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS website VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo_path VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS ocr_raw VARCHAR;
-        """))
-        conn.commit()
-    print("Schema ensured: comment, uid, website, photo_path, ocr_raw columns present")
-except Exception as e:
-    print(f"Schema ensure failed: {e}")
+def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
+    last_err = None
+    for i in range(max_retries):
+        try:
+            Base.metadata.create_all(bind=engine)
+            # Lightweight migrations for new columns
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS comment VARCHAR;
+                """))
+                conn.execute(text("""
+                    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS uid VARCHAR UNIQUE;
+                """))
+                conn.execute(text("""
+                    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS website VARCHAR;
+                """))
+                conn.execute(text("""
+                    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo_path VARCHAR;
+                """))
+                conn.execute(text("""
+                    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS ocr_raw VARCHAR;
+                """))
+                conn.commit()
+            print("Database initialized and schema ensured")
+            return True
+        except Exception as e:
+            last_err = e
+            time.sleep(delay)
+    print(f"Database init failed after retries: {last_err}")
+    return False
 
-# Backfill UID for existing contacts without one
-try:
-    SessionLocal = sessionmaker(bind=engine)
-    with SessionLocal() as s:
-        missing = s.query(Contact).filter((Contact.uid == None) | (Contact.uid == '')).all()
-        updated = 0
-        for c in missing:
-            c.uid = uuid.uuid4().hex
-            updated += 1
-        if updated:
-            s.commit()
-            print(f"Backfilled UID for {updated} contact(s)")
-except Exception as e:
-    print(f"UID backfill failed: {e}")
+# Initialize DB on import (container start)
+init_db_with_retry()
+
+def backfill_uids_safe():
+    try:
+        SessionLocal = sessionmaker(bind=engine)
+        with SessionLocal() as s:
+            missing = s.query(Contact).filter((Contact.uid == None) | (Contact.uid == '')).all()
+            updated = 0
+            for c in missing:
+                c.uid = uuid.uuid4().hex
+                updated += 1
+            if updated:
+                s.commit()
+                print(f"Backfilled UID for {updated} contact(s)")
+    except Exception as e:
+        print(f"UID backfill failed: {e}")
+
+backfill_uids_safe()
 
 # Pydantic models for validation
 class ContactCreate(BaseModel):
