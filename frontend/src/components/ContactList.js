@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function ContactList({lang='ru'}){
+export default function ContactList({lang='ru', onEdit}){
   const [contacts, setContacts] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -59,6 +59,28 @@ export default function ContactList({lang='ru'}){
 
   const toggle = (id)=> setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]);
 
+  const exportSelected = async (format='csv')=>{
+    if(!selected.length) return alert(lang==='ru' ? 'Ничего не выбрано' : 'Nothing selected');
+    const ids = selected.join(',');
+    const url = format==='xlsx'
+      ? `http://localhost:8000/contacts/export/xlsx?ids=${encodeURIComponent(ids)}`
+      : `http://localhost:8000/contacts/export?ids=${encodeURIComponent(ids)}`;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      const href = window.URL.createObjectURL(blob);
+      a.href = href;
+      a.download = format==='xlsx' ? 'contacts.xlsx' : 'contacts.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(href);
+    } catch (e) {
+      alert('Export failed');
+    }
+  };
+
   const updateContactField = async (id, patch)=>{
     await fetch(`http://localhost:8000/contacts/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch)});
   };
@@ -98,9 +120,11 @@ export default function ContactList({lang='ru'}){
         <input placeholder={lang==='ru' ? '🔍 Поиск...' : '🔍 Search...'} value={search} onChange={handleSearch} style={{flex:1, padding:8}} />
         <input placeholder="UID" value={uidFilter} onChange={handleUidFilter} style={{width:200, padding:8}} />
       </div>
-      <div style={{marginBottom:10}}>
+      <div style={{marginBottom:10, display:'flex', gap:8, flexWrap:'wrap'}}>
         <button onClick={deleteSelected}>🗑️ {lang==='ru' ? 'Удалить выбранные' : 'Delete selected'}</button>
-        <button style={{marginLeft:8}} onClick={()=>setShowBulkEdit(!showBulkEdit)}>✏️ {lang==='ru' ? 'Массовое редактирование' : 'Bulk edit'}</button>
+        <button onClick={()=>setShowBulkEdit(!showBulkEdit)}>✏️ {lang==='ru' ? 'Массовое редактирование' : 'Bulk edit'}</button>
+        <button onClick={()=>exportSelected('csv')}>⬇️ {lang==='ru' ? 'Экспорт выбранных (CSV)' : 'Export selected (CSV)'}</button>
+        <button onClick={()=>exportSelected('xlsx')}>⬇️ {lang==='ru' ? 'Экспорт выбранных (XLSX)' : 'Export selected (XLSX)'}</button>
       </div>
 
       {showBulkEdit && (
@@ -115,12 +139,20 @@ export default function ContactList({lang='ru'}){
 
       <table border="1" cellPadding="6" style={{width:'100%'}}>
         <thead>
-          <tr><th></th><th>UID</th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Сайт' : 'Website'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
+          <tr><th></th><th>{lang==='ru' ? 'Действия' : 'Actions'}</th><th>UID</th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Сайт' : 'Website'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
         </thead>
         <tbody>
           {filtered.map(c => (
-            <tr key={c.id} onClick={()=> setDetail(c)} style={{cursor:'pointer'}}>
-              <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} onClick={(e)=> e.stopPropagation()} /></td>
+            <tr key={c.id}>
+              <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} /></td>
+              <td style={{whiteSpace:'nowrap'}}>
+                {c.photo_path ? (
+                  <a href={`http://localhost:8000/files/${c.photo_path}`} target="_blank" rel="noreferrer">{lang==='ru'?'Фото':'Photo'}</a>
+                ) : (
+                  <span style={{color:'#999'}}>—</span>
+                )}
+                <button style={{marginLeft:8}} onClick={()=> onEdit?.(c.id)}>{lang==='ru'?'Ред.':'Edit'}</button>
+              </td>
               <td>{c.uid ? <span title={c.uid} style={{whiteSpace:'nowrap'}}>{c.uid.slice(0,8)}<button style={{marginLeft:6}} onClick={(e)=>{e.stopPropagation(); navigator.clipboard?.writeText(String(c.uid));}}>{lang==='ru'?'Коп.':'Copy'}</button></span> : ''}</td>
               <td>{c.full_name||''}</td>
               <td>{c.company||''}</td>
@@ -134,6 +166,7 @@ export default function ContactList({lang='ru'}){
           ))}
           <tr style={{background:'#f7f7f7'}}>
             <td></td>
+            <td></td>
             <td style={{color:'#555'}}>{lang==='ru' ? 'Авто' : 'Auto'}</td>
             <td><input value={newContact.full_name} onChange={(e)=>setNewContact({...newContact, full_name:e.target.value})} placeholder={lang==='ru' ? 'Имя' : 'Name'} /></td>
             <td><input value={newContact.company} onChange={(e)=>setNewContact({...newContact, company:e.target.value})} placeholder={lang==='ru' ? 'Компания' : 'Company'} /></td>
@@ -143,7 +176,7 @@ export default function ContactList({lang='ru'}){
             <td><input value={newContact.address} onChange={(e)=>setNewContact({...newContact, address:e.target.value})} placeholder={lang==='ru' ? 'Адрес' : 'Address'} /></td>
             <td><input value={newContact.comment} onChange={(e)=>setNewContact({...newContact, comment:e.target.value})} placeholder={lang==='ru' ? 'Комментарий' : 'Comment'} /></td>
           </tr>
-          <tr><td colSpan="10" style={{textAlign:'right'}}><button onClick={createNew}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
+          <tr><td colSpan="11" style={{textAlign:'right'}}><button onClick={createNew}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
         </tbody>
       </table>
     </div>

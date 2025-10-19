@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ImportExport from './components/ImportExport';
 import UploadCard from './components/UploadCard';
 import ContactList from './components/ContactList';
+import ContactEdit from './components/ContactEdit';
 import Settings from './components/Settings';
 
 const translations = {
@@ -18,7 +19,8 @@ const translations = {
 function App(){
   const [lang, setLang] = useState('ru');
   const [defaultProvider, setDefaultProvider] = useState('tesseract');
-  const [route, setRoute] = useState('home'); // 'home' | 'settings'
+  const [route, setRoute] = useState('home'); // 'home' | 'settings' | 'edit'
+  const [editId, setEditId] = useState(null);
   const t = translations[lang];
 
   useEffect(()=>{
@@ -44,7 +46,7 @@ function App(){
         <>
           <ImportExport />
           <UploadCard lang={lang} defaultProvider={defaultProvider} />
-          <ContactList lang={lang} />
+          <ContactList lang={lang} onEdit={(id)=>{ setEditId(id); setRoute('edit'); }} />
         </>
       )}
       {route==='settings' && (
@@ -54,6 +56,9 @@ function App(){
           onChangeLang={setLang}
           onChangeProvider={setDefaultProvider}
         />
+      )}
+      {route==='edit' && (
+        <ContactEdit id={editId} lang={lang} onBack={()=> setRoute('home')} />
       )}
     </div>
   );
