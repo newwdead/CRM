@@ -2,11 +2,12 @@
 
 > **Full-featured CRM system with OCR recognition and Telegram integration**
 
-![Version](https://img.shields.io/badge/version-1.6-blue)
+![Version](https://img.shields.io/badge/version-1.7-blue)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
 ![React](https://img.shields.io/badge/React-18-blue)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
+![UI](https://img.shields.io/badge/UI-Modern-brightgreen)
 
 [**Русская документация**](README.ru.md) | [English Documentation](README.md)
 
@@ -17,21 +18,26 @@
 BizCard CRM is a modern web-based contact management system specializing in automatic business card recognition. The system allows you to:
 
 - 📸 **Upload business card photos** via web interface or Telegram
-- 🤖 **Automatically recognize text** using OCR (Tesseract or Parsio)
-- 💼 **Manage contacts** in a convenient interface
+- 🤖 **Automatically recognize text** using multiple OCR providers with fallback
+- 💼 **Manage contacts** in a modern, responsive interface
 - 📱 **Integrate with Telegram** for instant card processing
 - 📊 **Export data** to CSV and XLSX formats
 - 🔍 **Search and filter** contacts
+- 🎨 **Modern UI/UX** with drag & drop and modal dialogs
+- ⚙️ **Web-based settings** for all system parameters
 
 ---
 
 ## ✨ Features
 
 ### 🖼️ OCR Recognition
-- Two OCR providers: **Tesseract** (local, free) and **Parsio** (cloud, paid)
+- Multiple OCR providers: **Tesseract** (local, free), **Parsio** (cloud), **Google Vision** (cloud)
+- **Auto mode** with intelligent fallback between providers
+- Web-based OCR provider management and configuration
 - Multi-pass image processing for better accuracy
 - Support for Russian and English languages
 - Images up to 20 MB
+- Confidence scoring for OCR results
 
 ### 📱 Telegram Integration
 - Automatic photo processing from Telegram
@@ -42,15 +48,39 @@ BizCard CRM is a modern web-based contact management system specializing in auto
 
 ### 💾 Contact Management
 - Full CRUD operations
-- Bulk update/delete
+- Bulk update/delete with modal forms
 - Inline comment editing
 - Photo attachments
 - Unique identifiers (UID)
+- Real-time statistics (total, with email, with phone)
+- Quick actions (email, phone, website links)
+- Select all/deselect all functionality
 
 ### 📊 Import/Export
-- Import from CSV and XLSX
+- Import from CSV and XLSX with **drag & drop**
 - Export to CSV and XLSX
 - Export selected contacts
+- Visual progress indicators
+- Status modals with detailed feedback
+
+### 🎨 Modern UI/UX (NEW in v1.7)
+- **Responsive design** for all devices (mobile, tablet, desktop)
+- **Drag & drop** file uploads
+- **Modal dialogs** for results and forms
+- **Tab-based settings** (General, OCR, Telegram)
+- **CSS variables** for consistent theming
+- **Smooth animations** and transitions
+- **Loading spinners** for async operations
+- **Badges and alerts** for visual feedback
+
+### ⚙️ Web Settings (NEW in v1.7)
+- Interface language selection
+- Default OCR provider configuration
+- Notification preferences
+- Auto-refresh settings
+- OCR provider status dashboard
+- Telegram bot configuration
+- All settings managed through web UI
 
 ---
 
