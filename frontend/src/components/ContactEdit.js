@@ -49,13 +49,25 @@ export default function ContactEdit({ id, lang='ru', onBack }){
     const load = async ()=>{
       try {
         setLoading(true);
-        const res = await fetch('/api/contacts/');
-        const all = await res.json();
-        const found = (all||[]).find(c => c.id === id);
-        if(!cancel){
-          setData(found || null);
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Прямой запрос конкретного контакта по ID
+        const res = await fetch(`/api/contacts/${id}`, { headers });
+        
+        if (res.ok) {
+          const contact = await res.json();
+          if(!cancel){
+            setData(contact);
+          }
+        } else {
+          if(!cancel) setData(null);
         }
       } catch (e) {
+        console.error('Error loading contact:', e);
         if(!cancel) setData(null);
       } finally {
         if(!cancel) setLoading(false);
@@ -69,6 +81,12 @@ export default function ContactEdit({ id, lang='ru', onBack }){
     if(!data) return;
     setSaving(true);
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const patch = {
         full_name: data.full_name || null,
         company: data.company || null,
@@ -81,7 +99,7 @@ export default function ContactEdit({ id, lang='ru', onBack }){
       };
       await fetch(`/api/contacts/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(patch)
       });
       alert(t.saved);
