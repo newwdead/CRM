@@ -10,6 +10,7 @@ from .database import engine, Base, get_db
 from .models import Contact, AppSetting
 from .ocr_utils import ocr_image_fileobj, ocr_parsio
 import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
+from PIL import Image
 
 def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
     last_err = None
@@ -61,6 +62,20 @@ def backfill_uids_safe():
         print(f"UID backfill failed: {e}")
 
 backfill_uids_safe()
+
+# --- Image utils ---
+def downscale_image_bytes(data: bytes, max_side: int = 2000) -> bytes:
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            im = im.convert('RGB')
+            # downscale in-place keeping aspect ratio
+            im.thumbnail((max_side, max_side))
+            out = io.BytesIO()
+            im.save(out, format='JPEG', quality=90)
+            return out.getvalue()
+    except Exception:
+        # if Pillow cannot open, return original
+        return data
 
 # Pydantic models for validation
 class ContactCreate(BaseModel):
@@ -227,19 +242,20 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         with open(save_path, 'wb') as f:
             f.write(content)
 
-        # OCR
+        # OCR (downscale first to reduce memory footprint)
         provider = get_setting(db, 'tg.provider', 'tesseract') or 'tesseract'
+        ocr_input = downscale_image_bytes(content, max_side=2000)
         if provider == 'parsio':
             try:
-                ocr_data = ocr_parsio(io.BytesIO(content), filename=os.path.basename(file_path))
+                ocr_data = ocr_parsio(io.BytesIO(ocr_input), filename=os.path.basename(file_path))
                 raw_json = json.dumps(ocr_data, ensure_ascii=False)
                 data = ocr_data
             except Exception:
-                ocr_text = ocr_image_fileobj(io.BytesIO(content))
+                ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
                 raw_json = json.dumps(ocr_text, ensure_ascii=False)
                 data = ocr_text
         else:
-            ocr_text = ocr_image_fileobj(io.BytesIO(content))
+            ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
             raw_json = json.dumps(ocr_text, ensure_ascii=False)
             data = ocr_text
 
@@ -336,19 +352,22 @@ def upload_card(
         with open(save_path, 'wb') as f:
             f.write(content)
         
+        # Prepare data for OCR (downscale to reduce memory footprint)
+        ocr_input = downscale_image_bytes(content, max_side=2000)
+
         # Run OCR via selected provider
         if provider == 'parsio':
             try:
-                ocr_data = ocr_parsio(io.BytesIO(content), filename=file.filename)
+                ocr_data = ocr_parsio(io.BytesIO(ocr_input), filename=file.filename)
                 raw_json = json.dumps(ocr_data, ensure_ascii=False)
                 data = ocr_data
             except Exception as e:
                 # fallback to Tesseract on Parsio failure
-                ocr_text = ocr_image_fileobj(io.BytesIO(content))
+                ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
                 raw_json = json.dumps(ocr_text, ensure_ascii=False)
                 data = ocr_text
         else:
-            ocr_text = ocr_image_fileobj(io.BytesIO(content))
+            ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
             raw_json = json.dumps(ocr_text, ensure_ascii=False)
             data = ocr_text
         
