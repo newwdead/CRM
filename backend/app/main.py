@@ -8,9 +8,18 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from .database import engine, Base, get_db
 from .models import Contact, AppSetting
-from .ocr_utils import ocr_image_fileobj, ocr_parsio
+from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
+from .ocr_providers import OCRManager
 import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
 from PIL import Image
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Инициализация OCR Manager
+ocr_manager = OCRManager()
 
 def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
     last_err = None
@@ -153,6 +162,15 @@ def get_version():
 def health():
     return {'status':'ok'}
 
+# --- OCR Providers Info ---
+@app.get('/ocr/providers')
+def get_ocr_providers():
+    """Получить информацию о доступных OCR провайдерах"""
+    return {
+        'available': ocr_manager.get_available_providers(),
+        'details': ocr_manager.get_provider_info()
+    }
+
 # --- Settings helpers ---
 def get_setting(db: Session, key: str, default: Optional[str] = None) -> Optional[str]:
     row = db.query(AppSetting).filter(AppSetting.key == key).first()
@@ -171,7 +189,7 @@ class TelegramSettings(BaseModel):
     enabled: bool = False
     token: Optional[str] = None
     allowed_chats: Optional[str] = None  # comma-separated chat IDs
-    provider: Optional[str] = 'tesseract'  # 'tesseract' | 'parsio'
+    provider: Optional[str] = 'auto'  # 'auto' | 'tesseract' | 'parsio' | 'google'
 
 @app.get('/settings/telegram')
 def get_telegram_settings(db: Session = Depends(get_db)):
@@ -179,7 +197,7 @@ def get_telegram_settings(db: Session = Depends(get_db)):
         'enabled': get_setting(db, 'tg.enabled', 'false') == 'true',
         'token': get_setting(db, 'tg.token', None),
         'allowed_chats': get_setting(db, 'tg.allowed_chats', ''),
-        'provider': get_setting(db, 'tg.provider', 'tesseract') or 'tesseract',
+        'provider': get_setting(db, 'tg.provider', 'auto') or 'auto',
     }
 
 @app.put('/settings/telegram')
@@ -187,7 +205,7 @@ def put_telegram_settings(data: TelegramSettings, db: Session = Depends(get_db))
     set_setting(db, 'tg.enabled', 'true' if data.enabled else 'false')
     set_setting(db, 'tg.token', (data.token or '').strip() or None)
     set_setting(db, 'tg.allowed_chats', (data.allowed_chats or '').strip())
-    set_setting(db, 'tg.provider', (data.provider or 'tesseract'))
+    set_setting(db, 'tg.provider', (data.provider or 'auto'))
     return {'ok': True}
 
 # --- Telegram webhook ---
@@ -243,21 +261,31 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
             f.write(content)
 
         # OCR (downscale first to reduce memory footprint)
-        provider = get_setting(db, 'tg.provider', 'tesseract') or 'tesseract'
+        provider = get_setting(db, 'tg.provider', 'auto') or 'auto'
         ocr_input = downscale_image_bytes(content, max_side=2000)
-        if provider == 'parsio':
-            try:
-                ocr_data = ocr_parsio(io.BytesIO(ocr_input), filename=os.path.basename(file_path))
-                raw_json = json.dumps(ocr_data, ensure_ascii=False)
-                data = ocr_data
-            except Exception:
-                ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
-                raw_json = json.dumps(ocr_text, ensure_ascii=False)
-                data = ocr_text
-        else:
-            ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
-            raw_json = json.dumps(ocr_text, ensure_ascii=False)
-            data = ocr_text
+        
+        # Use OCRManager with automatic fallback
+        preferred = None if provider == 'auto' else provider
+        try:
+            ocr_result = ocr_manager.recognize(
+                ocr_input,
+                filename=os.path.basename(file_path),
+                preferred_provider=preferred
+            )
+            
+            data = ocr_result['data']
+            raw_json = json.dumps({
+                'provider': ocr_result['provider'],
+                'confidence': ocr_result.get('confidence', 0),
+                'raw_data': ocr_result.get('raw_data'),
+                'raw_text': ocr_result.get('raw_text'),
+            }, ensure_ascii=False)
+            
+            logger.info(f"Telegram OCR successful with {ocr_result['provider']}")
+            
+        except Exception as e:
+            logger.error(f"Telegram OCR failed: {e}")
+            raise HTTPException(status_code=500, detail=f'OCR failed: {str(e)}')
 
         if not any(data.values()):
             raise HTTPException(status_code=400, detail='OCR extracted no data')
@@ -325,7 +353,7 @@ def delete_contact(contact_id: int, db: Session = Depends(get_db)):
 @app.post('/upload/')
 def upload_card(
     file: UploadFile = File(...),
-    provider: str = Query('tesseract', enum=['tesseract','parsio']),
+    provider: str = Query('auto', enum=['auto', 'tesseract', 'parsio', 'google']),
     db: Session = Depends(get_db)
 ):
     try:
@@ -333,18 +361,14 @@ def upload_card(
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
-        # Check file size
-        # v1.2: allow up to 20MB for Parsio, 10MB for Tesseract
-        limit = 20 * 1024 * 1024 if provider == 'parsio' else 10 * 1024 * 1024
-        # Read up to limit + 1 byte to detect overflow, then reset pointer before OCR
+        # Check file size (20MB max)
+        limit = 20 * 1024 * 1024
         head = file.file.read(limit + 1)
         if len(head) > limit:
-            raise HTTPException(status_code=400, detail=(
-                "File too large. Maximum size is 20MB for Parsio" if provider == 'parsio'
-                else "File too large. Maximum size is 10MB"
-            ))
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 20MB")
         file.file.seek(0)
-        # Save a copy of the uploaded file to disk
+        
+        # Save uploaded file to disk
         content = file.file.read()
         file.file.seek(0)
         safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename or 'upload')}"
@@ -355,27 +379,35 @@ def upload_card(
         # Prepare data for OCR (downscale to reduce memory footprint)
         ocr_input = downscale_image_bytes(content, max_side=2000)
 
-        # Run OCR via selected provider
-        if provider == 'parsio':
-            try:
-                ocr_data = ocr_parsio(io.BytesIO(ocr_input), filename=file.filename)
-                raw_json = json.dumps(ocr_data, ensure_ascii=False)
-                data = ocr_data
-            except Exception as e:
-                # fallback to Tesseract on Parsio failure
-                ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
-                raw_json = json.dumps(ocr_text, ensure_ascii=False)
-                data = ocr_text
-        else:
-            ocr_text = ocr_image_fileobj(io.BytesIO(ocr_input))
-            raw_json = json.dumps(ocr_text, ensure_ascii=False)
-            data = ocr_text
+        # Run OCR via OCRManager with automatic fallback
+        preferred = None if provider == 'auto' else provider
+        
+        try:
+            ocr_result = ocr_manager.recognize(
+                ocr_input,
+                filename=file.filename,
+                preferred_provider=preferred
+            )
+            
+            data = ocr_result['data']
+            raw_json = json.dumps({
+                'provider': ocr_result['provider'],
+                'confidence': ocr_result.get('confidence', 0),
+                'raw_data': ocr_result.get('raw_data'),
+                'raw_text': ocr_result.get('raw_text'),
+            }, ensure_ascii=False)
+            
+            logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}")
+            
+        except Exception as e:
+            logger.error(f"OCR failed: {e}")
+            raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
         
         # Validate OCR results
         if not any(data.values()):
             raise HTTPException(status_code=400, detail="No text could be extracted from the image")
         
-        # attach stored metadata
+        # Attach stored metadata
         data['uid'] = uuid.uuid4().hex
         data['photo_path'] = safe_name
         data['ocr_raw'] = raw_json
@@ -383,12 +415,30 @@ def upload_card(
         db.add(contact)
         db.commit()
         db.refresh(contact)
-        return contact
+        
+        # Add provider info to response
+        contact_dict = {
+            "id": contact.id,
+            "uid": contact.uid,
+            "full_name": contact.full_name,
+            "company": contact.company,
+            "position": contact.position,
+            "email": contact.email,
+            "phone": contact.phone,
+            "address": contact.address,
+            "comment": contact.comment,
+            "website": contact.website,
+            "photo_path": contact.photo_path,
+            "ocr_provider": ocr_result['provider'],
+            "ocr_confidence": ocr_result.get('confidence', 0),
+        }
+        
+        return contact_dict
         
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 # --- Export CSV ---
 @app.get('/contacts/export')
