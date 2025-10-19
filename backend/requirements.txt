@@ -16,3 +16,4 @@ bcrypt==4.0.1
 slowapi
 prometheus-fastapi-instrumentator
 prometheus-client
+reportlab
