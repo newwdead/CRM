@@ -351,12 +351,73 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- CRUD ---
-@app.get('/contacts/')
+@app.get('/contacts/', response_model=List[schemas.ContactResponse])
 def list_contacts(
+    q: str = Query(None, description="Search query (full-text search across all fields)"),
+    company: str = Query(None, description="Filter by company"),
+    position: str = Query(None, description="Filter by position"),
+    tags: str = Query(None, description="Filter by tag names (comma-separated)"),
+    sort_by: str = Query('id', description="Sort field: id, full_name, company, position"),
+    sort_order: str = Query('desc', description="Sort order: asc, desc"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    return db.query(Contact).order_by(Contact.id.desc()).all()
+    """
+    Get list of contacts with advanced search and filtering.
+    
+    Parameters:
+    - q: Full-text search across all fields (name, company, position, email, phone)
+    - company: Filter by company (case-insensitive partial match)
+    - position: Filter by position (case-insensitive partial match)
+    - tags: Filter by tag names (comma-separated, e.g., "vip,client")
+    - sort_by: Field to sort by (id, full_name, company, position)
+    - sort_order: Sort direction (asc, desc)
+    """
+    from .models import Tag
+    
+    query = db.query(Contact)
+    
+    # Full-text search
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (Contact.full_name.ilike(search_term)) |
+            (Contact.company.ilike(search_term)) |
+            (Contact.position.ilike(search_term)) |
+            (Contact.email.ilike(search_term)) |
+            (Contact.phone.ilike(search_term)) |
+            (Contact.website.ilike(search_term)) |
+            (Contact.address.ilike(search_term))
+        )
+    
+    # Filter by company
+    if company:
+        query = query.filter(Contact.company.ilike(f"%{company}%"))
+    
+    # Filter by position
+    if position:
+        query = query.filter(Contact.position.ilike(f"%{position}%"))
+    
+    # Filter by tags
+    if tags:
+        tag_names = [name.strip() for name in tags.split(',') if name.strip()]
+        if tag_names:
+            # Get tag IDs for the given names
+            tag_records = db.query(Tag).filter(Tag.name.in_(tag_names)).all()
+            tag_ids = [tag.id for tag in tag_records]
+            
+            if tag_ids:
+                # Filter contacts that have ANY of the specified tags
+                query = query.filter(Contact.tags.any(Tag.id.in_(tag_ids)))
+    
+    # Sorting
+    sort_field = getattr(Contact, sort_by, Contact.id)
+    if sort_order.lower() == 'asc':
+        query = query.order_by(sort_field.asc())
+    else:
+        query = query.order_by(sort_field.desc())
+    
+    return query.all()
 
 @app.get('/contacts/uid/{uid}')
 def get_contact_by_uid(
@@ -641,6 +702,150 @@ def update_bulk(
     db.execute(stmt)
     db.commit()
     return {'updated': len(ids)}
+
+
+# ============================================================================
+# TAG ENDPOINTS
+# ============================================================================
+
+@app.get('/tags/', response_model=List[schemas.TagResponse])
+def list_tags(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all tags."""
+    from .models import Tag
+    return db.query(Tag).order_by(Tag.name).all()
+
+
+@app.post('/tags/', response_model=schemas.TagResponse, status_code=status.HTTP_201_CREATED)
+def create_tag(
+    tag_data: schemas.TagCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new tag."""
+    from .models import Tag
+    
+    # Check if tag with this name already exists
+    existing = db.query(Tag).filter(Tag.name == tag_data.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tag '{tag_data.name}' already exists"
+        )
+    
+    tag = Tag(**tag_data.dict())
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    
+    logger.info(f"Tag created by {current_user.username}: {tag.name}")
+    return tag
+
+
+@app.put('/tags/{tag_id}', response_model=schemas.TagResponse)
+def update_tag(
+    tag_id: int,
+    tag_data: schemas.TagUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a tag."""
+    from .models import Tag
+    
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail='Tag not found')
+    
+    # Check for duplicate name
+    if tag_data.name and tag_data.name != tag.name:
+        existing = db.query(Tag).filter(Tag.name == tag_data.name).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tag '{tag_data.name}' already exists"
+            )
+        tag.name = tag_data.name
+    
+    if tag_data.color is not None:
+        tag.color = tag_data.color
+    
+    db.commit()
+    db.refresh(tag)
+    
+    logger.info(f"Tag updated by {current_user.username}: {tag.name}")
+    return tag
+
+
+@app.delete('/tags/{tag_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_tag(
+    tag_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)  # Only admins can delete tags
+):
+    """Delete a tag (admin only)."""
+    from .models import Tag
+    
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail='Tag not found')
+    
+    logger.info(f"Tag deleted by admin {current_user.username}: {tag.name}")
+    db.delete(tag)
+    db.commit()
+    return
+
+
+@app.post('/contacts/{contact_id}/tags', response_model=schemas.ContactResponse)
+def add_tag_to_contact(
+    contact_id: int,
+    tag_ids: List[int] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Add tags to a contact."""
+    from .models import Tag
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    for tag_id in tag_ids:
+        tag = db.query(Tag).filter(Tag.id == tag_id).first()
+        if tag and tag not in contact.tags:
+            contact.tags.append(tag)
+    
+    db.commit()
+    db.refresh(contact)
+    
+    logger.info(f"Tags added to contact {contact.full_name} by {current_user.username}")
+    return contact
+
+
+@app.delete('/contacts/{contact_id}/tags/{tag_id}', response_model=schemas.ContactResponse)
+def remove_tag_from_contact(
+    contact_id: int,
+    tag_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Remove a tag from a contact."""
+    from .models import Tag
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if tag and tag in contact.tags:
+        contact.tags.remove(tag)
+    
+    db.commit()
+    db.refresh(contact)
+    
+    logger.info(f"Tag removed from contact {contact.full_name} by {current_user.username}")
+    return contact
 
 
 # ============================================================================

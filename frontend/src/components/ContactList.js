@@ -2,12 +2,18 @@ import React, { useEffect, useState } from 'react';
 
 export default function ContactList({ lang = 'ru', onEdit }) {
   const [contacts, setContacts] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [selected, setSelected] = useState([]);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
+  
+  // Search & Filter States
   const [search, setSearch] = useState('');
-  const [uidFilter, setUidFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [positionFilter, setPositionFilter] = useState('');
+  const [sortBy, setSortBy] = useState('id');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  
   const [newContact, setNewContact] = useState({
     full_name: '', company: '', position: '', email: '',
     phone: '', address: '', comment: '', website: ''
@@ -48,6 +54,15 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     confirmDelete: 'Удалить выбранные контакты?',
     nothingSelected: 'Ничего не выбрано',
     fillAtLeastOne: 'Заполните хотя бы одно поле',
+    advancedFilters: 'Расширенные фильтры',
+    hideFilters: 'Скрыть фильтры',
+    clearFilters: 'Очистить фильтры',
+    filterByCompany: 'Фильтр по компании',
+    filterByPosition: 'Фильтр по должности',
+    sortBy: 'Сортировка',
+    sortOrder: 'Порядок',
+    ascending: 'По возрастанию',
+    descending: 'По убыванию',
   } : {
     contacts: 'Contacts',
     search: 'Search...',
@@ -81,63 +96,78 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     confirmDelete: 'Delete selected contacts?',
     nothingSelected: 'Nothing selected',
     fillAtLeastOne: 'Fill at least one field',
+    advancedFilters: 'Advanced Filters',
+    hideFilters: 'Hide Filters',
+    clearFilters: 'Clear Filters',
+    filterByCompany: 'Filter by Company',
+    filterByPosition: 'Filter by Position',
+    sortBy: 'Sort By',
+    sortOrder: 'Sort Order',
+    ascending: 'Ascending',
+    descending: 'Descending',
   };
 
   const load = async () => {
-    const res = await fetch('/api/contacts/');
-    const data = await res.json();
-    setContacts(data);
-    setFiltered(data);
-    
-    // Calculate stats
-    setStats({
-      total: data.length,
-      withEmail: data.filter(c => c.email).length,
-      withPhone: data.filter(c => c.phone).length
-    });
+    try {
+      // Build query params
+      const params = new URLSearchParams();
+      if (search) params.append('q', search);
+      if (companyFilter) params.append('company', companyFilter);
+      if (positionFilter) params.append('position', positionFilter);
+      params.append('sort_by', sortBy);
+      params.append('sort_order', sortOrder);
+
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/contacts/?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) {
+        console.error('Failed to load contacts:', res.status);
+        return;
+      }
+      
+      const data = await res.json();
+      setContacts(data);
+      
+      // Calculate stats
+      setStats({
+        total: data.length,
+        withEmail: data.filter(c => c.email).length,
+        withPhone: data.filter(c => c.phone).length
+      });
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+    }
   };
 
   useEffect(() => {
     load();
+  }, [search, companyFilter, positionFilter, sortBy, sortOrder]);
+
+  useEffect(() => {
     const handler = () => load();
     window.addEventListener('refresh-contacts', handler);
     return () => window.removeEventListener('refresh-contacts', handler);
   }, []);
 
-  const applyFilters = (q, uidQ) => {
-    const ql = (q || '').toLowerCase();
-    const ul = (uidQ || '').toLowerCase();
-    let base = contacts.filter(c =>
-      (c.full_name || '').toLowerCase().includes(ql) ||
-      (c.email || '').toLowerCase().includes(ql) ||
-      (c.phone || '').toLowerCase().includes(ql) ||
-      (c.company || '').toLowerCase().includes(ql) ||
-      (c.comment || '').toLowerCase().includes(ql) ||
-      (c.website || '').toLowerCase().includes(ql)
-    );
-    if (ul) base = base.filter(c => (c.uid || '').toLowerCase().includes(ul));
-    setFiltered(base);
-  };
-
-  const handleSearch = (e) => {
-    const q = e.target.value;
-    setSearch(q);
-    applyFilters(q, uidFilter);
-  };
-
-  const handleUidFilter = (e) => {
-    const val = e.target.value;
-    setUidFilter(val);
-    applyFilters(search, val);
+  const clearFilters = () => {
+    setSearch('');
+    setCompanyFilter('');
+    setPositionFilter('');
+    setSortBy('id');
+    setSortOrder('desc');
   };
 
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
   const toggleAll = () => {
-    if (selected.length === filtered.length) {
+    if (selected.length === contacts.length) {
       setSelected([]);
     } else {
-      setSelected(filtered.map(c => c.id));
+      setSelected(contacts.map(c => c.id));
     }
   };
 
@@ -223,16 +253,62 @@ export default function ContactList({ lang = 'ru', onEdit }) {
         <input
           placeholder={`🔍 ${t.search}`}
           value={search}
-          onChange={handleSearch}
+          onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: '200px' }}
         />
-        <input
-          placeholder={`🔑 ${t.uid}`}
-          value={uidFilter}
-          onChange={handleUidFilter}
-          style={{ width: '200px' }}
-        />
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="secondary"
+        >
+          {showFilters ? '🔽 ' + t.hideFilters : '🔼 ' + t.advancedFilters}
+        </button>
+        {(search || companyFilter || positionFilter) && (
+          <button onClick={clearFilters} className="secondary">
+            ✖️ {t.clearFilters}
+          </button>
+        )}
       </div>
+
+      {/* Advanced Filters */}
+      {showFilters && (
+        <div className="alert info" style={{ marginBottom: '16px' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '16px' }}>🎯 {t.advancedFilters}</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <div className="form-group">
+              <label>{t.filterByCompany}</label>
+              <input
+                placeholder={t.company}
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>{t.filterByPosition}</label>
+              <input
+                placeholder={t.position}
+                value={positionFilter}
+                onChange={(e) => setPositionFilter(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>{t.sortBy}</label>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="id">ID</option>
+                <option value="full_name">{t.name}</option>
+                <option value="company">{t.company}</option>
+                <option value="position">{t.position}</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t.sortOrder}</label>
+              <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                <option value="desc">{t.descending}</option>
+                <option value="asc">{t.ascending}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -240,7 +316,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           ➕ {t.addNew}
         </button>
         <button onClick={toggleAll} className="secondary">
-          {selected.length === filtered.length ? '☑️ ' + t.deselectAll : '☐ ' + t.selectAll}
+          {selected.length === contacts.length ? '☑️ ' + t.deselectAll : '☐ ' + t.selectAll}
         </button>
         {selected.length > 0 && (
           <>
@@ -383,7 +459,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
               <th style={{ width: '40px' }}>
                 <input
                   type="checkbox"
-                  checked={selected.length === filtered.length && filtered.length > 0}
+                  checked={selected.length === contacts.length && contacts.length > 0}
                   onChange={toggleAll}
                 />
               </th>
@@ -400,14 +476,14 @@ export default function ContactList({ lang = 'ru', onEdit }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {contacts.length === 0 ? (
               <tr>
                 <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                  {search || uidFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
+                  {search || companyFilter || positionFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
                 </td>
               </tr>
             ) : (
-              filtered.map(c => (
+              contacts.map(c => (
                 <tr key={c.id}>
                   <td>
                     <input

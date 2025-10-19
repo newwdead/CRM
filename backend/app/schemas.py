@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation.
 """
 
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -111,7 +111,42 @@ class ContactUpdate(ContactBase):
 class ContactResponse(ContactBase):
     """Schema for contact in responses."""
     id: int
+    tags: List['TagResponse'] = []
     
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Tag Schemas
+# ============================================================================
+
+class TagBase(BaseModel):
+    """Base tag schema."""
+    name: str
+    color: Optional[str] = '#2563eb'
+
+
+class TagCreate(TagBase):
+    """Schema for creating a tag."""
+    pass
+
+
+class TagUpdate(BaseModel):
+    """Schema for updating a tag."""
+    name: Optional[str] = None
+    color: Optional[str] = None
+
+
+class TagResponse(TagBase):
+    """Schema for tag in responses."""
+    id: int
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Need to update forward references
+ContactResponse.model_rebuild()
 
