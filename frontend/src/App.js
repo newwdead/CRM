@@ -22,6 +22,7 @@ function App(){
   const [defaultProvider, setDefaultProvider] = useState('tesseract');
   const [route, setRoute] = useState('home'); // 'home' | 'settings' | 'edit' | 'telegram'
   const [editId, setEditId] = useState(null);
+  const [ver, setVer] = useState({version:'', commit:'', message:''});
   const t = translations[lang];
 
   useEffect(()=>{
@@ -33,8 +34,17 @@ function App(){
     } catch {}
   },[]);
 
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const res = await fetch('/api/version');
+        if(res.ok){ setVer(await res.json()); }
+      }catch{}
+    })();
+  },[]);
+
   return (
-    <div className="container">
+    <div className="container" style={{minHeight:'100vh', display:'flex', flexDirection:'column'}}>
       <header style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <h1>{t.title}</h1>
         <nav style={{display:'flex', gap:8}}>
@@ -65,6 +75,10 @@ function App(){
       {route==='telegram' && (
         <TelegramSettings lang={lang} />
       )}
+      <footer style={{marginTop:'auto', padding:'8px 0', color:'#666', fontSize:12}}>
+        <div>Version: {ver.version||'n/a'} {ver.commit?`(${ver.commit.slice(0,7)})`:''}</div>
+        {ver.message && <div>{ver.message}</div>}
+      </footer>
     </div>
   );
 }

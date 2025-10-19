@@ -8,6 +8,9 @@ services:
     environment:
       - TZ=Europe/Moscow
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - APP_VERSION=v1.5
+      - APP_COMMIT=
+      - APP_MESSAGE=VK Cloud deploy, proxy, relative URLs, DB init retry
     volumes:
       - ./uploads:/app/uploads
 

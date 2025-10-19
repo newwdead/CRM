@@ -124,6 +124,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Version endpoint (proxied via /api in frontend nginx)
+@app.get('/api/version')
+def get_version():
+    return {
+        'version': os.environ.get('APP_VERSION', 'unknown'),
+        'commit': os.environ.get('APP_COMMIT', ''),
+        'message': os.environ.get('APP_MESSAGE', ''),
+    }
+
 # --- Health ---
 @app.get('/health')
 def health():
