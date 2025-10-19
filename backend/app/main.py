@@ -101,6 +101,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Health ---
+@app.get('/health')
+def health():
+    return {'status':'ok'}
+
 # --- CRUD ---
 @app.get('/contacts/')
 def list_contacts(db: Session = Depends(get_db)):
