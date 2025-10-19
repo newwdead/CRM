@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Que
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
@@ -41,6 +41,21 @@ try:
     print("Schema ensured: comment, uid, website, photo_path, ocr_raw columns present")
 except Exception as e:
     print(f"Schema ensure failed: {e}")
+
+# Backfill UID for existing contacts without one
+try:
+    SessionLocal = sessionmaker(bind=engine)
+    with SessionLocal() as s:
+        missing = s.query(Contact).filter((Contact.uid == None) | (Contact.uid == '')).all()
+        updated = 0
+        for c in missing:
+            c.uid = uuid.uuid4().hex
+            updated += 1
+        if updated:
+            s.commit()
+            print(f"Backfilled UID for {updated} contact(s)")
+except Exception as e:
+    print(f"UID backfill failed: {e}")
 
 # Pydantic models for validation
 class ContactCreate(BaseModel):
@@ -113,6 +128,13 @@ def health():
 @app.get('/contacts/')
 def list_contacts(db: Session = Depends(get_db)):
     return db.query(Contact).order_by(Contact.id.desc()).all()
+
+@app.get('/contacts/uid/{uid}')
+def get_contact_by_uid(uid: str, db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.uid == uid).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Not found')
+    return contact
 
 @app.post('/contacts/')
 def create_contact(data: ContactCreate, db: Session = Depends(get_db)):
