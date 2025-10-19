@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-export default function UploadCard({lang='ru'}){
+export default function UploadCard({lang='ru', defaultProvider='tesseract'}){
   const [file, setFile] = useState(null);
-  const [provider, setProvider] = useState('tesseract');
+  const [provider, setProvider] = useState(defaultProvider || 'tesseract');
   const [error, setError] = useState(null);
   const [showError, setShowError] = useState(false);
 
