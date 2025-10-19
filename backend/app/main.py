@@ -26,6 +26,9 @@ try:
             ALTER TABLE contacts ADD COLUMN IF NOT EXISTS comment VARCHAR;
         """))
         conn.execute(text("""
+            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS uid VARCHAR UNIQUE;
+        """))
+        conn.execute(text("""
             ALTER TABLE contacts ADD COLUMN IF NOT EXISTS website VARCHAR;
         """))
         conn.execute(text("""
@@ -35,7 +38,7 @@ try:
             ALTER TABLE contacts ADD COLUMN IF NOT EXISTS ocr_raw VARCHAR;
         """))
         conn.commit()
-    print("Schema ensured: comment, website, photo_path, ocr_raw columns present")
+    print("Schema ensured: comment, uid, website, photo_path, ocr_raw columns present")
 except Exception as e:
     print(f"Schema ensure failed: {e}")
 
@@ -113,7 +116,10 @@ def list_contacts(db: Session = Depends(get_db)):
 
 @app.post('/contacts/')
 def create_contact(data: ContactCreate, db: Session = Depends(get_db)):
-    contact = Contact(**data.dict())
+    payload = data.dict()
+    if not payload.get('uid'):
+        payload['uid'] = uuid.uuid4().hex
+    contact = Contact(**payload)
     db.add(contact)
     db.commit()
     db.refresh(contact)
@@ -194,6 +200,7 @@ def upload_card(
             raise HTTPException(status_code=400, detail="No text could be extracted from the image")
         
         # attach stored metadata
+        data['uid'] = uuid.uuid4().hex
         data['photo_path'] = safe_name
         data['ocr_raw'] = raw_json
         contact = Contact(**data)
@@ -213,9 +220,9 @@ def export_csv(db: Session = Depends(get_db)):
     contacts = db.query(Contact).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['id','full_name','company','position','email','phone','address','comment','website','photo_path'])
+    writer.writerow(['id','uid','full_name','company','position','email','phone','address','comment','website','photo_path'])
     for c in contacts:
-        writer.writerow([c.id, c.full_name or '', c.company or '', c.position or '', c.email or '', c.phone or '', c.address or '', c.comment or '', c.website or '', c.photo_path or ''])
+        writer.writerow([c.id, c.uid or '', c.full_name or '', c.company or '', c.position or '', c.email or '', c.phone or '', c.address or '', c.comment or '', c.website or '', c.photo_path or ''])
     output.seek(0)
     return StreamingResponse(output, media_type='text/csv', headers={'Content-Disposition':'attachment; filename=contacts.csv'})
 
@@ -225,6 +232,7 @@ def export_xlsx(db: Session = Depends(get_db)):
     contacts = db.query(Contact).all()
     df = pd.DataFrame([{
         'id': c.id,
+        'uid': c.uid,
         'full_name': c.full_name,
         'company': c.company,
         'position': c.position,

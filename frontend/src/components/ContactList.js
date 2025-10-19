@@ -7,7 +7,7 @@ export default function ContactList({lang='ru'}){
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   const [search, setSearch] = useState('');
-  const [newContact, setNewContact] = useState({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
+  const [newContact, setNewContact] = useState({uid:'',full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -90,12 +90,13 @@ export default function ContactList({lang='ru'}){
 
       <table border="1" cellPadding="6" style={{width:'100%'}}>
         <thead>
-          <tr><th></th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Сайт' : 'Website'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
+          <tr><th></th><th>UID</th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Сайт' : 'Website'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
         </thead>
         <tbody>
           {filtered.map(c => (
             <tr key={c.id} onClick={()=> setDetail(c)} style={{cursor:'pointer'}}>
               <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} onClick={(e)=> e.stopPropagation()} /></td>
+              <td>{c.uid ? <span title={c.uid} style={{whiteSpace:'nowrap'}}>{c.uid.slice(0,8)}<button style={{marginLeft:6}} onClick={(e)=>{e.stopPropagation(); navigator.clipboard?.writeText(String(c.uid));}}>{lang==='ru'?'Коп.':'Copy'}</button></span> : ''}</td>
               <td>{c.full_name||''}</td>
               <td>{c.company||''}</td>
               <td>{c.position||''}</td>
@@ -108,6 +109,7 @@ export default function ContactList({lang='ru'}){
           ))}
           <tr style={{background:'#f7f7f7'}}>
             <td></td>
+            <td><input value={newContact.uid} onChange={(e)=>setNewContact({...newContact, uid:e.target.value})} placeholder="UID" /></td>
             <td><input value={newContact.full_name} onChange={(e)=>setNewContact({...newContact, full_name:e.target.value})} placeholder={lang==='ru' ? 'Имя' : 'Name'} /></td>
             <td><input value={newContact.company} onChange={(e)=>setNewContact({...newContact, company:e.target.value})} placeholder={lang==='ru' ? 'Компания' : 'Company'} /></td>
             <td><input value={newContact.position} onChange={(e)=>setNewContact({...newContact, position:e.target.value})} placeholder={lang==='ru' ? 'Должность' : 'Position'} /></td>
@@ -116,7 +118,7 @@ export default function ContactList({lang='ru'}){
             <td><input value={newContact.address} onChange={(e)=>setNewContact({...newContact, address:e.target.value})} placeholder={lang==='ru' ? 'Адрес' : 'Address'} /></td>
             <td><input value={newContact.comment} onChange={(e)=>setNewContact({...newContact, comment:e.target.value})} placeholder={lang==='ru' ? 'Комментарий' : 'Comment'} /></td>
           </tr>
-          <tr><td colSpan="8" style={{textAlign:'right'}}><button onClick={createNew}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
+          <tr><td colSpan="10" style={{textAlign:'right'}}><button onClick={createNew}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
         </tbody>
       </table>
     </div>
