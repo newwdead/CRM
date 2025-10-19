@@ -124,8 +124,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Version endpoint (proxied via /api in frontend nginx)
-@app.get('/api/version')
+# Version endpoint (frontend calls /api/version; nginx strips /api/ and forwards to /version)
+@app.get('/version')
 def get_version():
     return {
         'version': os.environ.get('APP_VERSION', 'unknown'),
