@@ -11,3 +11,6 @@ class Contact(Base):
     phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
     comment = Column(String, nullable=True)
+    website = Column(String, nullable=True)
+    photo_path = Column(String, nullable=True)
+    ocr_raw = Column(String, nullable=True)

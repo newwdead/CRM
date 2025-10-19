@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
@@ -8,7 +9,7 @@ from typing import Optional
 from .database import engine, Base, get_db
 from .models import Contact
 from .ocr_utils import ocr_image_fileobj, ocr_parsio
-import io, csv, tempfile, pandas as pd, os
+import io, csv, tempfile, pandas as pd, os, uuid, json
 
 # Create tables if they don't exist
 try:
@@ -24,8 +25,17 @@ try:
         conn.execute(text("""
             ALTER TABLE contacts ADD COLUMN IF NOT EXISTS comment VARCHAR;
         """))
+        conn.execute(text("""
+            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS website VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo_path VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS ocr_raw VARCHAR;
+        """))
         conn.commit()
-    print("Schema ensured: comment column present")
+    print("Schema ensured: comment, website, photo_path, ocr_raw columns present")
 except Exception as e:
     print(f"Schema ensure failed: {e}")
 
@@ -38,6 +48,7 @@ class ContactCreate(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     comment: Optional[str] = None
+    website: Optional[str] = None
     
     @validator('email')
     def validate_email(cls, v):
@@ -59,6 +70,7 @@ class ContactUpdate(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     comment: Optional[str] = None
+    website: Optional[str] = None
     
     @validator('email')
     def validate_email(cls, v):
@@ -73,6 +85,8 @@ class ContactUpdate(BaseModel):
         return v
 
 app = FastAPI(title="BizCard CRM")
+os.makedirs('uploads', exist_ok=True)
+app.mount('/files', StaticFiles(directory='uploads'), name='files')
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,22 +160,37 @@ def upload_card(
                 else "File too large. Maximum size is 10MB"
             ))
         file.file.seek(0)
+        # Save a copy of the uploaded file to disk
+        content = file.file.read()
+        file.file.seek(0)
+        safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename or 'upload')}"
+        save_path = os.path.join('uploads', safe_name)
+        with open(save_path, 'wb') as f:
+            f.write(content)
         
         # Run OCR via selected provider
         if provider == 'parsio':
             try:
-                data = ocr_parsio(file.file, filename=file.filename)
+                ocr_data = ocr_parsio(io.BytesIO(content), filename=file.filename)
+                raw_json = json.dumps(ocr_data, ensure_ascii=False)
+                data = ocr_data
             except Exception as e:
-                # v1.2 fallback to Tesseract on Parsio failure
-                file.file.seek(0)
-                data = ocr_image_fileobj(file.file)
+                # fallback to Tesseract on Parsio failure
+                ocr_text = ocr_image_fileobj(io.BytesIO(content))
+                raw_json = json.dumps(ocr_text, ensure_ascii=False)
+                data = ocr_text
         else:
-            data = ocr_image_fileobj(file.file)
+            ocr_text = ocr_image_fileobj(io.BytesIO(content))
+            raw_json = json.dumps(ocr_text, ensure_ascii=False)
+            data = ocr_text
         
         # Validate OCR results
         if not any(data.values()):
             raise HTTPException(status_code=400, detail="No text could be extracted from the image")
         
+        # attach stored metadata
+        data['photo_path'] = safe_name
+        data['ocr_raw'] = raw_json
         contact = Contact(**data)
         db.add(contact)
         db.commit()
@@ -179,9 +208,9 @@ def export_csv(db: Session = Depends(get_db)):
     contacts = db.query(Contact).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['id','full_name','company','position','email','phone','address','comment'])
+    writer.writerow(['id','full_name','company','position','email','phone','address','comment','website','photo_path'])
     for c in contacts:
-        writer.writerow([c.id, c.full_name or '', c.company or '', c.position or '', c.email or '', c.phone or '', c.address or '', c.comment or ''])
+        writer.writerow([c.id, c.full_name or '', c.company or '', c.position or '', c.email or '', c.phone or '', c.address or '', c.comment or '', c.website or '', c.photo_path or ''])
     output.seek(0)
     return StreamingResponse(output, media_type='text/csv', headers={'Content-Disposition':'attachment; filename=contacts.csv'})
 
@@ -198,6 +227,8 @@ def export_xlsx(db: Session = Depends(get_db)):
         'phone': c.phone,
         'address': c.address,
         'comment': c.comment,
+        'website': c.website,
+        'photo_path': c.photo_path,
     } for c in contacts])
     buffer = io.BytesIO()
     df.to_excel(buffer, index=False)
