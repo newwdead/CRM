@@ -185,7 +185,8 @@ def create_user(
     email: str,
     password: str,
     full_name: Optional[str] = None,
-    is_admin: bool = False
+    is_admin: bool = False,
+    is_active: bool = False  # Default: requires admin approval
 ) -> User:
     """
     Create a new user in the database.
@@ -197,6 +198,7 @@ def create_user(
         password: Plain text password (will be hashed)
         full_name: Optional full name
         is_admin: Whether user should have admin privileges
+        is_active: Whether user is active (default False = requires approval)
     
     Returns:
         Created User object
@@ -220,7 +222,7 @@ def create_user(
         hashed_password=hashed_password,
         full_name=full_name,
         is_admin=is_admin,
-        is_active=True
+        is_active=is_active
     )
     
     db.add(user)
@@ -252,7 +254,8 @@ def init_default_admin(db: Session):
             email=default_email,
             password=default_password,
             full_name="System Administrator",
-            is_admin=True
+            is_admin=True,
+            is_active=True  # Admin is always active
         )
         print(f"✅ Default admin user created: {admin_user.username}")
         print(f"⚠️  Please change the default password immediately!")

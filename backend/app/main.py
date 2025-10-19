@@ -701,10 +701,10 @@ async def login(
         )
     
     if not user.is_active:
-        auth_attempts_counter.labels(status='disabled').inc()
+        auth_attempts_counter.labels(status='pending_approval').inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
+            detail="Your account is awaiting administrator approval. Please contact the system administrator."
         )
     
     # Create access token
@@ -869,3 +869,214 @@ async def toggle_admin(
     logger.info(f"Admin status changed by {current_user.username}: {user.username} -> {is_admin}")
     
     return user
+
+
+@app.patch('/auth/users/{user_id}/activate', response_model=schemas.UserResponse)
+async def activate_user(
+    user_id: int,
+    is_active: bool = Body(..., embed=True),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Activate or deactivate a user (admin only).
+    Used to approve new user registrations.
+    Requires valid JWT token with admin privileges.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = is_active
+    db.commit()
+    db.refresh(user)
+    
+    action = "activated" if is_active else "deactivated"
+    logger.info(f"User {action} by admin {current_user.username}: {user.username}")
+    
+    return user
+
+
+@app.put('/auth/users/{user_id}/profile', response_model=schemas.UserResponse)
+async def update_user_profile(
+    user_id: int,
+    update_data: schemas.UserUpdate,
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update user profile (admin only).
+    Allows updating email, full_name, and password.
+    Requires valid JWT token with admin privileges.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update fields if provided
+    if update_data.email is not None:
+        # Check if email already exists for another user
+        existing = db.query(User).filter(
+            User.email == update_data.email,
+            User.id != user_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use by another user"
+            )
+        user.email = update_data.email
+    
+    if update_data.full_name is not None:
+        user.full_name = update_data.full_name
+    
+    if update_data.password is not None:
+        user.hashed_password = auth_utils.get_password_hash(update_data.password)
+    
+    db.commit()
+    db.refresh(user)
+    
+    logger.info(f"User profile updated by admin {current_user.username}: {user.username}")
+    
+    return user
+
+
+# ============================================================================
+# SYSTEM SETTINGS ENDPOINTS
+# ============================================================================
+
+@app.get('/settings/system')
+async def get_system_settings(
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get system settings (admin only).
+    Returns various system configuration parameters.
+    """
+    return {
+        "database": {
+            "total_contacts": db.query(Contact).count(),
+            "total_users": db.query(User).count(),
+            "pending_users": db.query(User).filter(User.is_active == False).count(),
+        },
+        "ocr": {
+            "default_provider": "auto",
+            "available_providers": ["tesseract", "parsio", "google", "auto"],
+            "tesseract_langs": os.getenv("TESSERACT_LANGS", "rus+eng"),
+        },
+        "telegram": {
+            "bot_token_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
+            "webhook_url": os.getenv("TELEGRAM_WEBHOOK_URL", ""),
+        },
+        "authentication": {
+            "token_expire_minutes": auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES,
+            "require_admin_approval": True,
+        },
+        "application": {
+            "version": os.getenv("APP_VERSION", "1.9"),
+            "environment": os.getenv("ENVIRONMENT", "development"),
+        }
+    }
+
+
+@app.get('/settings/pending-users', response_model=list[schemas.UserResponse])
+async def get_pending_users(
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of users pending approval (admin only).
+    Returns users with is_active=False.
+    """
+    pending_users = db.query(User).filter(User.is_active == False).all()
+    return pending_users
+
+
+@app.get('/settings/editable')
+async def get_editable_settings(
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get editable settings (admin only).
+    Returns current environment variables and database settings.
+    """
+    from .models import AppSetting
+    
+    # Get database settings
+    def get_setting(key: str, default: str = ""):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        return setting.value if setting else default
+    
+    return {
+        "ocr": {
+            "tesseract_langs": get_setting("TESSERACT_LANGS", os.getenv("TESSERACT_LANGS", "rus+eng")),
+            "parsio_api_key": get_setting("PARSIO_API_KEY", ""),
+            "google_vision_api_key": get_setting("GOOGLE_VISION_API_KEY", ""),
+        },
+        "telegram": {
+            "bot_token": get_setting("TELEGRAM_BOT_TOKEN", ""),
+            "webhook_url": get_setting("TELEGRAM_WEBHOOK_URL", ""),
+        },
+        "auth": {
+            "token_expire_minutes": int(get_setting("TOKEN_EXPIRE_MINUTES", str(auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES))),
+            "require_admin_approval": get_setting("REQUIRE_ADMIN_APPROVAL", "true") == "true",
+        }
+    }
+
+
+@app.put('/settings/editable')
+async def update_editable_settings(
+    settings: dict = Body(...),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update editable settings (admin only).
+    Saves settings to database.
+    """
+    from .models import AppSetting
+    
+    def set_setting(key: str, value: str):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = AppSetting(key=key, value=value)
+            db.add(setting)
+    
+    # Update OCR settings
+    if "ocr" in settings:
+        if "tesseract_langs" in settings["ocr"]:
+            set_setting("TESSERACT_LANGS", settings["ocr"]["tesseract_langs"])
+        if "parsio_api_key" in settings["ocr"]:
+            set_setting("PARSIO_API_KEY", settings["ocr"]["parsio_api_key"])
+        if "google_vision_api_key" in settings["ocr"]:
+            set_setting("GOOGLE_VISION_API_KEY", settings["ocr"]["google_vision_api_key"])
+    
+    # Update Telegram settings
+    if "telegram" in settings:
+        if "bot_token" in settings["telegram"]:
+            set_setting("TELEGRAM_BOT_TOKEN", settings["telegram"]["bot_token"])
+        if "webhook_url" in settings["telegram"]:
+            set_setting("TELEGRAM_WEBHOOK_URL", settings["telegram"]["webhook_url"])
+    
+    # Update Auth settings
+    if "auth" in settings:
+        if "token_expire_minutes" in settings["auth"]:
+            set_setting("TOKEN_EXPIRE_MINUTES", str(settings["auth"]["token_expire_minutes"]))
+        if "require_admin_approval" in settings["auth"]:
+            set_setting("REQUIRE_ADMIN_APPROVAL", "true" if settings["auth"]["require_admin_approval"] else "false")
+    
+    db.commit()
+    
+    logger.info(f"Settings updated by admin {current_user.username}")
+    
+    return {"message": "Settings updated successfully. Restart application for some changes to take effect."}

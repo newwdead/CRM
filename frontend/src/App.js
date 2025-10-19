@@ -1,339 +1,278 @@
 import React, { useEffect, useState } from 'react';
+import LoginPage from './components/LoginPage';
 import ImportExport from './components/ImportExport';
 import UploadCard from './components/UploadCard';
 import ContactList from './components/ContactList';
 import ContactEdit from './components/ContactEdit';
 import Settings from './components/Settings';
-import Login from './components/Login';
-import Register from './components/Register';
-
-const translations = {
-  en: {
-    title: 'Business Card CRM',
-    home: 'Home',
-    settings: 'Settings',
-    contacts: 'Contacts',
-    upload: 'Upload',
-    version: 'Version',
-    login: 'Login',
-    logout: 'Logout',
-    register: 'Register',
-    profile: 'Profile',
-    admin: 'Admin',
-    welcome: 'Welcome',
-  },
-  ru: {
-    title: 'CRM визиток',
-    home: 'Главная',
-    settings: 'Настройки',
-    contacts: 'Контакты',
-    upload: 'Загрузить',
-    version: 'Версия',
-    login: 'Вход',
-    logout: 'Выход',
-    register: 'Регистрация',
-    profile: 'Профиль',
-    admin: 'Админ',
-    welcome: 'Добро пожаловать',
-  }
-};
+import AdminPanel from './components/AdminPanel';
+import translations from './translations';
 
 function App() {
-  const [lang, setLang] = useState('ru');
-  const [defaultProvider, setDefaultProvider] = useState('auto');
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [lang, setLang] = useState(localStorage.getItem('lang') || 'ru');
+  
   const [route, setRoute] = useState('home');
   const [editId, setEditId] = useState(null);
   const [ver, setVer] = useState({ version: '', commit: '', message: '' });
-  const [ocrProviders, setOcrProviders] = useState([]);
-  
-  // Authentication state
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
   
   const t = translations[lang];
 
-  // Load saved auth on mount
+  // Check authentication on mount
   useEffect(() => {
-    try {
-      const lsLang = localStorage.getItem('app.lang');
-      const lsProv = localStorage.getItem('app.defaultProvider');
-      const lsToken = localStorage.getItem('access_token');
-      const lsUser = localStorage.getItem('user');
-      
-      if (lsLang) setLang(lsLang);
-      if (lsProv) setDefaultProvider(lsProv);
-      
-      if (lsToken && lsUser) {
-        setToken(lsToken);
-        setUser(JSON.parse(lsUser));
-        // Verify token is still valid
-        verifyToken(lsToken);
-      } else {
-        setAuthLoading(false);
-      }
-    } catch {
-      setAuthLoading(false);
-    }
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
     
-    loadVersion();
-    loadOCRProviders();
-  }, []);
-
-  const verifyToken = async (tokenToVerify) => {
-    try {
-      const res = await fetch('/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${tokenToVerify}`
-        }
-      });
-      
-      if (res.ok) {
-        const userData = await res.json();
+    if (token && savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
         setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      } else {
-        // Token invalid, clear auth
+        setIsAuthenticated(true);
+        
+        // Verify token is still valid
+        fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        .then(response => {
+          if (!response.ok) {
+            // Token expired or invalid
+            handleLogout();
+          }
+        })
+        .catch(() => {
+          handleLogout();
+        });
+      } catch (error) {
         handleLogout();
       }
-    } catch (err) {
-      console.error('Token verification failed:', err);
-    } finally {
-      setAuthLoading(false);
     }
-  };
+    
+    setAuthLoading(false);
+  }, []);
 
-  const loadVersion = async () => {
-    try {
-      const res = await fetch('/api/version');
-      if (res.ok) {
-        setVer(await res.json());
-      }
-    } catch {}
-  };
+  // Fetch version info
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetch('/api/version')
+        .then(r => r.json())
+        .then(data => setVer(data))
+        .catch(err => console.error('Failed to fetch version:', err));
+    }
+  }, [isAuthenticated]);
 
-  const loadOCRProviders = async () => {
-    try {
-      const res = await fetch('/api/ocr/providers');
-      if (res.ok) {
-        const data = await res.json();
-        setOcrProviders(data.available || []);
-      }
-    } catch {}
-  };
-
-  const handleLangChange = (newLang) => {
-    setLang(newLang);
-  };
-
-  const handleProviderChange = (newProvider) => {
-    setDefaultProvider(newProvider);
-  };
-
-  const handleLogin = (userData, accessToken) => {
+  const handleLoginSuccess = (userData) => {
     setUser(userData);
-    setToken(accessToken);
-    setShowLogin(false);
-    setShowRegister(false);
-    // Refresh page data if needed
-    loadOCRProviders();
-  };
-
-  const handleRegister = (userData, accessToken) => {
-    setUser(userData);
-    setToken(accessToken);
-    setShowLogin(false);
-    setShowRegister(false);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    setIsAuthenticated(true);
     setRoute('home');
   };
 
-  const handleSwitchToRegister = () => {
-    setShowLogin(false);
-    setShowRegister(true);
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setIsAuthenticated(false);
+    setRoute('home');
   };
 
-  const handleSwitchToLogin = () => {
-    setShowRegister(false);
-    setShowLogin(true);
+  const toggleLanguage = () => {
+    const newLang = lang === 'en' ? 'ru' : 'en';
+    setLang(newLang);
+    localStorage.setItem('lang', newLang);
   };
 
-  // Show loading while checking auth
+  // Show loading while checking authentication
   if (authLoading) {
     return (
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
-          <div>{lang === 'ru' ? 'Загрузка...' : 'Loading...'}</div>
-        </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: '18px'
+      }}>
+        Loading...
       </div>
     );
   }
 
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} lang={lang} t={t} />;
+  }
+
+  // Main application (authenticated)
   return (
     <div className="container">
       {/* Header */}
-      <header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h1 style={{ margin: 0 }}>{t.title}</h1>
-          {ocrProviders.length > 0 && (
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {ocrProviders.map(provider => (
-                <span 
-                  key={provider}
-                  className="badge success"
-                  title={`${provider} ${lang === 'ru' ? 'доступен' : 'available'}`}
-                  style={{ fontSize: '10px' }}
-                >
-                  {provider === 'Tesseract' ? '🔧' : provider === 'Parsio' ? '☁️' : '🌐'}
-                </span>
-              ))}
+      <header className="header">
+        <div className="header-content">
+          <div className="header-left">
+            <div className="logo">
+              <span className="logo-icon">💼</span>
+              <h1>BizCard CRM</h1>
             </div>
-          )}
+            {ver.version && (
+              <span className="badge badge-primary version-badge">v{ver.version}</span>
+            )}
+          </div>
+
+          <div className="header-right">
+            <button 
+              onClick={toggleLanguage} 
+              className="btn btn-secondary lang-btn"
+              title={lang === 'en' ? 'Switch to Russian' : 'Переключить на English'}
+            >
+              🌐 {lang === 'en' ? 'RU' : 'EN'}
+            </button>
+            <div className="user-info">
+              <span className="user-welcome">
+                👋 {t.welcome}, <strong>{user?.full_name || user?.username}</strong>
+              </span>
+              {user?.is_admin && (
+                <span className="badge badge-primary">{t.admin}</span>
+              )}
+            </div>
+            <button onClick={handleLogout} className="btn btn-secondary">
+              🚪 {t.logout}
+            </button>
+          </div>
         </div>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {/* Navigation */}
+        <nav className="nav">
           <button
+            className={`nav-btn ${route === 'home' ? 'active' : ''}`}
             onClick={() => setRoute('home')}
-            className={route === 'home' ? '' : 'secondary'}
-            disabled={route === 'home'}
           >
             🏠 {t.home}
           </button>
           <button
+            className={`nav-btn ${route === 'contacts' ? 'active' : ''}`}
+            onClick={() => setRoute('contacts')}
+          >
+            📇 {t.contacts}
+          </button>
+          <button
+            className={`nav-btn ${route === 'upload' ? 'active' : ''}`}
+            onClick={() => setRoute('upload')}
+          >
+            📤 {t.uploadCard}
+          </button>
+          <button
+            className={`nav-btn ${route === 'import-export' ? 'active' : ''}`}
+            onClick={() => setRoute('import-export')}
+          >
+            📊 {t.importExport}
+          </button>
+          <button
+            className={`nav-btn ${route === 'settings' ? 'active' : ''}`}
             onClick={() => setRoute('settings')}
-            className={route === 'settings' ? '' : 'secondary'}
-            disabled={route === 'settings'}
           >
             ⚙️ {t.settings}
           </button>
-
-          {/* Auth section */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {user ? (
-              <>
-                <span style={{ 
-                  fontSize: '14px', 
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span className={user.is_admin ? 'badge danger' : 'badge info'}>
-                    {user.is_admin ? '👑 ' + t.admin : '👤 ' + t.profile}
-                  </span>
-                  <strong>{user.username}</strong>
-                </span>
-                <button onClick={handleLogout} className="secondary" style={{ padding: '6px 12px' }}>
-                  🚪 {t.logout}
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setShowLogin(true)} style={{ padding: '6px 16px' }}>
-                  🔐 {t.login}
-                </button>
-                <button onClick={() => setShowRegister(true)} className="success" style={{ padding: '6px 16px' }}>
-                  📝 {t.register}
-                </button>
-              </>
-            )}
-          </div>
+          {user?.is_admin && (
+            <button
+              className={`nav-btn ${route === 'admin' ? 'active' : ''}`}
+              onClick={() => setRoute('admin')}
+            >
+              🛡️ {t.adminPanel}
+            </button>
+          )}
         </nav>
       </header>
 
       {/* Main Content */}
-      <main style={{ flex: 1 }}>
+      <main className="main">
         {route === 'home' && (
-          <div>
-            {user && (
-              <div className="alert info" style={{ marginBottom: '20px' }}>
-                👋 {t.welcome}, <strong>{user.full_name || user.username}</strong>!
-                {user.is_admin && (
-                  <span style={{ marginLeft: '12px' }}>
-                    👑 {lang === 'ru' ? 'Права администратора' : 'Administrator rights'}
-                  </span>
-                )}
+          <div className="home-dashboard">
+            <div className="dashboard-header">
+              <h2>📊 {t.dashboardTitle}</h2>
+              <p>{t.dashboardSubtitle}</p>
+            </div>
+            
+            <div className="dashboard-grid">
+              <div className="dashboard-card" onClick={() => setRoute('upload')}>
+                <div className="dashboard-icon">📤</div>
+                <h3>{t.uploadCard}</h3>
+                <p>{t.uploadCardDesc}</p>
+              </div>
+
+              <div className="dashboard-card" onClick={() => setRoute('contacts')}>
+                <div className="dashboard-icon">📇</div>
+                <h3>{t.viewContacts}</h3>
+                <p>{t.viewContactsDesc}</p>
+              </div>
+
+              <div className="dashboard-card" onClick={() => setRoute('import-export')}>
+                <div className="dashboard-icon">📊</div>
+                <h3>{t.importExport}</h3>
+                <p>{t.importExportDesc}</p>
+              </div>
+
+              <div className="dashboard-card" onClick={() => setRoute('settings')}>
+                <div className="dashboard-icon">⚙️</div>
+                <h3>{t.settings}</h3>
+                <p>{t.settingsDesc}</p>
+              </div>
+
+              {user?.is_admin && (
+                <div className="dashboard-card" onClick={() => setRoute('admin')}>
+                  <div className="dashboard-icon">🛡️</div>
+                  <h3>{t.adminPanel}</h3>
+                  <p>{t.adminPanelDesc}</p>
+                </div>
+              )}
+            </div>
+
+            {ver.message && (
+              <div className="dashboard-info">
+                <h3>ℹ️ {t.latestUpdate}</h3>
+                <p>{ver.message}</p>
               </div>
             )}
-            
-            <div className="grid grid-2" style={{ marginBottom: '20px' }}>
-              <UploadCard lang={lang} defaultProvider={defaultProvider} />
-              <ImportExport lang={lang} />
-            </div>
-            <ContactList
-              lang={lang}
-              onEdit={(id) => {
-                setEditId(id);
-                setRoute('edit');
-              }}
-            />
           </div>
         )}
 
-        {route === 'settings' && (
-          <Settings
-            lang={lang}
-            defaultProvider={defaultProvider}
-            onChangeLang={handleLangChange}
-            onChangeProvider={handleProviderChange}
-          />
+        {route === 'contacts' && (
+          <ContactList onEdit={(id) => { setEditId(id); setRoute('edit'); }} t={t} lang={lang} />
         )}
 
-        {route === 'edit' && (
-          <ContactEdit
-            id={editId}
-            lang={lang}
-            onBack={() => setRoute('home')}
-          />
+        {route === 'upload' && (
+          <UploadCard t={t} lang={lang} />
+        )}
+
+        {route === 'import-export' && (
+          <ImportExport t={t} lang={lang} />
+        )}
+
+        {route === 'settings' && (
+          <Settings t={t} lang={lang} />
+        )}
+
+        {route === 'edit' && editId && (
+          <ContactEdit id={editId} onBack={() => setRoute('contacts')} t={t} lang={lang} />
+        )}
+
+        {route === 'admin' && user?.is_admin && (
+          <AdminPanel t={t} lang={lang} />
         )}
       </main>
 
       {/* Footer */}
-      <footer>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <div>
-            <span style={{ marginRight: '8px' }}>
-              {t.version}: <strong>{ver.version || 'n/a'}</strong>
-            </span>
-            {ver.commit && (
-              <span style={{ fontSize: '11px', opacity: 0.7 }}>
-                ({ver.commit.slice(0, 7)})
-              </span>
-            )}
-          </div>
-          {ver.message && (
-            <div style={{ fontSize: '11px', opacity: 0.8 }}>
-              {ver.message}
-            </div>
-          )}
-        </div>
+      <footer className="footer">
+        <p>© 2025 BizCard CRM - {t.footerText}</p>
+        {ver.version && (
+          <p className="text-xs text-secondary">
+            {t.version} {ver.version} {ver.commit && `(${ver.commit.substring(0, 7)})`}
+          </p>
+        )}
       </footer>
-
-      {/* Auth Modals */}
-      {showLogin && (
-        <Login
-          lang={lang}
-          onLogin={handleLogin}
-          onSwitchToRegister={handleSwitchToRegister}
-        />
-      )}
-
-      {showRegister && (
-        <Register
-          lang={lang}
-          onRegister={handleRegister}
-          onSwitchToLogin={handleSwitchToLogin}
-        />
-      )}
     </div>
   );
 }
