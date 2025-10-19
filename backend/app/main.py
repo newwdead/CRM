@@ -11,6 +11,8 @@ from datetime import timedelta
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Gauge, Histogram
 from .database import engine, Base, get_db
 from .models import Contact, AppSetting, User
 from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
@@ -31,6 +33,15 @@ ocr_manager = OCRManager()
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
+
+# Prometheus metrics
+ocr_processing_counter = Counter('ocr_processing_total', 'Total OCR processing requests', ['provider', 'status'])
+ocr_processing_time = Histogram('ocr_processing_seconds', 'OCR processing time', ['provider'])
+contacts_total = Gauge('contacts_total', 'Total number of contacts')
+contacts_created_counter = Counter('contacts_created_total', 'Total contacts created')
+users_total = Gauge('users_total', 'Total number of users')
+auth_attempts_counter = Counter('auth_attempts_total', 'Authentication attempts', ['status'])
+telegram_messages_counter = Counter('telegram_messages_total', 'Telegram messages processed', ['status'])
 
 def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
     last_err = None
@@ -153,6 +164,9 @@ class ContactUpdate(BaseModel):
         return v
 
 app = FastAPI(title="BizCard CRM")
+
+# Initialize Prometheus instrumentation
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Add rate limiter
 app.state.limiter = limiter
@@ -368,6 +382,11 @@ def create_contact(
     db.add(contact)
     db.commit()
     db.refresh(contact)
+    
+    # Update contact metrics
+    contacts_created_counter.inc()
+    contacts_total.set(db.query(Contact).count())
+    
     return contact
 
 @app.put('/contacts/{contact_id}')
@@ -439,11 +458,19 @@ def upload_card(
         preferred = None if provider == 'auto' else provider
         
         try:
+            # Track OCR processing time
+            start_time = time.time()
             ocr_result = ocr_manager.recognize(
                 ocr_input,
                 filename=file.filename,
                 preferred_provider=preferred
             )
+            processing_time = time.time() - start_time
+            
+            # Update Prometheus metrics
+            used_provider = ocr_result['provider']
+            ocr_processing_time.labels(provider=used_provider).observe(processing_time)
+            ocr_processing_counter.labels(provider=used_provider, status='success').inc()
             
             data = ocr_result['data']
             raw_json = json.dumps({
@@ -453,9 +480,11 @@ def upload_card(
                 'raw_text': ocr_result.get('raw_text'),
             }, ensure_ascii=False)
             
-            logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}")
+            logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}, time: {processing_time:.2f}s")
             
         except Exception as e:
+            # Track OCR failure
+            ocr_processing_counter.labels(provider=preferred or 'auto', status='failed').inc()
             logger.error(f"OCR failed: {e}")
             raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
         
@@ -471,6 +500,10 @@ def upload_card(
         db.add(contact)
         db.commit()
         db.refresh(contact)
+        
+        # Update contact metrics
+        contacts_created_counter.inc()
+        contacts_total.set(db.query(Contact).count())
         
         # Add provider info to response
         contact_dict = {
@@ -660,6 +693,7 @@ async def login(
     """
     user = auth_utils.authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        auth_attempts_counter.labels(status='failed').inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -667,6 +701,7 @@ async def login(
         )
     
     if not user.is_active:
+        auth_attempts_counter.labels(status='disabled').inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is disabled"
@@ -678,6 +713,10 @@ async def login(
         data={"sub": user.username},
         expires_delta=access_token_expires
     )
+    
+    # Update auth metrics
+    auth_attempts_counter.labels(status='success').inc()
+    users_total.set(db.query(User).count())
     
     logger.info(f"User logged in: {user.username}")
     

@@ -1,0 +1,183 @@
+# Prometheus Alerting Rules for BizCard CRM
+
+groups:
+  # System Alerts
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes (current: {{ $value }}%)"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% (current: {{ $value }}%)"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Disk space is running low"
+          description: "Available disk space is below 15% (current: {{ $value }}%)"
+
+      - alert: HighDiskIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High disk I/O detected"
+          description: "Disk I/O is high for more than 10 minutes"
+
+  # Application Alerts
+  - name: application_alerts
+    interval: 30s
+    rules:
+      - alert: BackendDown
+        expr: up{job="fastapi-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "Backend service is down"
+          description: "FastAPI backend has been down for more than 1 minute"
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "More than 5% of requests are returning 5xx errors"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High API response time"
+          description: "95th percentile response time is above 2 seconds (current: {{ $value }}s)"
+
+      - alert: TooManyFailedLogins
+        expr: rate(auth_attempts_total{status="failed"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "More than 10 failed login attempts per second, possible brute force attack"
+
+  # OCR Alerts
+  - name: ocr_alerts
+    interval: 30s
+    rules:
+      - alert: HighOCRFailureRate
+        expr: sum(rate(ocr_processing_total{status="failed"}[5m])) / sum(rate(ocr_processing_total[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: ocr
+        annotations:
+          summary: "High OCR failure rate"
+          description: "More than 20% of OCR requests are failing"
+
+      - alert: SlowOCRProcessing
+        expr: histogram_quantile(0.95, rate(ocr_processing_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: ocr
+        annotations:
+          summary: "Slow OCR processing"
+          description: "95th percentile OCR processing time is above 10 seconds (current: {{ $value }}s)"
+
+  # Database Alerts
+  - name: database_alerts
+    interval: 30s
+    rules:
+      - alert: PostgresDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: TooManyConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Too many database connections"
+          description: "Database connection usage is above 80%"
+
+      - alert: HighQueryTime
+        expr: rate(pg_stat_activity_max_tx_duration{state="active"}[5m]) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Long-running database queries"
+          description: "Queries are taking longer than 30 seconds"
+
+  # Container Alerts
+  - name: container_alerts
+    interval: 30s
+    rules:
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: containers
+        annotations:
+          summary: "Container using too much memory"
+          description: "Container {{ $labels.name }} is using more than 90% of its memory limit"
+
+      - alert: ContainerCPUThrottling
+        expr: rate(container_cpu_cfs_throttled_seconds_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          service: containers
+        annotations:
+          summary: "Container CPU throttling"
+          description: "Container {{ $labels.name }} is being CPU throttled"
+
+      - alert: ContainerRestarting
+        expr: rate(container_last_seen[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: containers
+        annotations:
+          summary: "Container is restarting"
+          description: "Container {{ $labels.name }} is restarting frequently"
+
