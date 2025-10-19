@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libfreetype6 \
     libopenjp2-7 \
-    libtiff5 \
-    libwebp6 \
+    libtiff-dev \
+    libwebp-dev \
     pkg-config \
     gcc \
     && rm -rf /var/lib/apt/lists/*
