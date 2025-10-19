@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Install Tesseract and image codecs for Pillow (JPEG/PNG/TIFF/WebP/JPEG2000)
+# Install Tesseract, PostgreSQL client, and image codecs for Pillow (JPEG/PNG/TIFF/WebP/JPEG2000)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-rus \
@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebp-dev \
     pkg-config \
     gcc \
+    postgresql-client \
+    gzip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -20,7 +20,8 @@ from .ocr_providers import OCRManager
 from . import auth_utils
 from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
-import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
+import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time, subprocess, glob
+from pathlib import Path
 from PIL import Image
 import logging
 
@@ -1772,3 +1773,225 @@ async def update_editable_settings(
     logger.info(f"Settings updated by admin {current_user.username}")
     
     return {"message": "Settings updated successfully. Restart application for some changes to take effect."}
+
+
+# ============================================================================
+# Backup Management Endpoints (Admin Only)
+# ============================================================================
+
+@app.get('/backups/')
+async def list_backups(
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    List all database backups (admin only).
+    Returns list of backup files with metadata.
+    """
+    backup_dir = Path("/home/ubuntu/fastapi-bizcard-crm-ready/backups")
+    
+    if not backup_dir.exists():
+        return {"backups": [], "backup_dir": str(backup_dir)}
+    
+    backups = []
+    for backup_file in sorted(backup_dir.glob("backup_bizcard_crm_*.sql.gz"), reverse=True):
+        stat = backup_file.stat()
+        backups.append({
+            "filename": backup_file.name,
+            "size": stat.st_size,
+            "size_human": f"{stat.st_size / 1024:.2f} KB" if stat.st_size < 1024*1024 else f"{stat.st_size / (1024*1024):.2f} MB",
+            "created_at": stat.st_mtime,
+            "created_at_human": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+        })
+    
+    return {
+        "backups": backups,
+        "backup_dir": str(backup_dir),
+        "total_count": len(backups),
+        "total_size": sum(b["size"] for b in backups),
+        "total_size_human": f"{sum(b['size'] for b in backups) / (1024*1024):.2f} MB"
+    }
+
+
+@app.post('/backups/create')
+async def create_backup(
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Create a manual database backup (admin only).
+    Uses pg_dump to create a compressed database backup.
+    """
+    backup_dir = Path("/home/ubuntu/fastapi-bizcard-crm-ready/backups")
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate backup filename with timestamp
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    backup_filename = f"backup_bizcard_crm_{timestamp}.sql.gz"
+    backup_path = backup_dir / backup_filename
+    
+    # Database connection details
+    db_host = os.getenv("DB_HOST", "db")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", "bizcard_crm")
+    db_user = os.getenv("DB_USER", "postgres")
+    db_password = os.getenv("DB_PASSWORD", "password")
+    
+    try:
+        # Create backup using pg_dump
+        env = os.environ.copy()
+        env["PGPASSWORD"] = db_password
+        
+        # pg_dump command with gzip compression
+        dump_cmd = [
+            "pg_dump",
+            "-h", db_host,
+            "-p", db_port,
+            "-U", db_user,
+            "-d", db_name,
+            "--no-owner",
+            "--no-acl"
+        ]
+        
+        # Run pg_dump and compress output
+        with open(backup_path, 'wb') as f:
+            dump_process = subprocess.Popen(
+                dump_cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            gzip_process = subprocess.Popen(
+                ["gzip"],
+                stdin=dump_process.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE
+            )
+            
+            dump_process.stdout.close()
+            gzip_stderr = gzip_process.communicate()[1]
+            dump_stderr = dump_process.communicate()[1]
+        
+        if dump_process.returncode == 0 and gzip_process.returncode == 0:
+            backup_size = backup_path.stat().st_size
+            size_human = f"{backup_size / 1024:.2f} KB" if backup_size < 1024*1024 else f"{backup_size / (1024*1024):.2f} MB"
+            
+            return {
+                "success": True,
+                "message": f"Backup created successfully: {backup_filename}",
+                "filename": backup_filename,
+                "size": backup_size,
+                "size_human": size_human
+            }
+        else:
+            error_msg = dump_stderr.decode() if dump_stderr else gzip_stderr.decode() if gzip_stderr else "Unknown error"
+            # Clean up failed backup
+            if backup_path.exists():
+                backup_path.unlink()
+            return {
+                "success": False,
+                "message": "Backup failed",
+                "error": error_msg
+            }
+    except Exception as e:
+        # Clean up on exception
+        if backup_path.exists():
+            backup_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+
+
+@app.delete('/backups/{filename}')
+async def delete_backup(
+    filename: str,
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Delete a specific backup file (admin only).
+    """
+    # Security: ensure filename doesn't contain path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # Ensure filename matches expected pattern
+    if not filename.startswith("backup_bizcard_crm_") or not filename.endswith(".sql.gz"):
+        raise HTTPException(status_code=400, detail="Invalid backup filename")
+    
+    backup_path = Path("/home/ubuntu/fastapi-bizcard-crm-ready/backups") / filename
+    
+    if not backup_path.exists():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    
+    try:
+        backup_path.unlink()
+        return {
+            "success": True,
+            "message": f"Backup {filename} deleted successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete backup: {str(e)}")
+
+
+@app.get('/system/resources')
+async def get_system_resources(
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Get system resources and service URLs (admin only).
+    Returns URLs for all deployed services.
+    """
+    # Get server hostname or IP
+    server_host = os.getenv("SERVER_HOST", "localhost")
+    domain = os.getenv("DOMAIN", "ibbase.ru")
+    use_https = os.getenv("USE_HTTPS", "false").lower() == "true"
+    protocol = "https" if use_https else "http"
+    
+    return {
+        "services": {
+            "frontend": {
+                "name": "Frontend (React)",
+                "url": f"{protocol}://{domain}",
+                "local_url": "http://localhost:3000",
+                "description": "Main web interface"
+            },
+            "backend": {
+                "name": "Backend API",
+                "url": f"{protocol}://api.{domain}",
+                "local_url": "http://localhost:8000",
+                "description": "FastAPI REST API"
+            },
+            "api_docs": {
+                "name": "API Documentation",
+                "url": f"{protocol}://api.{domain}/docs",
+                "local_url": "http://localhost:8000/docs",
+                "description": "Swagger UI API docs"
+            },
+            "api_redoc": {
+                "name": "API ReDoc",
+                "url": f"{protocol}://api.{domain}/redoc",
+                "local_url": "http://localhost:8000/redoc",
+                "description": "Alternative API docs"
+            },
+            "grafana": {
+                "name": "Grafana Monitoring",
+                "url": f"{protocol}://monitoring.{domain}",
+                "local_url": "http://localhost:3001",
+                "description": "System monitoring dashboards"
+            },
+            "prometheus": {
+                "name": "Prometheus",
+                "url": None,  # Not exposed publicly
+                "local_url": "http://localhost:9090",
+                "description": "Metrics collection (internal only)"
+            },
+            "metrics": {
+                "name": "Application Metrics",
+                "url": f"{protocol}://api.{domain}/metrics",
+                "local_url": "http://localhost:8000/metrics",
+                "description": "Prometheus metrics endpoint"
+            }
+        },
+        "environment": {
+            "domain": domain,
+            "protocol": protocol,
+            "server_host": server_host
+        }
+    }

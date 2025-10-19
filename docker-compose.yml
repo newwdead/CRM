@@ -24,6 +24,9 @@ services:
       - PARSIO_TIMEOUT=${PARSIO_TIMEOUT:-30}
     volumes:
       - ./backend/app:/app/app
+      - ./uploads:/app/uploads
+      - ./backups:/home/ubuntu/fastapi-bizcard-crm-ready/backups
+      - ./scripts:/home/ubuntu/fastapi-bizcard-crm-ready/scripts:ro
     ports:
       - '8000:8000'
     depends_on:

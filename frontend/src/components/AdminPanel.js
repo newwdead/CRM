@@ -30,6 +30,13 @@ function AdminPanel({ t, lang }) {
     require_admin_approval: true
   });
 
+  // Backups state
+  const [backups, setBackups] = useState([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+
+  // System resources state
+  const [resources, setResources] = useState(null);
+
   useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers();
@@ -37,6 +44,10 @@ function AdminPanel({ t, lang }) {
     } else if (activeTab === 'settings') {
       fetchSystemSettings();
       fetchEditableSettings();
+    } else if (activeTab === 'backups') {
+      fetchBackups();
+    } else if (activeTab === 'resources') {
+      fetchResources();
     }
   }, [activeTab]);
 
@@ -291,6 +302,100 @@ function AdminPanel({ t, lang }) {
     }
   };
 
+  // Backup functions
+  const fetchBackups = async () => {
+    setBackupsLoading(true);
+    try {
+      const response = await fetch('/api/backups/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBackups(data);
+      }
+    } catch (error) {
+      console.error('Error fetching backups:', error);
+    } finally {
+      setBackupsLoading(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setError('');
+    setSuccess('');
+    setBackupsLoading(true);
+    try {
+      const response = await fetch('/api/backups/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSuccess(data.message || 'Backup created successfully!');
+        fetchBackups();
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        const data = await response.json();
+        setError(data.detail || 'Failed to create backup');
+      }
+    } catch (error) {
+      setError('Network error');
+    } finally {
+      setBackupsLoading(false);
+    }
+  };
+
+  const handleDeleteBackup = async (filename) => {
+    if (!window.confirm(`Are you sure you want to delete backup ${filename}?`)) {
+      return;
+    }
+    
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch(`/api/backups/${filename}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        setSuccess(`Backup ${filename} deleted successfully!`);
+        fetchBackups();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        const data = await response.json();
+        setError(data.detail || 'Failed to delete backup');
+      }
+    } catch (error) {
+      setError('Network error');
+    }
+  };
+
+  // Resources function
+  const fetchResources = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/system/resources', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setResources(data);
+      }
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="admin-panel">
       <div className="admin-header">
@@ -313,6 +418,18 @@ function AdminPanel({ t, lang }) {
           onClick={() => setActiveTab('settings')}
         >
           ⚙️ System Settings
+        </button>
+        <button
+          className={`tab ${activeTab === 'backups' ? 'active' : ''}`}
+          onClick={() => setActiveTab('backups')}
+        >
+          💾 Backups
+        </button>
+        <button
+          className={`tab ${activeTab === 'resources' ? 'active' : ''}`}
+          onClick={() => setActiveTab('resources')}
+        >
+          🔗 Resources
         </button>
       </div>
 
@@ -690,6 +807,183 @@ function AdminPanel({ t, lang }) {
             </div>
           ) : (
             <p>Failed to load system settings</p>
+          )}
+        </div>
+      )}
+
+      {/* Backups Tab */}
+      {activeTab === 'backups' && (
+        <div className="tab-content">
+          <div className="section-header">
+            <h3>💾 Database Backups</h3>
+            <button 
+              onClick={handleCreateBackup}
+              className="btn btn-primary"
+              disabled={backupsLoading}
+            >
+              {backupsLoading ? 'Creating...' : '📦 Create Backup Now'}
+            </button>
+          </div>
+
+          {backupsLoading && <p>Loading backups...</p>}
+
+          {backups.backups && backups.backups.length > 0 ? (
+            <div>
+              <div className="alert info" style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <strong>Total Backups:</strong> {backups.total_count}
+                  </div>
+                  <div>
+                    <strong>Total Size:</strong> {backups.total_size_human}
+                  </div>
+                  <div>
+                    <strong>Location:</strong> <code>{backups.backup_dir}</code>
+                  </div>
+                  <div>
+                    <strong>Retention:</strong> 30 days
+                  </div>
+                </div>
+              </div>
+
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Filename</th>
+                      <th>Created At</th>
+                      <th>Size</th>
+                      <th style={{ textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backups.backups.map((backup, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <code style={{ fontSize: '0.85em' }}>{backup.filename}</code>
+                        </td>
+                        <td>{backup.created_at_human}</td>
+                        <td>{backup.size_human}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDeleteBackup(backup.filename)}
+                            className="btn btn-danger btn-sm"
+                            style={{ fontSize: '0.8em', padding: '4px 12px' }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="alert info" style={{ marginTop: '20px' }}>
+                <strong>💡 Auto Backup:</strong> Automatic backups run daily at 3:00 AM. 
+                Backups older than 30 days are automatically removed.
+              </div>
+            </div>
+          ) : (
+            <div className="alert warning">
+              <p>No backups found. Click "Create Backup Now" to create your first backup.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resources Tab */}
+      {activeTab === 'resources' && (
+        <div className="tab-content">
+          <h3>🔗 System Resources & Links</h3>
+          <p style={{ marginBottom: '20px', color: '#666' }}>
+            Quick access to all deployed services and monitoring dashboards
+          </p>
+
+          {loading && <p>Loading resources...</p>}
+
+          {resources && resources.services ? (
+            <div className="resources-grid" style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '20px',
+              marginTop: '20px'
+            }}>
+              {Object.entries(resources.services).map(([key, service]) => (
+                <div key={key} className="resource-card" style={{
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  backgroundColor: '#f9f9f9'
+                }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {service.name}
+                  </h4>
+                  <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '15px' }}>
+                    {service.description}
+                  </p>
+                  
+                  {service.url ? (
+                    <div style={{ marginBottom: '10px' }}>
+                      <strong style={{ fontSize: '0.85em', color: '#666' }}>Production URL:</strong>
+                      <div>
+                        <a 
+                          href={service.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="btn btn-primary btn-sm"
+                          style={{ marginTop: '5px', display: 'inline-block' }}
+                        >
+                          🌐 Open {service.name}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '10px' }}>
+                      <span className="badge badge-secondary" style={{ fontSize: '0.8em' }}>
+                        Internal Only
+                      </span>
+                    </div>
+                  )}
+
+                  <div>
+                    <strong style={{ fontSize: '0.85em', color: '#666' }}>Local URL:</strong>
+                    <div>
+                      <code style={{ 
+                        display: 'block', 
+                        padding: '8px', 
+                        backgroundColor: '#fff', 
+                        borderRadius: '4px',
+                        fontSize: '0.85em',
+                        marginTop: '5px',
+                        border: '1px solid #ddd'
+                      }}>
+                        {service.local_url}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>Failed to load resources</p>
+          )}
+
+          {resources && resources.environment && (
+            <div className="alert info" style={{ marginTop: '30px' }}>
+              <h4 style={{ marginTop: 0 }}>🌍 Environment Info</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                <div>
+                  <strong>Domain:</strong> <code>{resources.environment.domain}</code>
+                </div>
+                <div>
+                  <strong>Protocol:</strong> <code>{resources.environment.protocol}</code>
+                </div>
+                <div>
+                  <strong>Server:</strong> <code>{resources.environment.server_host}</code>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
