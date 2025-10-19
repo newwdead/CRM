@@ -1,46 +1,197 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import OCRSettings from './OCRSettings';
+import TelegramSettings from './TelegramSettings';
 
-export default function Settings({ lang='ru', defaultProvider='tesseract', onChangeLang, onChangeProvider }){
-  const [locLang, setLocLang] = useState(lang);
+export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChangeLang, onChangeProvider }) {
+  const [activeTab, setActiveTab] = useState('general');
+
+  const t = lang === 'ru' ? {
+    title: '⚙️ Настройки',
+    generalTab: 'Общие',
+    ocrTab: 'OCR Провайдеры',
+    telegramTab: 'Telegram',
+    interfaceLanguage: 'Язык интерфейса',
+    defaultProvider: 'Провайдер OCR по умолчанию',
+    auto: 'Авто (рекомендуется)',
+    save: 'Сохранить',
+    saved: 'Настройки сохранены!',
+    hint: 'Подсказка: настройки сохраняются в браузере (localStorage).',
+    darkMode: 'Темная тема',
+    notifications: 'Уведомления',
+    enableNotifications: 'Включить уведомления о новых контактах',
+    autoRefresh: 'Автообновление',
+    enableAutoRefresh: 'Автоматически обновлять список контактов',
+    refreshInterval: 'Интервал обновления (сек)',
+  } : {
+    title: '⚙️ Settings',
+    generalTab: 'General',
+    ocrTab: 'OCR Providers',
+    telegramTab: 'Telegram',
+    interfaceLanguage: 'Interface Language',
+    defaultProvider: 'Default OCR Provider',
+    auto: 'Auto (recommended)',
+    save: 'Save',
+    saved: 'Settings saved!',
+    hint: 'Note: settings are saved in browser localStorage.',
+    darkMode: 'Dark Mode',
+    notifications: 'Notifications',
+    enableNotifications: 'Enable new contact notifications',
+    autoRefresh: 'Auto Refresh',
+    enableAutoRefresh: 'Automatically refresh contact list',
+    refreshInterval: 'Refresh interval (sec)',
+  };
+
+  const [localLang, setLocalLang] = useState(lang);
   const [provider, setProvider] = useState(defaultProvider);
+  const [notifications, setNotifications] = useState(
+    localStorage.getItem('app.notifications') === 'true'
+  );
+  const [autoRefresh, setAutoRefresh] = useState(
+    localStorage.getItem('app.autoRefresh') === 'true'
+  );
+  const [refreshInterval, setRefreshInterval] = useState(
+    parseInt(localStorage.getItem('app.refreshInterval') || '30')
+  );
 
-  useEffect(()=>{ setLocLang(lang) }, [lang]);
-  useEffect(()=>{ setProvider(defaultProvider) }, [defaultProvider]);
-
-  const save = ()=>{
-    onChangeLang?.(locLang);
+  const handleSave = () => {
+    onChangeLang?.(localLang);
     onChangeProvider?.(provider);
+    
     try {
-      localStorage.setItem('app.lang', locLang);
+      localStorage.setItem('app.lang', localLang);
       localStorage.setItem('app.defaultProvider', provider);
-    } catch {}
-    alert(locLang==='ru' ? 'Настройки сохранены' : 'Settings saved');
+      localStorage.setItem('app.notifications', String(notifications));
+      localStorage.setItem('app.autoRefresh', String(autoRefresh));
+      localStorage.setItem('app.refreshInterval', String(refreshInterval));
+      
+      alert(t.saved);
+      
+      // Trigger refresh if auto-refresh settings changed
+      if (autoRefresh) {
+        window.dispatchEvent(new Event('settings-changed'));
+      }
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+    }
   };
 
   return (
-    <div style={{paddingTop:10}}>
-      <h2>{locLang==='ru' ? '⚙️ Настройки' : '⚙️ Settings'}</h2>
+    <div>
+      <div className="card">
+        <h2>{t.title}</h2>
+        
+        {/* Tabs */}
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'general' ? 'active' : ''}`}
+            onClick={() => setActiveTab('general')}
+          >
+            {t.generalTab}
+          </button>
+          <button
+            className={`tab ${activeTab === 'ocr' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ocr')}
+          >
+            {t.ocrTab}
+          </button>
+          <button
+            className={`tab ${activeTab === 'telegram' ? 'active' : ''}`}
+            onClick={() => setActiveTab('telegram')}
+          >
+            {t.telegramTab}
+          </button>
+        </div>
 
-      <div style={{marginBottom:12}}>
-        <label style={{marginRight:8}}>{locLang==='ru' ? 'Язык интерфейса' : 'Interface language'}</label>
-        <select value={locLang} onChange={(e)=> setLocLang(e.target.value)}>
-          <option value="ru">Рус</option>
-          <option value="en">EN</option>
-        </select>
-      </div>
+        {/* Tab Content */}
+        {activeTab === 'general' && (
+          <div>
+            {/* Language */}
+            <div className="form-group">
+              <label>{t.interfaceLanguage}</label>
+              <select 
+                value={localLang} 
+                onChange={(e) => setLocalLang(e.target.value)}
+                style={{ maxWidth: '300px' }}
+              >
+                <option value="ru">🇷🇺 Русский</option>
+                <option value="en">🇬🇧 English</option>
+              </select>
+            </div>
 
-      <div style={{marginBottom:12}}>
-        <label style={{marginRight:8}}>{locLang==='ru' ? 'Провайдер OCR по умолчанию' : 'Default OCR provider'}</label>
-        <select value={provider} onChange={(e)=> setProvider(e.target.value)}>
-          <option value="tesseract">Tesseract</option>
-          <option value="parsio">Parsio</option>
-        </select>
-      </div>
+            {/* Default Provider */}
+            <div className="form-group">
+              <label>{t.defaultProvider}</label>
+              <select 
+                value={provider} 
+                onChange={(e) => setProvider(e.target.value)}
+                style={{ maxWidth: '300px' }}
+              >
+                <option value="auto">{t.auto}</option>
+                <option value="tesseract">Tesseract</option>
+                <option value="parsio">Parsio</option>
+                <option value="google">Google Vision</option>
+              </select>
+            </div>
 
-      <button onClick={save}>{locLang==='ru' ? 'Сохранить' : 'Save'}</button>
+            {/* Notifications */}
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={notifications}
+                  onChange={(e) => setNotifications(e.target.checked)}
+                />
+                {t.enableNotifications}
+              </label>
+            </div>
 
-      <div style={{marginTop:16, color:'#555', fontSize:14}}>
-        <div>{locLang==='ru' ? 'Подсказка: настройки сохраняются в браузере (localStorage).' : 'Note: settings are saved in browser localStorage.'}</div>
+            {/* Auto Refresh */}
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                />
+                {t.enableAutoRefresh}
+              </label>
+            </div>
+
+            {autoRefresh && (
+              <div className="form-group" style={{ marginLeft: '28px' }}>
+                <label>{t.refreshInterval}</label>
+                <input
+                  type="number"
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(parseInt(e.target.value) || 30)}
+                  min="10"
+                  max="300"
+                  style={{ maxWidth: '150px' }}
+                />
+              </div>
+            )}
+
+            <button onClick={handleSave} className="success">
+              {t.save}
+            </button>
+
+            <div className="alert info" style={{ marginTop: '16px' }}>
+              ℹ️ {t.hint}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ocr' && (
+          <div>
+            <OCRSettings lang={lang} />
+          </div>
+        )}
+
+        {activeTab === 'telegram' && (
+          <div>
+            <TelegramSettings lang={lang} />
+          </div>
+        )}
       </div>
     </div>
   );
