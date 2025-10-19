@@ -104,6 +104,33 @@ def init_default_users():
 backfill_uids_safe()
 init_default_users()
 
+# ============================================================================
+# AUDIT LOG HELPER
+# ============================================================================
+
+def create_audit_log(
+    db: Session,
+    contact_id: Optional[int],
+    user: User,
+    action: str,
+    entity_type: str = 'contact',
+    changes: Optional[dict] = None
+):
+    """Create an audit log entry."""
+    from .models import AuditLog
+    import json
+    
+    audit_entry = AuditLog(
+        contact_id=contact_id,
+        user_id=user.id if user else None,
+        username=user.username if user else None,
+        action=action,
+        entity_type=entity_type,
+        changes=json.dumps(changes, ensure_ascii=False) if changes else None
+    )
+    db.add(audit_entry)
+    # Note: Commit should be done by the caller
+
 # --- Image utils ---
 def downscale_image_bytes(data: bytes, max_side: int = 2000) -> bytes:
     try:
@@ -357,6 +384,7 @@ def list_contacts(
     company: str = Query(None, description="Filter by company"),
     position: str = Query(None, description="Filter by position"),
     tags: str = Query(None, description="Filter by tag names (comma-separated)"),
+    groups: str = Query(None, description="Filter by group names (comma-separated)"),
     sort_by: str = Query('id', description="Sort field: id, full_name, company, position"),
     sort_order: str = Query('desc', description="Sort order: asc, desc"),
     db: Session = Depends(get_db),
@@ -370,10 +398,11 @@ def list_contacts(
     - company: Filter by company (case-insensitive partial match)
     - position: Filter by position (case-insensitive partial match)
     - tags: Filter by tag names (comma-separated, e.g., "vip,client")
+    - groups: Filter by group names (comma-separated, e.g., "partners,customers")
     - sort_by: Field to sort by (id, full_name, company, position)
     - sort_order: Sort direction (asc, desc)
     """
-    from .models import Tag
+    from .models import Tag, Group
     
     query = db.query(Contact)
     
@@ -410,6 +439,18 @@ def list_contacts(
                 # Filter contacts that have ANY of the specified tags
                 query = query.filter(Contact.tags.any(Tag.id.in_(tag_ids)))
     
+    # Filter by groups
+    if groups:
+        group_names = [name.strip() for name in groups.split(',') if name.strip()]
+        if group_names:
+            # Get group IDs for the given names
+            group_records = db.query(Group).filter(Group.name.in_(group_names)).all()
+            group_ids = [group.id for group in group_records]
+            
+            if group_ids:
+                # Filter contacts that have ANY of the specified groups
+                query = query.filter(Contact.groups.any(Group.id.in_(group_ids)))
+    
     # Sorting
     sort_field = getattr(Contact, sort_by, Contact.id)
     if sort_order.lower() == 'asc':
@@ -441,6 +482,18 @@ def create_contact(
         payload['uid'] = uuid.uuid4().hex
     contact = Contact(**payload)
     db.add(contact)
+    db.flush()  # Get ID without committing
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='created',
+        entity_type='contact',
+        changes=payload
+    )
+    
     db.commit()
     db.refresh(contact)
     
@@ -462,6 +515,17 @@ def update_contact(
         raise HTTPException(status_code=404, detail='Not found')
     
     update_data = data.dict(exclude_unset=True)
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='updated',
+        entity_type='contact',
+        changes=update_data
+    )
+    
     for k, v in update_data.items():
         if hasattr(contact, k):
             setattr(contact, k, v)
@@ -478,6 +542,17 @@ def delete_contact(
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail='Not found')
+    
+    # Audit log (before deletion)
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='deleted',
+        entity_type='contact',
+        changes={'full_name': contact.full_name, 'company': contact.company}
+    )
+    
     db.delete(contact)
     db.commit()
     return {'deleted': contact_id}
@@ -846,6 +921,210 @@ def remove_tag_from_contact(
     
     logger.info(f"Tag removed from contact {contact.full_name} by {current_user.username}")
     return contact
+
+
+# ============================================================================
+# GROUP ENDPOINTS
+# ============================================================================
+
+@app.get('/groups/', response_model=List[schemas.GroupResponse])
+def list_groups(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all groups."""
+    from .models import Group
+    return db.query(Group).order_by(Group.name).all()
+
+
+@app.post('/groups/', response_model=schemas.GroupResponse, status_code=status.HTTP_201_CREATED)
+def create_group(
+    group_data: schemas.GroupCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new group."""
+    from .models import Group
+    
+    # Check if group with this name already exists
+    existing = db.query(Group).filter(Group.name == group_data.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Group '{group_data.name}' already exists"
+        )
+    
+    group = Group(**group_data.dict())
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    
+    logger.info(f"Group created by {current_user.username}: {group.name}")
+    return group
+
+
+@app.put('/groups/{group_id}', response_model=schemas.GroupResponse)
+def update_group(
+    group_id: int,
+    group_data: schemas.GroupUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a group."""
+    from .models import Group
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail='Group not found')
+    
+    # Check for duplicate name
+    if group_data.name and group_data.name != group.name:
+        existing = db.query(Group).filter(Group.name == group_data.name).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Group '{group_data.name}' already exists"
+            )
+        group.name = group_data.name
+    
+    if group_data.description is not None:
+        group.description = group_data.description
+    
+    if group_data.color is not None:
+        group.color = group_data.color
+    
+    db.commit()
+    db.refresh(group)
+    
+    logger.info(f"Group updated by {current_user.username}: {group.name}")
+    return group
+
+
+@app.delete('/groups/{group_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)  # Only admins can delete groups
+):
+    """Delete a group (admin only)."""
+    from .models import Group
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail='Group not found')
+    
+    logger.info(f"Group deleted by admin {current_user.username}: {group.name}")
+    db.delete(group)
+    db.commit()
+    return
+
+
+@app.post('/contacts/{contact_id}/groups', response_model=schemas.ContactResponse)
+def add_group_to_contact(
+    contact_id: int,
+    group_ids: List[int] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Add groups to a contact."""
+    from .models import Group
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    for group_id in group_ids:
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if group and group not in contact.groups:
+            contact.groups.append(group)
+    
+    db.commit()
+    db.refresh(contact)
+    
+    logger.info(f"Groups added to contact {contact.full_name} by {current_user.username}")
+    return contact
+
+
+@app.delete('/contacts/{contact_id}/groups/{group_id}', response_model=schemas.ContactResponse)
+def remove_group_from_contact(
+    contact_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Remove a group from a contact."""
+    from .models import Group
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group and group in contact.groups:
+        contact.groups.remove(group)
+        
+        # Audit log
+        create_audit_log(
+            db=db,
+            contact_id=contact.id,
+            user=current_user,
+            action='group_removed',
+            entity_type='contact',
+            changes={'group_id': group.id, 'group_name': group.name}
+        )
+    
+    db.commit()
+    db.refresh(contact)
+    
+    logger.info(f"Group removed from contact {contact.full_name} by {current_user.username}")
+    return contact
+
+
+# ============================================================================
+# AUDIT LOG ENDPOINTS
+# ============================================================================
+
+@app.get('/contacts/{contact_id}/history', response_model=List[schemas.AuditLogResponse])
+def get_contact_history(
+    contact_id: int,
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of records to return"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get audit history for a specific contact."""
+    from .models import AuditLog
+    
+    # Check if contact exists
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    # Get audit logs for this contact
+    logs = db.query(AuditLog).filter(
+        AuditLog.contact_id == contact_id
+    ).order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    
+    return logs
+
+
+@app.get('/audit/recent', response_model=List[schemas.AuditLogResponse])
+def get_recent_audit_logs(
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    entity_type: Optional[str] = Query(None, description="Filter by entity type (contact, tag, group)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)  # Only admins can view all logs
+):
+    """Get recent audit logs (admin only)."""
+    from .models import AuditLog
+    
+    query = db.query(AuditLog)
+    
+    if entity_type:
+        query = query.filter(AuditLog.entity_type == entity_type)
+    
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    
+    return logs
 
 
 # ============================================================================

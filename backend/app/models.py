@@ -11,6 +11,14 @@ contact_tags = Table(
     Column('tag_id', Integer, ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True)
 )
 
+# Association table for many-to-many relationship between contacts and groups
+contact_groups = Table(
+    'contact_groups',
+    Base.metadata,
+    Column('contact_id', Integer, ForeignKey('contacts.id', ondelete='CASCADE'), primary_key=True),
+    Column('group_id', Integer, ForeignKey('groups.id', ondelete='CASCADE'), primary_key=True)
+)
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -33,6 +41,17 @@ class Tag(Base):
     # Relationship to contacts
     contacts = relationship('Contact', secondary=contact_tags, back_populates='tags')
 
+class Group(Base):
+    __tablename__ = "groups"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    color = Column(String, nullable=True, default='#10b981')  # Default green
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationship to contacts
+    contacts = relationship('Contact', secondary=contact_groups, back_populates='groups')
+
 class Contact(Base):
     __tablename__ = "contacts"
     id = Column(Integer, primary_key=True, index=True)
@@ -48,11 +67,23 @@ class Contact(Base):
     photo_path = Column(String, nullable=True)
     ocr_raw = Column(String, nullable=True)
     
-    # Relationship to tags
+    # Relationships
     tags = relationship('Tag', secondary=contact_tags, back_populates='contacts')
+    groups = relationship('Group', secondary=contact_groups, back_populates='contacts')
 
 class AppSetting(Base):
     __tablename__ = "app_settings"
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String, unique=True, index=True, nullable=False)
     value = Column(String, nullable=True)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey('contacts.id', ondelete='CASCADE'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    username = Column(String, nullable=True)  # Store username for records even if user is deleted
+    action = Column(String, nullable=False)  # 'created', 'updated', 'deleted', 'tag_added', 'tag_removed', etc.
+    entity_type = Column(String, nullable=False, default='contact')  # 'contact', 'tag', 'group'
+    changes = Column(String, nullable=True)  # JSON string of changes
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -112,6 +112,7 @@ class ContactResponse(ContactBase):
     """Schema for contact in responses."""
     id: int
     tags: List['TagResponse'] = []
+    groups: List['GroupResponse'] = []
     
     class Config:
         from_attributes = True
@@ -142,6 +143,57 @@ class TagResponse(TagBase):
     """Schema for tag in responses."""
     id: int
     created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Group Schemas
+# ============================================================================
+
+class GroupBase(BaseModel):
+    """Base group schema."""
+    name: str
+    description: Optional[str] = None
+    color: Optional[str] = '#10b981'
+
+
+class GroupCreate(GroupBase):
+    """Schema for creating a group."""
+    pass
+
+
+class GroupUpdate(BaseModel):
+    """Schema for updating a group."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+
+
+class GroupResponse(GroupBase):
+    """Schema for group in responses."""
+    id: int
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Audit Log Schemas
+# ============================================================================
+
+class AuditLogResponse(BaseModel):
+    """Schema for audit log in responses."""
+    id: int
+    contact_id: Optional[int] = None
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    action: str
+    entity_type: str
+    changes: Optional[str] = None
+    timestamp: Optional[datetime] = None
     
     class Config:
         from_attributes = True
