@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to release (e.g., v1.2)'
+        required: true
+        default: ''
+      body_path:
+        description: 'Path to release notes file'
+        required: false
+        default: ''
 
 jobs:
   build-and-release:
@@ -12,13 +22,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Determine tag and notes path
+        id: meta
+        run: |
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          NOTES="${{ inputs.body_path }}"
+          if [ -z "$NOTES" ] && [ -f "RELEASE_NOTES_${TAG}.md" ]; then
+            NOTES="RELEASE_NOTES_${TAG}.md"
+          fi
+          echo "notes=$NOTES" >> $GITHUB_OUTPUT
+
       - name: Zip project (excluding common large/cache dirs)
         run: |
           zip -r artifact.zip . -x "*.git*" "node_modules/*" "frontend/node_modules/*" "*/build/*" "*/dist/*" "*/coverage/*"
 
-      - name: Create GitHub Release
+      - name: Create/Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          body_path: ${{ steps.meta.outputs.notes }}
           files: |
             artifact.zip
         env:
