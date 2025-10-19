@@ -10,3 +10,6 @@ gunicorn
 email-validator
 psycopg2-binary
 requests
+python-jose[cryptography]
+passlib[bcrypt]
+slowapi

@@ -1,15 +1,19 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional
+from typing import Optional, List
+from datetime import timedelta
 from .database import engine, Base, get_db
-from .models import Contact, AppSetting
+from .models import Contact, AppSetting, User
 from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
 from .ocr_providers import OCRManager
+from . import auth_utils
+from . import schemas
 import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
 from PIL import Image
 import logging
@@ -70,7 +74,17 @@ def backfill_uids_safe():
     except Exception as e:
         print(f"UID backfill failed: {e}")
 
+def init_default_users():
+    """Initialize default admin user if no users exist."""
+    try:
+        SessionLocal = sessionmaker(bind=engine)
+        with SessionLocal() as db:
+            auth_utils.init_default_admin(db)
+    except Exception as e:
+        print(f"User initialization failed: {e}")
+
 backfill_uids_safe()
+init_default_users()
 
 # --- Image utils ---
 def downscale_image_bytes(data: bytes, max_side: int = 2000) -> bytes:
@@ -532,3 +546,222 @@ def update_bulk(payload: dict, db: Session = Depends(get_db)):
     db.execute(stmt)
     db.commit()
     return {'updated': len(ids)}
+
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.post('/auth/register', response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
+    """
+    Register a new user.
+    
+    - **username**: Unique username (alphanumeric, 3-50 characters)
+    - **email**: Valid email address
+    - **password**: Password (minimum 6 characters)
+    - **full_name**: Optional full name
+    """
+    try:
+        # Create user (auth_utils will check for duplicates)
+        user = auth_utils.create_user(
+            db=db,
+            username=user_data.username,
+            email=user_data.email,
+            password=user_data.password,
+            full_name=user_data.full_name,
+            is_admin=False  # Regular users can't self-promote to admin
+        )
+        logger.info(f"New user registered: {user.username}")
+        return user
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@app.post('/auth/login', response_model=schemas.Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    """
+    Login with username/email and password.
+    Returns JWT access token.
+    
+    - **username**: Username or email
+    - **password**: User password
+    """
+    user = auth_utils.authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth_utils.create_access_token(
+        data={"sub": user.username},
+        expires_delta=access_token_expires
+    )
+    
+    logger.info(f"User logged in: {user.username}")
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get('/auth/me', response_model=schemas.UserResponse)
+async def get_current_user_info(
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Get current authenticated user information.
+    Requires valid JWT token.
+    """
+    return current_user
+
+
+@app.put('/auth/me', response_model=schemas.UserResponse)
+async def update_current_user(
+    user_update: schemas.UserUpdate,
+    current_user: User = Depends(auth_utils.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user profile.
+    Requires valid JWT token.
+    
+    - **email**: New email (optional)
+    - **full_name**: New full name (optional)
+    - **password**: New password (optional)
+    """
+    # Update fields
+    if user_update.email is not None:
+        # Check if email is already taken by another user
+        existing = auth_utils.get_user_by_email(db, user_update.email)
+        if existing and existing.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        current_user.email = user_update.email
+    
+    if user_update.full_name is not None:
+        current_user.full_name = user_update.full_name
+    
+    if user_update.password is not None:
+        current_user.hashed_password = auth_utils.get_password_hash(user_update.password)
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    logger.info(f"User updated profile: {current_user.username}")
+    
+    return current_user
+
+
+@app.get('/auth/users', response_model=List[schemas.UserResponse])
+async def list_users(
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List all users (admin only).
+    Requires valid JWT token with admin privileges.
+    """
+    users = db.query(User).all()
+    return users
+
+
+@app.get('/auth/users/{user_id}', response_model=schemas.UserResponse)
+async def get_user(
+    user_id: int,
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get user by ID (admin only).
+    Requires valid JWT token with admin privileges.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return user
+
+
+@app.delete('/auth/users/{user_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete user by ID (admin only).
+    Requires valid JWT token with admin privileges.
+    Cannot delete yourself.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete yourself"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    db.delete(user)
+    db.commit()
+    
+    logger.info(f"User deleted by admin {current_user.username}: {user.username}")
+    
+    return None
+
+
+@app.patch('/auth/users/{user_id}/admin', response_model=schemas.UserResponse)
+async def toggle_admin(
+    user_id: int,
+    is_admin: bool = Body(..., embed=True),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle admin status for a user (admin only).
+    Requires valid JWT token with admin privileges.
+    Cannot change your own admin status.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own admin status"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_admin = is_admin
+    db.commit()
+    db.refresh(user)
+    
+    logger.info(f"Admin status changed by {current_user.username}: {user.username} -> {is_admin}")
+    
+    return user
