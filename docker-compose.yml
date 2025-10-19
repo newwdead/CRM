@@ -36,6 +36,9 @@ services:
       - backend
     ports:
       - '3000:80'
+      - '8443:8443'
+    volumes:
+      - /etc/nginx/certs:/etc/nginx/certs:ro
 
 volumes:
   postgres_data:

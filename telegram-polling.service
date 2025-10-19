@@ -1,0 +1,19 @@
+[Unit]
+Description=Telegram Polling для BizCard CRM
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/fastapi-bizcard-crm-ready
+Environment="TELEGRAM_TOKEN=8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_1Qw9Pm5s"
+ExecStart=/usr/bin/python3 /home/ubuntu/fastapi-bizcard-crm-ready/telegram_polling.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

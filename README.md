@@ -1,166 +1,323 @@
-# fastapi-bizcard-crm (production-ready)
+# 📇 BizCard CRM - Business Card Management System
 
-**What**: Business-card OCR + CRM. React frontend (multi-language RU/EN) served by Nginx, FastAPI backend (Gunicorn+Uvicorn) with Tesseract OCR built into the container. SQLite used for storage (file `./data/contacts.db`).
+> **Full-featured CRM system with OCR recognition and Telegram integration**
 
-## Quick start (Linux / macOS / Windows with Docker Desktop)
-1. Unzip or clone this project.
-2. Build and run (production build):
-```bash
-docker-compose build
-docker-compose up -d
+![Version](https://img.shields.io/badge/version-1.6-blue)
+![Python](https://img.shields.io/badge/python-3.10-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
+![React](https://img.shields.io/badge/React-18-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
+
+[**Русская документация**](README.ru.md) | [English Documentation](README.md)
+
+---
+
+## 🎯 About
+
+BizCard CRM is a modern web-based contact management system specializing in automatic business card recognition. The system allows you to:
+
+- 📸 **Upload business card photos** via web interface or Telegram
+- 🤖 **Automatically recognize text** using OCR (Tesseract or Parsio)
+- 💼 **Manage contacts** in a convenient interface
+- 📱 **Integrate with Telegram** for instant card processing
+- 📊 **Export data** to CSV and XLSX formats
+- 🔍 **Search and filter** contacts
+
+---
+
+## ✨ Features
+
+### 🖼️ OCR Recognition
+- Two OCR providers: **Tesseract** (local, free) and **Parsio** (cloud, paid)
+- Multi-pass image processing for better accuracy
+- Support for Russian and English languages
+- Images up to 20 MB
+
+### 📱 Telegram Integration
+- Automatic photo processing from Telegram
+- Two modes: **webhook** (production) and **polling** (development)
+- Configurable allowed chats
+- OCR provider selection
+- Systemd service for auto-start
+
+### 💾 Contact Management
+- Full CRUD operations
+- Bulk update/delete
+- Inline comment editing
+- Photo attachments
+- Unique identifiers (UID)
+
+### 📊 Import/Export
+- Import from CSV and XLSX
+- Export to CSV and XLSX
+- Export selected contacts
+
+---
+
+## 🛠️ Technology Stack
+
+**Backend:** FastAPI, SQLAlchemy, PostgreSQL, Tesseract OCR  
+**Frontend:** React 18, Create React App  
+**Infrastructure:** Docker, Docker Compose, Nginx, SSL/TLS
+
+---
+
+## 📁 Project Structure
+
 ```
-3. Open frontend: http://localhost:3000  
-   API /docs (FastAPI): http://localhost:8000/docs
-
-## Notes
-- Tesseract is installed in backend image (languages: eng + rus). If you need extra languages, install them into the container or into the host Tesseract.
-- Data file is persisted into `./data/contacts.db` on the host because of the volume mapping in docker-compose.
-- To stop and remove containers:
-```bash
-docker-compose down
+fastapi-bizcard-crm-ready/
+│
+├── backend/              # FastAPI application
+│   ├── app/
+│   │   ├── main.py      # Main app, CRUD endpoints, OCR processing
+│   │   ├── models.py    # SQLAlchemy models
+│   │   ├── database.py  # Database configuration
+│   │   └── ocr_utils.py # OCR functionality
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── frontend/            # React application
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── App.js
+│   │   └── index.js
+│   ├── nginx.conf       # Nginx configuration
+│   ├── package.json
+│   └── Dockerfile
+│
+├── uploads/             # Uploaded business card photos
+├── docker-compose.yml   # Docker Compose config
+├── telegram_polling.py  # Telegram polling script
+├── .env.example         # Environment variables template
+│
+├── README.md            # Documentation (English)
+├── README.ru.md         # Documentation (Russian)
+├── SSL_SETUP.md         # SSL setup guide
+└── TELEGRAM_SETUP.md    # Telegram integration guide
 ```
 
-# System Overview
+---
 
-This repository provides a production-ready Business Card OCR + lightweight CRM.
+## 🚀 Quick Start
 
-- **Frontend**: React SPA (RU/EN), built and served by Nginx (`frontend/`).
-- **Backend**: FastAPI served by Gunicorn+Uvicorn (`backend/`).
-- **DB**: PostgreSQL (via Docker Compose service `db`).
-- **OCR Providers**:
-  - Local: Tesseract (eng+rus) with multi-pass preprocessing.
-  - Cloud: Parsio (via API, mailbox upload + document polling).
+### Prerequisites
 
-# Architecture
+- Docker (v20.10+)
+- Docker Compose (v2.0+)
+- 4 GB RAM
+- 10 GB disk space
 
-- **Containers** (see `docker-compose.yml`):
-  - `db`: PostgreSQL 15.
-  - `backend`: Python 3.10-slim + FastAPI + Gunicorn + Uvicorn; Tesseract installed (`eng`, `rus`).
-  - `frontend`: Nginx serving a production React build.
+### Installation
 
-- **Backend modules** (key files):
-  - `backend/app/main.py` – FastAPI app, CRUD endpoints, upload OCR, import/export, bulk ops.
-  - `backend/app/models.py` – SQLAlchemy models (`Contact`).
-  - `backend/app/database.py` – SQLAlchemy engine & session; reads `DATABASE_URL`.
-  - `backend/app/ocr_utils.py` – OCR with Tesseract and Parsio integration.
+```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/fastapi-bizcard-crm.git
+cd fastapi-bizcard-crm-ready
 
-- **Frontend components**:
-  - `frontend/src/components/UploadCard.js` – upload form with provider selector (Tesseract/Parsio).
-  - `frontend/src/components/ContactList.js` – list, search, add, inline edit (`comment`), bulk edit/delete.
-  - `frontend/src/components/ImportExport.js` – CSV/XLSX import/export (if present).
+# 2. (Optional) Create .env file
+cp .env.example .env
+# Edit .env if needed
 
-# Features
+# 3. Build and start containers
+docker compose up -d --build
 
-- **Contacts CRUD** with fields: `full_name`, `company`, `position`, `email`, `phone`, `address`, `comment`.
-- **Upload & OCR** for business cards:
-  - Select provider in UI: Tesseract (local) or Parsio (cloud).
-  - File size limit: 10MB; content-type must be image/*.
-  - Tesseract: multi-pass (grayscale, threshold, median blur, PSM variants), languages `eng+rus`.
-  - Parsio: POST to mailbox upload, then poll document until fields are ready.
-- **Import** contacts from CSV/XLSX; **NaN** normalized to `null`.
-- **Export** contacts to CSV and XLSX (in-memory streaming).
-- **Bulk actions**: delete and update selected contacts.
-- **Inline edit** for `comment` directly in the table.
+# 4. Wait for startup (30-60 seconds)
+docker compose logs -f
 
-# Environment
+# 5. Open in browser
+# Frontend:  http://localhost:3000
+# API docs:  http://localhost:8000/docs
+# HTTPS:     https://localhost:8443
+```
 
-Create `.env` in project root (Compose auto-loads it). Important variables:
+### Health Check
+
+```bash
+# Check container status
+docker compose ps
+
+# Check health endpoint
+curl http://localhost:8000/health
+
+# View logs
+docker compose logs backend
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Create `.env` file in project root:
 
 ```ini
-# Database (default provided via docker-compose)
+# Database
 DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+POSTGRES_PASSWORD=your_secure_password
 
-# Parsio (Cloud OCR)
-PARSIO_API_KEY=YOUR_PARSIO_API_KEY
-# Mailbox upload endpoint, e.g.
-PARSIO_API_URL=https://api.parsio.io/mailboxes/<mailbox_id>/upload
-# Document fetch template (defaults to https://api.parsio.io/docs/{id})
-PARSIO_DOCUMENT_URL_TEMPLATE=https://api.parsio.io/docs/{id}
-PARSIO_AUTH_HEADER_NAME=X-API-Key
-PARSIO_AUTH_HEADER_VALUE={key}
-PARSIO_TIMEOUT=45
-PARSIO_POLL_INTERVAL=2.0
-PARSIO_POLL_MAX_ATTEMPTS=20
+# Parsio Cloud OCR (optional)
+PARSIO_API_KEY=your_api_key
+PARSIO_API_URL=https://api.parsio.io/mailboxes/<id>/upload
 
-# Misc
-TZ=Europe/Berlin
+# Application
+APP_VERSION=v1.6
+TZ=Europe/Moscow
 ```
 
-# Backend API
+### Telegram Setup
 
-Base URL: `http://localhost:8000`
-
-- `GET /contacts/` – list contacts.
-- `POST /contacts/` – create (`ContactCreate`).
-- `PUT /contacts/{id}` – update (`ContactUpdate`).
-- `DELETE /contacts/{id}` – delete one.
-- `POST /contacts/delete_bulk` – delete many; JSON body is an array of IDs, e.g. `[1,2,3]`.
-- `PUT /contacts/update_bulk` – bulk update `{ "ids": [..], "fields": {..} }`.
-- `POST /upload/?provider=tesseract|parsio` – upload image and OCR.
-  - Multipart field: `file` (tries `document` as fallback for Parsio).
-- `GET /contacts/export` – CSV download.
-- `GET /contacts/export/xlsx` – XLSX download.
-- `POST /contacts/import` – CSV/XLSX upload to import.
-
-# OCR Providers
-
-- **Tesseract (local)**
-  - Installed in `backend` image: packages `tesseract-ocr`, `tesseract-ocr-rus`.
-  - Preprocessing and PSM variants improve accuracy for RU/EN.
-
-- **Parsio (cloud)**
-  - Upload to `PARSIO_API_URL` (mailbox upload endpoint).
-  - Extract `doc_id` from response (supports `Location` header and deep JSON scan).
-  - Poll `PARSIO_DOCUMENT_URL_TEMPLATE` (default `/docs/{id}`) until fields are ready.
-  - Normalizes typical fields to our schema from keys like:
-    - `ContactNames`, `CompanyNames`, `Emails`, `MobilePhones`, `WorkPhones`, `JobTitles`, `Departments`, `Websites`.
-
-# Running
-
-Production-like (Docker):
+1. Create bot via [@BotFather](https://t.me/BotFather)
+2. Get token
+3. Configure via API:
 
 ```bash
+curl -X PUT http://localhost:8000/settings/telegram \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": true,
+    "token": "your_token",
+    "allowed_chats": "123456789",
+    "provider": "tesseract"
+  }'
+```
+
+4. Start polling service:
+
+```bash
+sudo systemctl enable telegram-polling
+sudo systemctl start telegram-polling
+```
+
+See [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) for details.
+
+---
+
+## 📖 API Documentation
+
+Interactive API documentation is automatically generated:
+
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
+
+### Main Endpoints
+
+```http
+GET    /contacts/              # List all contacts
+GET    /contacts/{id}          # Get contact by ID
+POST   /contacts/              # Create contact
+PUT    /contacts/{id}          # Update contact
+DELETE /contacts/{id}          # Delete contact
+POST   /contacts/delete_bulk   # Bulk delete
+PUT    /contacts/update_bulk   # Bulk update
+
+POST   /upload/?provider=tesseract  # Upload & OCR
+
+GET    /contacts/export        # Export to CSV
+GET    /contacts/export/xlsx   # Export to XLSX
+POST   /contacts/import        # Import from CSV/XLSX
+
+GET    /settings/telegram      # Get Telegram settings
+PUT    /settings/telegram      # Update Telegram settings
+POST   /telegram/webhook       # Telegram webhook endpoint
+
+GET    /health                 # Health check
+GET    /version                # App version
+```
+
+---
+
+## 🔒 SSL and HTTPS
+
+### Self-signed Certificate (development)
+
+```bash
+# Create directory
+sudo mkdir -p /etc/nginx/certs
+
+# Generate certificate
+sudo openssl req -x509 -newkey rsa:4096 -nodes \
+  -keyout /etc/nginx/certs/selfsigned.key \
+  -out /etc/nginx/certs/selfsigned.crt \
+  -days 365 \
+  -subj "/CN=localhost/O=BizCard CRM/C=US"
+
+# Restart frontend
+docker compose restart frontend
+```
+
+See [SSL_SETUP.md](SSL_SETUP.md) for production setup with Let's Encrypt.
+
+---
+
+## 🚢 Deployment
+
+### Production with Docker Compose
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+### Backup
+
+```bash
+# Backup database
+docker compose exec db pg_dump -U postgres bizcard_crm > backup.sql
+
+# Backup uploads
+tar -czf uploads_backup.tar.gz uploads/
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Containers don't start
+
+```bash
+docker compose logs
+docker compose down -v
 docker compose up -d --build
-# Frontend: http://localhost:3000
-# Backend docs: http://localhost:8000/docs
 ```
 
-Stop:
+### Database connection error
 
 ```bash
-docker compose down
+docker compose exec db psql -U postgres -c "SELECT version();"
+docker compose exec backend env | grep DATABASE_URL
 ```
 
-# Troubleshooting
+### Tesseract doesn't recognize Russian
 
-- **Upload fails with 400 (type/size)**: ensure file is an image and ≤ 10MB.
-- **Tesseract RU not recognized**: ensure `tesseract-ocr-rus` installed (already in Dockerfile).
-- **Parsio 404 "Cannot POST /"**: `PARSIO_API_URL` must be a mailbox upload endpoint, e.g. `/mailboxes/<id>/upload`, not the base URL.
-- **Parsio returns no fields**:
-  - Increase `PARSIO_POLL_INTERVAL` / `PARSIO_POLL_MAX_ATTEMPTS`.
-  - Verify `PARSIO_DOCUMENT_URL_TEMPLATE` matches your API (`/docs/{id}` or your host’s path).
-  - Check that fields exist in document JSON; adjust mapping if your structure differs.
-- **CORS**: backend allows `http://localhost:3000` and `http://127.0.0.1:3000`.
+```bash
+docker compose exec backend tesseract --list-langs
+# Should show: eng, rus
 
-# Security Notes
-
-- Do not commit `.env` with secrets.
-- API keys are read from environment and sent via headers; never embed keys in frontend.
-
-# Project Structure
-
-```
-backend/
-  app/
-    main.py
-    models.py
-    database.py
-    ocr_utils.py
-frontend/
-  src/
-    components/
-      UploadCard.js
-      ContactList.js
-docker-compose.yml
+docker compose build backend
 ```
 
+### Telegram not receiving messages
+
+```bash
+sudo systemctl status telegram-polling
+sudo journalctl -u telegram-polling -f
+curl http://localhost:8000/settings/telegram
+```
+
+---
+
+## 📝 License
+
+MIT License
+
+---
+
+## 👥 Support
+
+- 📧 Email: support@example.com
+- 💬 Telegram: @yourusername
+- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/fastapi-bizcard-crm/issues)
+
+---
+
+**Made with ❤️ for business card automation**
