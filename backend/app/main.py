@@ -135,17 +135,26 @@ def upload_card(
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
-        # Check file size (max 10MB)
-        limit = 10 * 1024 * 1024
+        # Check file size
+        # v1.2: allow up to 20MB for Parsio, 10MB for Tesseract
+        limit = 20 * 1024 * 1024 if provider == 'parsio' else 10 * 1024 * 1024
         # Read up to limit + 1 byte to detect overflow, then reset pointer before OCR
         head = file.file.read(limit + 1)
         if len(head) > limit:
-            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+            raise HTTPException(status_code=400, detail=(
+                "File too large. Maximum size is 20MB for Parsio" if provider == 'parsio'
+                else "File too large. Maximum size is 10MB"
+            ))
         file.file.seek(0)
         
         # Run OCR via selected provider
         if provider == 'parsio':
-            data = ocr_parsio(file.file, filename=file.filename)
+            try:
+                data = ocr_parsio(file.file, filename=file.filename)
+            except Exception as e:
+                # v1.2 fallback to Tesseract on Parsio failure
+                file.file.seek(0)
+                data = ocr_image_fileobj(file.file)
         else:
             data = ocr_image_fileobj(file.file)
         
