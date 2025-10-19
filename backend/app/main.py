@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Query, status
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body, Query, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,11 +8,15 @@ from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 from datetime import timedelta
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from .database import engine, Base, get_db
 from .models import Contact, AppSetting, User
 from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
 from .ocr_providers import OCRManager
 from . import auth_utils
+from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
 import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time
 from PIL import Image
@@ -24,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 # Инициализация OCR Manager
 ocr_manager = OCRManager()
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
     last_err = None
@@ -146,6 +153,11 @@ class ContactUpdate(BaseModel):
         return v
 
 app = FastAPI(title="BizCard CRM")
+
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 os.makedirs('uploads', exist_ok=True)
 app.mount('/files', StaticFiles(directory='uploads'), name='files')
 
@@ -206,7 +218,10 @@ class TelegramSettings(BaseModel):
     provider: Optional[str] = 'auto'  # 'auto' | 'tesseract' | 'parsio' | 'google'
 
 @app.get('/settings/telegram')
-def get_telegram_settings(db: Session = Depends(get_db)):
+def get_telegram_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     return {
         'enabled': get_setting(db, 'tg.enabled', 'false') == 'true',
         'token': get_setting(db, 'tg.token', None),
@@ -215,7 +230,11 @@ def get_telegram_settings(db: Session = Depends(get_db)):
     }
 
 @app.put('/settings/telegram')
-def put_telegram_settings(data: TelegramSettings, db: Session = Depends(get_db)):
+def put_telegram_settings(
+    data: TelegramSettings,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)  # Only admin can change settings
+):
     set_setting(db, 'tg.enabled', 'true' if data.enabled else 'false')
     set_setting(db, 'tg.token', (data.token or '').strip() or None)
     set_setting(db, 'tg.allowed_chats', (data.allowed_chats or '').strip())
@@ -319,18 +338,29 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
 
 # --- CRUD ---
 @app.get('/contacts/')
-def list_contacts(db: Session = Depends(get_db)):
+def list_contacts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     return db.query(Contact).order_by(Contact.id.desc()).all()
 
 @app.get('/contacts/uid/{uid}')
-def get_contact_by_uid(uid: str, db: Session = Depends(get_db)):
+def get_contact_by_uid(
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     contact = db.query(Contact).filter(Contact.uid == uid).first()
     if not contact:
         raise HTTPException(status_code=404, detail='Not found')
     return contact
 
 @app.post('/contacts/')
-def create_contact(data: ContactCreate, db: Session = Depends(get_db)):
+def create_contact(
+    data: ContactCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     payload = data.dict()
     if not payload.get('uid'):
         payload['uid'] = uuid.uuid4().hex
@@ -341,7 +371,12 @@ def create_contact(data: ContactCreate, db: Session = Depends(get_db)):
     return contact
 
 @app.put('/contacts/{contact_id}')
-def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(get_db)):
+def update_contact(
+    contact_id: int,
+    data: ContactUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail='Not found')
@@ -355,7 +390,11 @@ def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(g
     return contact
 
 @app.delete('/contacts/{contact_id}')
-def delete_contact(contact_id: int, db: Session = Depends(get_db)):
+def delete_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail='Not found')
@@ -365,10 +404,13 @@ def delete_contact(contact_id: int, db: Session = Depends(get_db)):
 
 # --- Upload OCR ---
 @app.post('/upload/')
+@limiter.limit("60/minute")  # 60 uploads per minute per IP
 def upload_card(
+    request: Request,
     file: UploadFile = File(...),
     provider: str = Query('auto', enum=['auto', 'tesseract', 'parsio', 'google']),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     try:
         # Validate file type
@@ -456,7 +498,11 @@ def upload_card(
 
 # --- Export CSV ---
 @app.get('/contacts/export')
-def export_csv(ids: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def export_csv(
+    ids: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     q = db.query(Contact)
     if ids:
         try:
@@ -476,7 +522,11 @@ def export_csv(ids: Optional[str] = Query(None), db: Session = Depends(get_db)):
 
 # --- Export XLSX ---
 @app.get('/contacts/export/xlsx')
-def export_xlsx(ids: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def export_xlsx(
+    ids: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     q = db.query(Contact)
     if ids:
         try:
@@ -507,7 +557,11 @@ def export_xlsx(ids: Optional[str] = Query(None), db: Session = Depends(get_db))
 
 # --- Import CSV/XLSX ---
 @app.post('/contacts/import')
-def import_contacts(file: UploadFile = File(...), db: Session = Depends(get_db)):
+def import_contacts(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     ext = (file.filename or '').split('.')[-1].lower()
     if ext == 'csv':
         df = pd.read_csv(file.file)
@@ -530,14 +584,22 @@ def import_contacts(file: UploadFile = File(...), db: Session = Depends(get_db))
 
 # --- Bulk delete ---
 @app.post('/contacts/delete_bulk')
-def delete_bulk(ids: list[int] = Body(...), db: Session = Depends(get_db)):
+def delete_bulk(
+    ids: list[int] = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     db.query(Contact).filter(Contact.id.in_(ids)).delete(synchronize_session=False)
     db.commit()
     return {'deleted': len(ids)}
 
 # --- Bulk update ---
 @app.put('/contacts/update_bulk')
-def update_bulk(payload: dict, db: Session = Depends(get_db)):
+def update_bulk(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     ids = payload.get('ids', [])
     fields = payload.get('fields', {})
     if not ids or not fields:
@@ -553,7 +615,8 @@ def update_bulk(payload: dict, db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.post('/auth/register', response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
+@limiter.limit("10/hour")  # 10 registrations per hour per IP
+async def register(request: Request, user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     """
     Register a new user.
     
@@ -582,7 +645,9 @@ async def register(user_data: schemas.UserRegister, db: Session = Depends(get_db
 
 
 @app.post('/auth/login', response_model=schemas.Token)
+@limiter.limit("30/minute")  # 30 login attempts per minute per IP
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):

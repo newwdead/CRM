@@ -2,12 +2,13 @@
 
 > **Full-featured CRM system with OCR recognition and Telegram integration**
 
-![Version](https://img.shields.io/badge/version-1.7-blue)
+![Version](https://img.shields.io/badge/version-1.8-blue)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
 ![React](https://img.shields.io/badge/React-18-blue)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
 ![UI](https://img.shields.io/badge/UI-Modern-brightgreen)
+![Security](https://img.shields.io/badge/Security-JWT-orange)
 
 [**Русская документация**](README.ru.md) | [English Documentation](README.md)
 
@@ -25,6 +26,8 @@ BizCard CRM is a modern web-based contact management system specializing in auto
 - 🔍 **Search and filter** contacts
 - 🎨 **Modern UI/UX** with drag & drop and modal dialogs
 - ⚙️ **Web-based settings** for all system parameters
+- 🔐 **Secure authentication** with JWT tokens and role-based access
+- 🛡️ **Rate limiting** for API protection
 
 ---
 
@@ -78,6 +81,21 @@ BizCard CRM is a modern web-based contact management system specializing in auto
 - Default OCR provider configuration
 - Notification preferences
 - Auto-refresh settings
+
+### 🔐 Security & Authentication (NEW in v1.8)
+- **JWT token-based authentication**
+- **User registration and login** with secure password hashing (bcrypt)
+- **Role-based access control** (Admin and User roles)
+- **Protected API endpoints** - all data operations require authentication
+- **Rate limiting** to prevent abuse:
+  - Login: 30 attempts/minute
+  - Registration: 10/hour
+  - Upload: 60/minute
+- **Token expiration** (7 days default, configurable)
+- **User management** (admin panel for user administration)
+- **Profile management** (users can update their own profiles)
+- **Admin privileges** for settings and user management
+- **Automatic admin creation** on first startup (admin/admin)
 - OCR provider status dashboard
 - Telegram bot configuration
 - All settings managed through web UI
@@ -123,7 +141,8 @@ fastapi-bizcard-crm-ready/
 ├── README.md            # Documentation (English)
 ├── README.ru.md         # Documentation (Russian)
 ├── SSL_SETUP.md         # SSL setup guide
-└── TELEGRAM_SETUP.md    # Telegram integration guide
+├── TELEGRAM_SETUP.md    # Telegram integration guide
+└── AUTH_SETUP.md        # Authentication & security guide
 ```
 
 ---
@@ -159,6 +178,20 @@ docker compose logs -f
 # API docs:  http://localhost:8000/docs
 # HTTPS:     https://localhost:8443
 ```
+
+### Default Admin Credentials
+
+On first startup, a default admin account is automatically created:
+
+```
+Username: admin
+Password: admin
+Email: admin@example.com
+```
+
+⚠️ **IMPORTANT**: Change the default password immediately after first login!
+
+See [AUTH_SETUP.md](AUTH_SETUP.md) for detailed authentication documentation.
 
 ### Health Check
 

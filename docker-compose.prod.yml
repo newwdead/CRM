@@ -8,9 +8,9 @@ services:
     environment:
       - TZ=Europe/Moscow
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
-      - APP_VERSION=v1.7
+      - APP_VERSION=v1.8
       - APP_COMMIT=
-      - APP_MESSAGE=Modern UI, OCR provider management, enhanced web settings
+      - APP_MESSAGE=JWT Authentication, User Management, Rate Limiting, Security
     volumes:
       - ./uploads:/app/uploads
 
