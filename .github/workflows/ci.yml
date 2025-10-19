@@ -36,10 +36,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+      - name: Cache npm (frontend)
+        uses: actions/cache@v4
+        with:
+          path: frontend/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       - name: Install and build
         working-directory: frontend
         run: |
-          npm ci
+          mkdir -p .npm
+          if [ -f package-lock.json ]; then npm ci --cache .npm; else npm install --cache .npm; fi
           npm run build
