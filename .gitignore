@@ -10,3 +10,5 @@ uploads/
 data/
 *.db
 *.log
+backups/
+*.log

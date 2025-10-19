@@ -205,6 +205,14 @@ app.mount('/files', StaticFiles(directory='uploads'), name='files')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Production domains
+        "https://ibbase.ru",
+        "https://www.ibbase.ru",
+        "https://api.ibbase.ru",
+        "https://monitoring.ibbase.ru",
+        "http://ibbase.ru",
+        "http://www.ibbase.ru",
+        # Development/localhost
         "http://localhost:3000",
         "http://localhost:80", 
         "http://frontend:80",

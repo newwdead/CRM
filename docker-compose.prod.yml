@@ -1,25 +1,148 @@
-services:
-  db:
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+# Production Docker Compose Configuration for BizCard CRM
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d
 
+services:
+  # Backend - Production configuration
   backend:
-    ports: [] # do not expose backend publicly in prod; proxied via frontend
+    restart: always
     environment:
       - TZ=Europe/Moscow
-      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
-      - APP_VERSION=v1.8
-      - APP_COMMIT=
-      - APP_MESSAGE=JWT Authentication, User Management, Rate Limiting, Security
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-password}@db:5432/bizcard_crm
+      - APP_VERSION=v2.2
+      - APP_COMMIT=${GIT_COMMIT:-}
+      - APP_MESSAGE=Production Release - Advanced CRM with Tags, Groups, Audit Log
+      # JWT Settings (override defaults)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=10080
+      # OCR Settings
+      - TESSERACT_LANGS=${TESSERACT_LANGS:-rus+eng}
+      - PARSIO_API_KEY=${PARSIO_API_KEY:-}
+      - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY:-}
+      # Telegram Settings
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+    ports: [] # Backend не должен быть доступен напрямую в production
     volumes:
       - ./uploads:/app/uploads
+      - backend_logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
+  # Frontend - Production configuration
   frontend:
+    restart: always
     ports:
-      - '80:80'
-      - '8443:8443'
+      - '80:80'    # HTTP (will redirect to HTTPS after SSL setup)
+      - '443:443'  # HTTPS
     volumes:
-      - /etc/nginx/certs:/etc/nginx/certs:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # SSL certificates from Let's Encrypt
+      - nginx_logs:/var/log/nginx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database - Production configuration with backup
+  db:
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=bizcard_crm
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backups:/backups  # Mount backup directory
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana - Production configuration
+  grafana:
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=https://monitoring.ibbase.ru
+      - GF_SERVER_DOMAIN=monitoring.ibbase.ru
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    ports: [] # Grafana не должен быть доступен напрямую (через Nginx)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Prometheus - Production configuration
+  prometheus:
+    restart: always
+    ports: [] # Prometheus не должен быть доступен публично
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Node Exporter - Production configuration
+  node-exporter:
+    restart: always
+    ports: [] # Не публиковать наружу
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Postgres Exporter - Production configuration
+  postgres-exporter:
+    restart: always
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:${DB_PASSWORD:-password}@db:5432/bizcard_crm?sslmode=disable
+    ports: [] # Не публиковать наружу
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # cAdvisor - Production configuration
+  cadvisor:
+    restart: always
+    ports: [] # Не публиковать наружу
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
-  pgdata:
+  db_data:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
