@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:15
+    container_name: bizcard-db
+    environment:
+      POSTGRES_DB: bizcard_crm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    container_name: bizcard-backend
+    environment:
+      - TZ=Europe/Berlin
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - PARSIO_API_URL=${PARSIO_API_URL:-}
+      - PARSIO_API_KEY=${PARSIO_API_KEY:-}
+      - PARSIO_AUTH_HEADER_NAME=${PARSIO_AUTH_HEADER_NAME:-Authorization}
+      - PARSIO_AUTH_HEADER_VALUE=${PARSIO_AUTH_HEADER_VALUE:-Bearer {key}}
+      - PARSIO_TIMEOUT=${PARSIO_TIMEOUT:-30}
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - '8000:8000'
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: bizcard-frontend
+    depends_on:
+      - backend
+    ports:
+      - '3000:80'
+
+volumes:
+  postgres_data:

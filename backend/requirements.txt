@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+pandas
+openpyxl
+pytesseract
+Pillow
+python-multipart
+gunicorn
+email-validator
+psycopg2-binary
+requests
