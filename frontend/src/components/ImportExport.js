@@ -4,13 +4,13 @@ export default function ImportExport(){
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('');
 
-  const handleExportCSV = ()=> window.open('http://localhost:8000/contacts/export', '_blank');
-  const handleExportXLSX = ()=> window.open('http://localhost:8000/contacts/export/xlsx', '_blank');
+  const handleExportCSV = ()=> window.open('/api/contacts/export', '_blank');
+  const handleExportXLSX = ()=> window.open('/api/contacts/export/xlsx', '_blank');
 
   const handleImport = async ()=>{
     if(!file) return alert('Choose file');
     const fd = new FormData(); fd.append('file', file);
-    const res = await fetch('http://localhost:8000/contacts/import', { method:'POST', body: fd });
+    const res = await fetch('/api/contacts/import', { method:'POST', body: fd });
     const data = await res.json();
     setStatus(data.message || data.imported || data.error || JSON.stringify(data));
     window.dispatchEvent(new Event('refresh-contacts'));

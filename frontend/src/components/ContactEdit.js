@@ -49,7 +49,7 @@ export default function ContactEdit({ id, lang='ru', onBack }){
     const load = async ()=>{
       try {
         setLoading(true);
-        const res = await fetch('http://localhost:8000/contacts/');
+        const res = await fetch('/api/contacts/');
         const all = await res.json();
         const found = (all||[]).find(c => c.id === id);
         if(!cancel){
@@ -79,7 +79,7 @@ export default function ContactEdit({ id, lang='ru', onBack }){
         website: data.website || null,
         comment: data.comment || null,
       };
-      await fetch(`http://localhost:8000/contacts/${id}`, {
+      await fetch(`/api/contacts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
@@ -116,7 +116,17 @@ export default function ContactEdit({ id, lang='ru', onBack }){
       {data.photo_path && (
         <div style={{marginTop:12}}>
           <label style={{display:'block', fontWeight:'bold'}}>{t.photo}</label>
-          <a href={`http://localhost:8000/files/${data.photo_path}`} target="_blank" rel="noreferrer">{t.openOriginal}</a>
+          <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:8}}>
+            <a href={`/files/${data.photo_path}`} target="_blank" rel="noreferrer">{t.openOriginal}</a>
+          </div>
+          <div style={{border:'1px solid #ddd', padding:8, maxWidth: '100%', overflow:'auto'}}>
+            <img
+              src={`/files/${data.photo_path}`}
+              alt="card"
+              style={{maxWidth: '600px', width: '100%', height: 'auto'}}
+              onError={(e)=>{ e.currentTarget.style.display='none'; }}
+            />
+          </div>
         </div>
       )}
 

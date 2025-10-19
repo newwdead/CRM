@@ -17,7 +17,7 @@ export default function ContactList({lang='ru', onEdit}){
   const [zoom, setZoom] = useState(1);
 
   const load = async ()=>{
-    const res = await fetch('http://localhost:8000/contacts/');
+    const res = await fetch('/api/contacts/');
     const data = await res.json();
     setContacts(data);
     setFiltered(data);
@@ -63,8 +63,8 @@ export default function ContactList({lang='ru', onEdit}){
     if(!selected.length) return alert(lang==='ru' ? 'Ничего не выбрано' : 'Nothing selected');
     const ids = selected.join(',');
     const url = format==='xlsx'
-      ? `http://localhost:8000/contacts/export/xlsx?ids=${encodeURIComponent(ids)}`
-      : `http://localhost:8000/contacts/export?ids=${encodeURIComponent(ids)}`;
+      ? `/api/contacts/export/xlsx?ids=${encodeURIComponent(ids)}`
+      : `/api/contacts/export?ids=${encodeURIComponent(ids)}`;
     try {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -82,7 +82,7 @@ export default function ContactList({lang='ru', onEdit}){
   };
 
   const updateContactField = async (id, patch)=>{
-    await fetch(`http://localhost:8000/contacts/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch)});
+    await fetch(`/api/contacts/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch)});
   };
 
   const setContactLocal = (id, patch)=>{
@@ -93,7 +93,7 @@ export default function ContactList({lang='ru', onEdit}){
   const deleteSelected = async ()=>{
     if(!selected.length) return alert(lang==='ru' ? 'Ничего не выбрано' : 'Nothing selected');
     if(!confirm(lang==='ru' ? `Удалить ${selected.length} контактов?` : `Delete ${selected.length} contacts?`)) return;
-    await fetch('http://localhost:8000/contacts/delete_bulk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(selected)});
+    await fetch('/api/contacts/delete_bulk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(selected)});
     setSelected([]);
     await load();
   };
@@ -101,14 +101,14 @@ export default function ContactList({lang='ru', onEdit}){
   const applyBulkEdit = async ()=>{
     const fields = Object.fromEntries(Object.entries(bulkEditData).filter(([k,v]) => v && v.trim() !== ''));
     if(!Object.keys(fields).length) return alert(lang==='ru' ? 'Введите хотя бы одно поле' : 'Enter at least one field');
-    await fetch('http://localhost:8000/contacts/update_bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids:selected, fields})});
+    await fetch('/api/contacts/update_bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids:selected, fields})});
     setSelected([]); setShowBulkEdit(false); setBulkEditData({}); await load();
   };
 
   const createNew = async ()=>{
     const empty = Object.values(newContact).every(v=>!v);
     if(empty) return alert(lang==='ru' ? 'Заполните хотя бы одно поле' : 'Fill at least one field');
-    await fetch('http://localhost:8000/contacts/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(newContact)});
+    await fetch('/api/contacts/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(newContact)});
     setNewContact({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
     await load();
   };
@@ -147,7 +147,7 @@ export default function ContactList({lang='ru', onEdit}){
               <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} /></td>
               <td style={{whiteSpace:'nowrap'}}>
                 {c.photo_path ? (
-                  <a href={`http://localhost:8000/files/${c.photo_path}`} target="_blank" rel="noreferrer">{lang==='ru'?'Фото':'Photo'}</a>
+                  <a href={`/files/${c.photo_path}`} target="_blank" rel="noreferrer">{lang==='ru'?'Фото':'Photo'}</a>
                 ) : (
                   <span style={{color:'#999'}}>—</span>
                 )}

@@ -1,0 +1,19 @@
+services:
+  db:
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    ports: [] # do not expose backend publicly in prod; proxied via frontend
+    environment:
+      - TZ=Europe/Moscow
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+    volumes:
+      - ./uploads:/app/uploads
+
+  frontend:
+    ports:
+      - '80:80'
+
+volumes:
+  pgdata:

@@ -14,7 +14,7 @@ export default function UploadCard({lang='ru', defaultProvider='tesseract'}){
     }
     const fd = new FormData();
     fd.append('file', file);
-    const url = `http://localhost:8000/upload/?provider=${encodeURIComponent(provider)}`;
+    const url = `/api/upload/?provider=${encodeURIComponent(provider)}`;
     const res = await fetch(url, { method: 'POST', body: fd });
     if(res.ok){
       const data = await res.json();

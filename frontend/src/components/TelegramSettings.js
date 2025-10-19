@@ -12,7 +12,7 @@ export default function TelegramSettings({ lang='ru' }){
     const load = async ()=>{
       try {
         setLoading(true);
-        const res = await fetch('http://localhost:8000/settings/telegram');
+        const res = await fetch('/api/settings/telegram');
         const data = await res.json();
         setEnabled(!!data.enabled);
         setToken(data.token || '');
@@ -28,7 +28,7 @@ export default function TelegramSettings({ lang='ru' }){
   const save = async ()=>{
     try {
       setSaving(true);
-      await fetch('http://localhost:8000/settings/telegram', {
+      await fetch('/api/settings/telegram', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled, token, allowed_chats: allowed, provider })
