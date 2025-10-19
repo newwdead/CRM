@@ -7,7 +7,13 @@ export default function ContactList({lang='ru'}){
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   const [search, setSearch] = useState('');
-  const [newContact, setNewContact] = useState({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:''});
+  const [newContact, setNewContact] = useState({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [sort, setSort] = useState('-id');
+  const [detail, setDetail] = useState(null);
+  const [zoom, setZoom] = useState(1);
 
   const load = async ()=>{
     const res = await fetch('http://localhost:8000/contacts/');
@@ -26,7 +32,7 @@ export default function ContactList({lang='ru'}){
   const handleSearch = (e)=>{
     const q = e.target.value.toLowerCase();
     setSearch(q);
-    setFiltered(contacts.filter(c => (c.full_name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q) || (c.comment||'').toLowerCase().includes(q)));
+    setFiltered(contacts.filter(c => (c.full_name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q) || (c.comment||'').toLowerCase().includes(q) || (c.website||'').toLowerCase().includes(q)));
   };
 
   const toggle = (id)=> setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]);
@@ -48,18 +54,18 @@ export default function ContactList({lang='ru'}){
     await load();
   };
 
-  const applyBulk = async ()=>{
+  const applyBulkEdit = async ()=>{
     const fields = Object.fromEntries(Object.entries(bulkEditData).filter(([k,v]) => v && v.trim() !== ''));
     if(!Object.keys(fields).length) return alert(lang==='ru' ? 'Введите хотя бы одно поле' : 'Enter at least one field');
     await fetch('http://localhost:8000/contacts/update_bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids:selected, fields})});
     setSelected([]); setShowBulkEdit(false); setBulkEditData({}); await load();
   };
 
-  const addContact = async ()=>{
-    const empty = Object.values(newContact).every(v => !v || !v.trim());
+  const createNew = async ()=>{
+    const empty = Object.values(newContact).every(v=>!v);
     if(empty) return alert(lang==='ru' ? 'Заполните хотя бы одно поле' : 'Fill at least one field');
     await fetch('http://localhost:8000/contacts/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(newContact)});
-    setNewContact({full_name:'',company:'',position:'',email:'',phone:'',address:''});
+    setNewContact({full_name:'',company:'',position:'',email:'',phone:'',address:'',comment:'',website:''});
     await load();
   };
 
@@ -75,36 +81,29 @@ export default function ContactList({lang='ru'}){
       {showBulkEdit && (
         <div style={{border:'1px solid #ccc', padding:10, marginBottom:10}}>
           <h4>{lang==='ru' ? `Редактировать ${selected.length} контактов` : `Edit ${selected.length} contacts`}</h4>
-          {['company','position','email','phone','address','comment'].map(f => (
+          {['company','position','email','phone','address','comment','website'].map(f => (
             <input key={f} name={f} placeholder={f} onChange={(e)=>setBulkEditData({...bulkEditData, [f]: e.target.value})} style={{marginRight:6}} />
           ))}
-          <button onClick={applyBulk}>{lang==='ru' ? 'Применить' : 'Apply'}</button>
+          <button onClick={applyBulkEdit}>{lang==='ru' ? 'Применить' : 'Apply'}</button>
         </div>
       )}
 
       <table border="1" cellPadding="6" style={{width:'100%'}}>
         <thead>
-          <tr><th></th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
+          <tr><th></th><th>{lang==='ru' ? 'Имя' : 'Name'}</th><th>{lang==='ru' ? 'Компания' : 'Company'}</th><th>{lang==='ru' ? 'Должность' : 'Position'}</th><th>Email</th><th>{lang==='ru' ? 'Телефон' : 'Phone'}</th><th>{lang==='ru' ? 'Адрес' : 'Address'}</th><th>{lang==='ru' ? 'Сайт' : 'Website'}</th><th>{lang==='ru' ? 'Комментарий' : 'Comment'}</th></tr>
         </thead>
         <tbody>
           {filtered.map(c => (
-            <tr key={c.id}>
-              <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} /></td>
-              <td>{c.full_name}</td>
-              <td>{c.company}</td>
-              <td>{c.position}</td>
-              <td>{c.email}</td>
-              <td>{c.phone}</td>
-              <td>{c.address}</td>
-              <td>
-                <input
-                  value={c.comment || ''}
-                  onChange={(e)=> setContactLocal(c.id, {comment: e.target.value})}
-                  onBlur={async (e)=>{ await updateContactField(c.id, {comment: e.target.value}); }}
-                  placeholder={lang==='ru' ? 'Комментарий' : 'Comment'}
-                  style={{width:'100%'}}
-                />
-              </td>
+            <tr key={c.id} onClick={()=> setDetail(c)} style={{cursor:'pointer'}}>
+              <td><input type="checkbox" checked={selected.includes(c.id)} onChange={()=>toggle(c.id)} onClick={(e)=> e.stopPropagation()} /></td>
+              <td>{c.full_name||''}</td>
+              <td>{c.company||''}</td>
+              <td>{c.position||''}</td>
+              <td>{c.email||''}</td>
+              <td>{c.phone||''}</td>
+              <td>{c.address||''}</td>
+              <td>{c.website ? <a href={c.website} target="_blank" rel="noreferrer" onClick={(e)=> e.stopPropagation()}>{c.website}</a> : ''}</td>
+              <td>{c.comment||''}</td>
             </tr>
           ))}
           <tr style={{background:'#f7f7f7'}}>
