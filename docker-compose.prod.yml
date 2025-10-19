@@ -17,6 +17,9 @@ services:
   frontend:
     ports:
       - '80:80'
+      - '8443:8443'
+    volumes:
+      - /etc/nginx/certs:/etc/nginx/certs:ro
 
 volumes:
   pgdata:
