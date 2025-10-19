@@ -115,7 +115,7 @@ function App() {
           <div className="header-left">
             <div className="logo">
               <span className="logo-icon">💼</span>
-              <h1>BizCard CRM</h1>
+              <h1>ibbase</h1>
             </div>
             {ver.version && (
               <span className="badge badge-primary version-badge">v{ver.version}</span>
@@ -266,7 +266,7 @@ function App() {
 
       {/* Footer */}
       <footer className="footer">
-        <p>© 2025 BizCard CRM - {t.footerText}</p>
+        <p>© 2025 ibbase - {t.footerText}</p>
         {ver.version && (
           <p className="text-xs text-secondary">
             {t.version} {ver.version} {ver.commit && `(${ver.commit.substring(0, 7)})`}

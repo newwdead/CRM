@@ -148,7 +148,7 @@ function LoginPage({ onLoginSuccess }) {
         <div className="login-header">
           <div className="login-logo">
             <span className="logo-icon">💼</span>
-            <h1>BizCard CRM</h1>
+            <h1>ibbase</h1>
           </div>
           <p className="login-subtitle">Business Card Management System</p>
         </div>
@@ -314,7 +314,7 @@ function LoginPage({ onLoginSuccess }) {
         )}
 
         <div className="login-footer">
-          <p>© 2025 BizCard CRM v1.9 - Business Card Management System</p>
+          <p>© 2025 ibbase v1.9 - Business Card Management System</p>
         </div>
       </div>
     </div>

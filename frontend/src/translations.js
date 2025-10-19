@@ -25,7 +25,7 @@ export const translations = {
     adminPanel: 'Admin Panel',
     
     // Login Page
-    loginTitle: 'BizCard CRM',
+    loginTitle: 'ibbase',
     loginSubtitle: 'Business Card Management System',
     login: 'Login',
     register: 'Register',
@@ -186,7 +186,7 @@ export const translations = {
     adminPanel: 'Админ-панель',
     
     // Login Page
-    loginTitle: 'BizCard CRM',
+    loginTitle: 'ibbase',
     loginSubtitle: 'Система управления визитными карточками',
     login: 'Вход',
     register: 'Регистрация',
