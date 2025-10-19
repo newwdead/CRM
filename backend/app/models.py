@@ -15,3 +15,9 @@ class Contact(Base):
     website = Column(String, nullable=True)
     photo_path = Column(String, nullable=True)
     ocr_raw = Column(String, nullable=True)
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True, nullable=False)
+    value = Column(String, nullable=True)

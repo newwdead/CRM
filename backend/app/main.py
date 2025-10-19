@@ -7,9 +7,9 @@ from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from .database import engine, Base, get_db
-from .models import Contact
+from .models import Contact, AppSetting
 from .ocr_utils import ocr_image_fileobj, ocr_parsio
-import io, csv, tempfile, pandas as pd, os, uuid, json
+import io, csv, tempfile, pandas as pd, os, uuid, json, requests
 
 # Create tables if they don't exist
 try:
@@ -123,6 +123,127 @@ app.add_middleware(
 @app.get('/health')
 def health():
     return {'status':'ok'}
+
+# --- Settings helpers ---
+def get_setting(db: Session, key: str, default: Optional[str] = None) -> Optional[str]:
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    return row.value if row else default
+
+def set_setting(db: Session, key: str, value: Optional[str]):
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    if row:
+        row.value = value
+    else:
+        row = AppSetting(key=key, value=value)
+        db.add(row)
+    db.commit()
+
+class TelegramSettings(BaseModel):
+    enabled: bool = False
+    token: Optional[str] = None
+    allowed_chats: Optional[str] = None  # comma-separated chat IDs
+    provider: Optional[str] = 'tesseract'  # 'tesseract' | 'parsio'
+
+@app.get('/settings/telegram')
+def get_telegram_settings(db: Session = Depends(get_db)):
+    return {
+        'enabled': get_setting(db, 'tg.enabled', 'false') == 'true',
+        'token': get_setting(db, 'tg.token', None),
+        'allowed_chats': get_setting(db, 'tg.allowed_chats', ''),
+        'provider': get_setting(db, 'tg.provider', 'tesseract') or 'tesseract',
+    }
+
+@app.put('/settings/telegram')
+def put_telegram_settings(data: TelegramSettings, db: Session = Depends(get_db)):
+    set_setting(db, 'tg.enabled', 'true' if data.enabled else 'false')
+    set_setting(db, 'tg.token', (data.token or '').strip() or None)
+    set_setting(db, 'tg.allowed_chats', (data.allowed_chats or '').strip())
+    set_setting(db, 'tg.provider', (data.provider or 'tesseract'))
+    return {'ok': True}
+
+# --- Telegram webhook ---
+@app.post('/telegram/webhook')
+def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        # Check enabled and token present
+        if get_setting(db, 'tg.enabled', 'false') != 'true':
+            return {'ignored': 'disabled'}
+        token = get_setting(db, 'tg.token', None)
+        if not token:
+            raise HTTPException(status_code=400, detail='Telegram token not configured')
+
+        message = update.get('message') or update.get('edited_message')
+        if not message:
+            return {'ignored': 'no_message'}
+
+        chat_id = str(message.get('chat', {}).get('id')) if message.get('chat') else None
+        allowed = (get_setting(db, 'tg.allowed_chats', '') or '').strip()
+        if allowed:
+            allowed_set = {x.strip() for x in allowed.split(',') if x.strip()}
+            if chat_id not in allowed_set:
+                return {'ignored': 'chat_not_allowed'}
+
+        photos = message.get('photo') or []
+        if not photos:
+            return {'ignored': 'no_photo'}
+
+        # choose largest photo
+        best = max(photos, key=lambda p: (p.get('width', 0) or 0) * (p.get('height', 0) or 0))
+        file_id = best.get('file_id')
+        if not file_id:
+            raise HTTPException(status_code=400, detail='No file_id in photo')
+
+        # get file path
+        api = f'https://api.telegram.org/bot{token}'
+        r = requests.get(f'{api}/getFile', params={'file_id': file_id}, timeout=15)
+        r.raise_for_status()
+        file_path = r.json().get('result', {}).get('file_path')
+        if not file_path:
+            raise HTTPException(status_code=400, detail='Cannot get file_path')
+
+        # download file bytes
+        file_url = f'https://api.telegram.org/file/bot{token}/{file_path}'
+        img_res = requests.get(file_url, timeout=30)
+        img_res.raise_for_status()
+        content = img_res.content
+
+        # Save to uploads
+        safe_name = f"{uuid.uuid4().hex}_tg_{os.path.basename(file_path)}"
+        save_path = os.path.join('uploads', safe_name)
+        with open(save_path, 'wb') as f:
+            f.write(content)
+
+        # OCR
+        provider = get_setting(db, 'tg.provider', 'tesseract') or 'tesseract'
+        if provider == 'parsio':
+            try:
+                ocr_data = ocr_parsio(io.BytesIO(content), filename=os.path.basename(file_path))
+                raw_json = json.dumps(ocr_data, ensure_ascii=False)
+                data = ocr_data
+            except Exception:
+                ocr_text = ocr_image_fileobj(io.BytesIO(content))
+                raw_json = json.dumps(ocr_text, ensure_ascii=False)
+                data = ocr_text
+        else:
+            ocr_text = ocr_image_fileobj(io.BytesIO(content))
+            raw_json = json.dumps(ocr_text, ensure_ascii=False)
+            data = ocr_text
+
+        if not any(data.values()):
+            raise HTTPException(status_code=400, detail='OCR extracted no data')
+
+        data['uid'] = uuid.uuid4().hex
+        data['photo_path'] = safe_name
+        data['ocr_raw'] = raw_json
+        contact = Contact(**data)
+        db.add(contact)
+        db.commit()
+        db.refresh(contact)
+        return {'created_id': contact.id}
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- CRUD ---
 @app.get('/contacts/')
@@ -238,8 +359,16 @@ def upload_card(
 
 # --- Export CSV ---
 @app.get('/contacts/export')
-def export_csv(db: Session = Depends(get_db)):
-    contacts = db.query(Contact).all()
+def export_csv(ids: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    q = db.query(Contact)
+    if ids:
+        try:
+            id_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+            if id_list:
+                q = q.filter(Contact.id.in_(id_list))
+        except Exception:
+            pass
+    contacts = q.all()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['id','uid','full_name','company','position','email','phone','address','comment','website','photo_path'])
@@ -250,8 +379,16 @@ def export_csv(db: Session = Depends(get_db)):
 
 # --- Export XLSX ---
 @app.get('/contacts/export/xlsx')
-def export_xlsx(db: Session = Depends(get_db)):
-    contacts = db.query(Contact).all()
+def export_xlsx(ids: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    q = db.query(Contact)
+    if ids:
+        try:
+            id_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+            if id_list:
+                q = q.filter(Contact.id.in_(id_list))
+        except Exception:
+            pass
+    contacts = q.all()
     df = pd.DataFrame([{
         'id': c.id,
         'uid': c.uid,

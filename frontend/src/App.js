@@ -4,6 +4,7 @@ import UploadCard from './components/UploadCard';
 import ContactList from './components/ContactList';
 import ContactEdit from './components/ContactEdit';
 import Settings from './components/Settings';
+import TelegramSettings from './components/TelegramSettings';
 
 const translations = {
   en: {
@@ -19,7 +20,7 @@ const translations = {
 function App(){
   const [lang, setLang] = useState('ru');
   const [defaultProvider, setDefaultProvider] = useState('tesseract');
-  const [route, setRoute] = useState('home'); // 'home' | 'settings' | 'edit'
+  const [route, setRoute] = useState('home'); // 'home' | 'settings' | 'edit' | 'telegram'
   const [editId, setEditId] = useState(null);
   const t = translations[lang];
 
@@ -39,6 +40,7 @@ function App(){
         <nav style={{display:'flex', gap:8}}>
           <button onClick={()=>setRoute('home')} disabled={route==='home'}>{lang==='ru' ? 'Главная' : 'Home'}</button>
           <button onClick={()=>setRoute('settings')} disabled={route==='settings'}>{lang==='ru' ? 'Настройки' : 'Settings'}</button>
+          <button onClick={()=>setRoute('telegram')} disabled={route==='telegram'}>{lang==='ru' ? 'Telegram' : 'Telegram'}</button>
         </nav>
       </header>
 
@@ -59,6 +61,9 @@ function App(){
       )}
       {route==='edit' && (
         <ContactEdit id={editId} lang={lang} onBack={()=> setRoute('home')} />
+      )}
+      {route==='telegram' && (
+        <TelegramSettings lang={lang} />
       )}
     </div>
   );
