@@ -116,7 +116,7 @@ export default function ContactList({lang='ru'}){
             <td><input value={newContact.address} onChange={(e)=>setNewContact({...newContact, address:e.target.value})} placeholder={lang==='ru' ? 'Адрес' : 'Address'} /></td>
             <td><input value={newContact.comment} onChange={(e)=>setNewContact({...newContact, comment:e.target.value})} placeholder={lang==='ru' ? 'Комментарий' : 'Comment'} /></td>
           </tr>
-          <tr><td colSpan="8" style={{textAlign:'right'}}><button onClick={addContact}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
+          <tr><td colSpan="8" style={{textAlign:'right'}}><button onClick={createNew}>➕ {lang==='ru' ? 'Добавить' : 'Add'}</button></td></tr>
         </tbody>
       </table>
     </div>
