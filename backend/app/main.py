@@ -15,7 +15,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter, Gauge, Histogram
 from .database import engine, Base, get_db
 from .models import Contact, AppSetting, User
-from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
 from .ocr_providers import OCRManager
 from . import ocr_utils  # Enhanced OCR parsing
 from . import auth_utils
