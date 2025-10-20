@@ -2364,6 +2364,33 @@ async def get_editable_settings(
             "bot_token": get_setting("TELEGRAM_BOT_TOKEN", ""),
             "webhook_url": get_setting("TELEGRAM_WEBHOOK_URL", ""),
         },
+        "whatsapp": {
+            "api_token": get_setting("WHATSAPP_API_TOKEN", ""),
+            "phone_number_id": get_setting("WHATSAPP_PHONE_NUMBER_ID", ""),
+            "business_account_id": get_setting("WHATSAPP_BUSINESS_ACCOUNT_ID", ""),
+            "webhook_verify_token": get_setting("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),
+        },
+        "redis": {
+            "url": get_setting("REDIS_URL", os.getenv("REDIS_URL", "redis://redis:6379/0")),
+            "max_connections": int(get_setting("REDIS_MAX_CONNECTIONS", "10")),
+        },
+        "celery": {
+            "broker_url": get_setting("CELERY_BROKER_URL", os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")),
+            "result_backend": get_setting("CELERY_RESULT_BACKEND", os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")),
+            "worker_concurrency": int(get_setting("CELERY_WORKER_CONCURRENCY", "2")),
+            "task_time_limit": int(get_setting("CELERY_TASK_TIME_LIMIT", "300")),
+        },
+        "backup": {
+            "enabled": get_setting("BACKUP_ENABLED", "true") == "true",
+            "schedule": get_setting("BACKUP_SCHEDULE", "0 2 * * *"),  # Daily at 2 AM
+            "retention_days": int(get_setting("BACKUP_RETENTION_DAYS", "30")),
+            "backup_dir": get_setting("BACKUP_DIR", "/home/ubuntu/fastapi-bizcard-crm-ready/backups"),
+        },
+        "monitoring": {
+            "prometheus_enabled": get_setting("PROMETHEUS_ENABLED", "true") == "true",
+            "grafana_enabled": get_setting("GRAFANA_ENABLED", "true") == "true",
+            "metrics_retention_days": int(get_setting("METRICS_RETENTION_DAYS", "15")),
+        },
         "auth": {
             "token_expire_minutes": int(get_setting("TOKEN_EXPIRE_MINUTES", str(auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES))),
             "require_admin_approval": get_setting("REQUIRE_ADMIN_APPROVAL", "true") == "true",
@@ -2406,6 +2433,55 @@ async def update_editable_settings(
             set_setting("TELEGRAM_BOT_TOKEN", settings["telegram"]["bot_token"])
         if "webhook_url" in settings["telegram"]:
             set_setting("TELEGRAM_WEBHOOK_URL", settings["telegram"]["webhook_url"])
+    
+    # Update WhatsApp settings
+    if "whatsapp" in settings:
+        if "api_token" in settings["whatsapp"]:
+            set_setting("WHATSAPP_API_TOKEN", settings["whatsapp"]["api_token"])
+        if "phone_number_id" in settings["whatsapp"]:
+            set_setting("WHATSAPP_PHONE_NUMBER_ID", settings["whatsapp"]["phone_number_id"])
+        if "business_account_id" in settings["whatsapp"]:
+            set_setting("WHATSAPP_BUSINESS_ACCOUNT_ID", settings["whatsapp"]["business_account_id"])
+        if "webhook_verify_token" in settings["whatsapp"]:
+            set_setting("WHATSAPP_WEBHOOK_VERIFY_TOKEN", settings["whatsapp"]["webhook_verify_token"])
+    
+    # Update Redis settings
+    if "redis" in settings:
+        if "url" in settings["redis"]:
+            set_setting("REDIS_URL", settings["redis"]["url"])
+        if "max_connections" in settings["redis"]:
+            set_setting("REDIS_MAX_CONNECTIONS", str(settings["redis"]["max_connections"]))
+    
+    # Update Celery settings
+    if "celery" in settings:
+        if "broker_url" in settings["celery"]:
+            set_setting("CELERY_BROKER_URL", settings["celery"]["broker_url"])
+        if "result_backend" in settings["celery"]:
+            set_setting("CELERY_RESULT_BACKEND", settings["celery"]["result_backend"])
+        if "worker_concurrency" in settings["celery"]:
+            set_setting("CELERY_WORKER_CONCURRENCY", str(settings["celery"]["worker_concurrency"]))
+        if "task_time_limit" in settings["celery"]:
+            set_setting("CELERY_TASK_TIME_LIMIT", str(settings["celery"]["task_time_limit"]))
+    
+    # Update Backup settings
+    if "backup" in settings:
+        if "enabled" in settings["backup"]:
+            set_setting("BACKUP_ENABLED", "true" if settings["backup"]["enabled"] else "false")
+        if "schedule" in settings["backup"]:
+            set_setting("BACKUP_SCHEDULE", settings["backup"]["schedule"])
+        if "retention_days" in settings["backup"]:
+            set_setting("BACKUP_RETENTION_DAYS", str(settings["backup"]["retention_days"]))
+        if "backup_dir" in settings["backup"]:
+            set_setting("BACKUP_DIR", settings["backup"]["backup_dir"])
+    
+    # Update Monitoring settings
+    if "monitoring" in settings:
+        if "prometheus_enabled" in settings["monitoring"]:
+            set_setting("PROMETHEUS_ENABLED", "true" if settings["monitoring"]["prometheus_enabled"] else "false")
+        if "grafana_enabled" in settings["monitoring"]:
+            set_setting("GRAFANA_ENABLED", "true" if settings["monitoring"]["grafana_enabled"] else "false")
+        if "metrics_retention_days" in settings["monitoring"]:
+            set_setting("METRICS_RETENTION_DAYS", str(settings["monitoring"]["metrics_retention_days"]))
     
     # Update Auth settings
     if "auth" in settings:
@@ -2641,3 +2717,251 @@ async def get_system_resources(
             "server_host": server_host
         }
     }
+
+
+# ============================================================================
+# Documentation Endpoints (Admin Only)
+# ============================================================================
+
+@app.get('/documentation/{doc_name}')
+async def get_documentation(
+    doc_name: str,
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Get documentation content (admin only).
+    Supports markdown files from project root.
+    """
+    # Security: ensure doc_name doesn't contain path traversal
+    if ".." in doc_name or "/" in doc_name or "\\" in doc_name:
+        raise HTTPException(status_code=400, detail="Invalid document name")
+    
+    # Allow only specific documentation files
+    allowed_docs = [
+        "PRODUCTION_DEPLOYMENT.md",
+        "README.md",
+        "TELEGRAM_SETUP.md",
+        "WHATSAPP_SETUP.md",
+        "MONITORING_SETUP.md"
+    ]
+    
+    if doc_name not in allowed_docs:
+        raise HTTPException(status_code=404, detail="Documentation not found")
+    
+    doc_path = Path("/home/ubuntu/fastapi-bizcard-crm-ready") / doc_name
+    
+    if not doc_path.exists():
+        raise HTTPException(status_code=404, detail="Documentation file not found")
+    
+    try:
+        content = doc_path.read_text(encoding='utf-8')
+        return {
+            "filename": doc_name,
+            "content": content,
+            "size": len(content),
+            "last_modified": doc_path.stat().st_mtime
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read documentation: {str(e)}")
+
+
+@app.get('/documentation')
+async def list_documentation(
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    List available documentation files (admin only).
+    """
+    docs_root = Path("/home/ubuntu/fastapi-bizcard-crm-ready")
+    
+    available_docs = []
+    doc_files = [
+        ("PRODUCTION_DEPLOYMENT.md", "Руководство по Production Deployment", "production"),
+        ("README.md", "Основная документация проекта", "readme"),
+        ("TELEGRAM_SETUP.md", "Настройка Telegram интеграции", "telegram"),
+        ("WHATSAPP_SETUP.md", "Настройка WhatsApp интеграции", "whatsapp"),
+        ("MONITORING_SETUP.md", "Настройка мониторинга", "monitoring")
+    ]
+    
+    for filename, description, category in doc_files:
+        doc_path = docs_root / filename
+        if doc_path.exists():
+            stat = doc_path.stat()
+            available_docs.append({
+                "filename": filename,
+                "description": description,
+                "category": category,
+                "size": stat.st_size,
+                "last_modified": stat.st_mtime,
+                "last_modified_human": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+            })
+    
+    return {
+        "documents": available_docs,
+        "total_count": len(available_docs)
+    }
+
+
+# ============================================================================
+# Service Management Endpoints (Admin Only)
+# ============================================================================
+
+@app.get('/services/status')
+async def get_services_status(
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Get status of all Docker services (admin only).
+    """
+    try:
+        # Run docker compose ps to get service status
+        result = subprocess.run(
+            ['docker', 'compose', 'ps', '--format', 'json'],
+            cwd='/home/ubuntu/fastapi-bizcard-crm-ready',
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to get service status: {result.stderr}")
+        
+        # Parse JSON output (one JSON object per line)
+        services = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                try:
+                    service_info = json.loads(line)
+                    services.append({
+                        "name": service_info.get("Service", "unknown"),
+                        "container": service_info.get("Name", "unknown"),
+                        "state": service_info.get("State", "unknown"),
+                        "status": service_info.get("Status", "unknown"),
+                        "health": service_info.get("Health", "unknown"),
+                        "ports": service_info.get("Publishers", [])
+                    })
+                except json.JSONDecodeError:
+                    continue
+        
+        # Group services by category
+        service_categories = {
+            "core": ["backend", "frontend", "db"],
+            "processing": ["celery-worker", "redis"],
+            "monitoring": ["prometheus", "grafana", "node-exporter", "postgres-exporter", "cadvisor"]
+        }
+        
+        categorized_services = {}
+        for category, service_names in service_categories.items():
+            categorized_services[category] = [
+                svc for svc in services 
+                if any(name in svc["name"].lower() for name in service_names)
+            ]
+        
+        # Add uncategorized services
+        categorized_names = [svc["name"] for cat_services in categorized_services.values() for svc in cat_services]
+        categorized_services["other"] = [
+            svc for svc in services if svc["name"] not in categorized_names
+        ]
+        
+        return {
+            "services": services,
+            "categorized": categorized_services,
+            "total_count": len(services),
+            "running_count": len([s for s in services if s["state"].lower() == "running"]),
+            "timestamp": time.time()
+        }
+        
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Service status check timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get service status: {str(e)}")
+
+
+@app.post('/services/{service_name}/restart')
+async def restart_service(
+    service_name: str,
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Restart a specific Docker service (admin only).
+    """
+    # Security: validate service name
+    allowed_services = [
+        "backend", "frontend", "db", "celery-worker", "redis",
+        "prometheus", "grafana", "node-exporter", "postgres-exporter", "cadvisor"
+    ]
+    
+    if service_name not in allowed_services:
+        raise HTTPException(status_code=400, detail="Invalid service name")
+    
+    try:
+        # Restart the service
+        result = subprocess.run(
+            ['docker', 'compose', 'restart', service_name],
+            cwd='/home/ubuntu/fastapi-bizcard-crm-ready',
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to restart service: {result.stderr}")
+        
+        logger.info(f"Service {service_name} restarted by admin {current_user.username}")
+        
+        return {
+            "success": True,
+            "message": f"Service {service_name} restarted successfully",
+            "service": service_name,
+            "restarted_by": current_user.username,
+            "timestamp": time.time()
+        }
+        
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Service restart timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to restart service: {str(e)}")
+
+
+@app.get('/services/logs/{service_name}')
+async def get_service_logs(
+    service_name: str,
+    lines: int = Query(100, ge=1, le=1000),
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Get logs for a specific service (admin only).
+    """
+    # Security: validate service name
+    allowed_services = [
+        "backend", "frontend", "db", "celery-worker", "redis",
+        "prometheus", "grafana", "node-exporter", "postgres-exporter", "cadvisor"
+    ]
+    
+    if service_name not in allowed_services:
+        raise HTTPException(status_code=400, detail="Invalid service name")
+    
+    try:
+        # Get service logs
+        result = subprocess.run(
+            ['docker', 'compose', 'logs', '--tail', str(lines), service_name],
+            cwd='/home/ubuntu/fastapi-bizcard-crm-ready',
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to get logs: {result.stderr}")
+        
+        return {
+            "service": service_name,
+            "logs": result.stdout,
+            "lines": lines,
+            "timestamp": time.time()
+        }
+        
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Log retrieval timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get logs: {str(e)}")

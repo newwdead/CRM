@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Documentation from './Documentation';
+import ServiceManager from './ServiceManager';
 
 function AdminPanel({ t, lang }) {
   const [activeTab, setActiveTab] = useState('users');
@@ -30,6 +32,23 @@ function AdminPanel({ t, lang }) {
     google_vision_api_key: '',
     telegram_bot_token: '',
     telegram_webhook_url: '',
+    whatsapp_api_token: '',
+    whatsapp_phone_number_id: '',
+    whatsapp_business_account_id: '',
+    whatsapp_webhook_verify_token: '',
+    redis_url: '',
+    redis_max_connections: 10,
+    celery_broker_url: '',
+    celery_result_backend: '',
+    celery_worker_concurrency: 2,
+    celery_task_time_limit: 300,
+    backup_enabled: true,
+    backup_schedule: '0 2 * * *',
+    backup_retention_days: 30,
+    backup_dir: '/home/ubuntu/fastapi-bizcard-crm-ready/backups',
+    prometheus_enabled: true,
+    grafana_enabled: true,
+    metrics_retention_days: 15,
     token_expire_minutes: 10080,
     require_admin_approval: true
   });
@@ -119,13 +138,30 @@ function AdminPanel({ t, lang }) {
         const data = await response.json();
         setEditableSettings(data);
         setSettingsForm({
-          tesseract_langs: data.ocr.tesseract_langs || '',
-          parsio_api_key: data.ocr.parsio_api_key || '',
-          google_vision_api_key: data.ocr.google_vision_api_key || '',
-          telegram_bot_token: data.telegram.bot_token || '',
-          telegram_webhook_url: data.telegram.webhook_url || '',
-          token_expire_minutes: data.auth.token_expire_minutes || 10080,
-          require_admin_approval: data.auth.require_admin_approval !== false
+          tesseract_langs: data.ocr?.tesseract_langs || '',
+          parsio_api_key: data.ocr?.parsio_api_key || '',
+          google_vision_api_key: data.ocr?.google_vision_api_key || '',
+          telegram_bot_token: data.telegram?.bot_token || '',
+          telegram_webhook_url: data.telegram?.webhook_url || '',
+          whatsapp_api_token: data.whatsapp?.api_token || '',
+          whatsapp_phone_number_id: data.whatsapp?.phone_number_id || '',
+          whatsapp_business_account_id: data.whatsapp?.business_account_id || '',
+          whatsapp_webhook_verify_token: data.whatsapp?.webhook_verify_token || '',
+          redis_url: data.redis?.url || '',
+          redis_max_connections: data.redis?.max_connections || 10,
+          celery_broker_url: data.celery?.broker_url || '',
+          celery_result_backend: data.celery?.result_backend || '',
+          celery_worker_concurrency: data.celery?.worker_concurrency || 2,
+          celery_task_time_limit: data.celery?.task_time_limit || 300,
+          backup_enabled: data.backup?.enabled !== false,
+          backup_schedule: data.backup?.schedule || '0 2 * * *',
+          backup_retention_days: data.backup?.retention_days || 30,
+          backup_dir: data.backup?.backup_dir || '/home/ubuntu/fastapi-bizcard-crm-ready/backups',
+          prometheus_enabled: data.monitoring?.prometheus_enabled !== false,
+          grafana_enabled: data.monitoring?.grafana_enabled !== false,
+          metrics_retention_days: data.monitoring?.metrics_retention_days || 15,
+          token_expire_minutes: data.auth?.token_expire_minutes || 10080,
+          require_admin_approval: data.auth?.require_admin_approval !== false
         });
       }
     } catch (error) {
@@ -155,6 +191,33 @@ function AdminPanel({ t, lang }) {
           telegram: {
             bot_token: settingsForm.telegram_bot_token,
             webhook_url: settingsForm.telegram_webhook_url
+          },
+          whatsapp: {
+            api_token: settingsForm.whatsapp_api_token,
+            phone_number_id: settingsForm.whatsapp_phone_number_id,
+            business_account_id: settingsForm.whatsapp_business_account_id,
+            webhook_verify_token: settingsForm.whatsapp_webhook_verify_token
+          },
+          redis: {
+            url: settingsForm.redis_url,
+            max_connections: parseInt(settingsForm.redis_max_connections)
+          },
+          celery: {
+            broker_url: settingsForm.celery_broker_url,
+            result_backend: settingsForm.celery_result_backend,
+            worker_concurrency: parseInt(settingsForm.celery_worker_concurrency),
+            task_time_limit: parseInt(settingsForm.celery_task_time_limit)
+          },
+          backup: {
+            enabled: settingsForm.backup_enabled,
+            schedule: settingsForm.backup_schedule,
+            retention_days: parseInt(settingsForm.backup_retention_days),
+            backup_dir: settingsForm.backup_dir
+          },
+          monitoring: {
+            prometheus_enabled: settingsForm.prometheus_enabled,
+            grafana_enabled: settingsForm.grafana_enabled,
+            metrics_retention_days: parseInt(settingsForm.metrics_retention_days)
           },
           auth: {
             token_expire_minutes: parseInt(settingsForm.token_expire_minutes),
@@ -474,6 +537,18 @@ function AdminPanel({ t, lang }) {
         >
           🔗 Resources
         </button>
+        <button
+          className={`tab ${activeTab === 'services' ? 'active' : ''}`}
+          onClick={() => setActiveTab('services')}
+        >
+          🔧 Services
+        </button>
+        <button
+          className={`tab ${activeTab === 'documentation' ? 'active' : ''}`}
+          onClick={() => setActiveTab('documentation')}
+        >
+          📖 Documentation
+        </button>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -782,6 +857,192 @@ function AdminPanel({ t, lang }) {
                 </div>
               </div>
 
+              <div className="section">
+                <h4>💬 WhatsApp Integration</h4>
+                <div className="form-group">
+                  <label>WhatsApp API Token</label>
+                  <input
+                    type="password"
+                    value={settingsForm.whatsapp_api_token}
+                    onChange={(e) => setSettingsForm({...settingsForm, whatsapp_api_token: e.target.value})}
+                    placeholder="Enter WhatsApp API token"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Phone Number ID</label>
+                  <input
+                    type="text"
+                    value={settingsForm.whatsapp_phone_number_id}
+                    onChange={(e) => setSettingsForm({...settingsForm, whatsapp_phone_number_id: e.target.value})}
+                    placeholder="Enter Phone Number ID"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Business Account ID</label>
+                  <input
+                    type="text"
+                    value={settingsForm.whatsapp_business_account_id}
+                    onChange={(e) => setSettingsForm({...settingsForm, whatsapp_business_account_id: e.target.value})}
+                    placeholder="Enter Business Account ID"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Webhook Verify Token</label>
+                  <input
+                    type="password"
+                    value={settingsForm.whatsapp_webhook_verify_token}
+                    onChange={(e) => setSettingsForm({...settingsForm, whatsapp_webhook_verify_token: e.target.value})}
+                    placeholder="Enter webhook verify token"
+                  />
+                </div>
+              </div>
+
+              <div className="section">
+                <h4>🔴 Redis Configuration</h4>
+                <div className="form-group">
+                  <label>Redis URL</label>
+                  <input
+                    type="text"
+                    value={settingsForm.redis_url}
+                    onChange={(e) => setSettingsForm({...settingsForm, redis_url: e.target.value})}
+                    placeholder="redis://redis:6379/0"
+                  />
+                  <small>Redis connection URL</small>
+                </div>
+                <div className="form-group">
+                  <label>Max Connections</label>
+                  <input
+                    type="number"
+                    value={settingsForm.redis_max_connections}
+                    onChange={(e) => setSettingsForm({...settingsForm, redis_max_connections: e.target.value})}
+                    min="1"
+                    max="100"
+                  />
+                </div>
+              </div>
+
+              <div className="section">
+                <h4>⚡ Celery Configuration</h4>
+                <div className="form-group">
+                  <label>Broker URL</label>
+                  <input
+                    type="text"
+                    value={settingsForm.celery_broker_url}
+                    onChange={(e) => setSettingsForm({...settingsForm, celery_broker_url: e.target.value})}
+                    placeholder="redis://redis:6379/0"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Result Backend</label>
+                  <input
+                    type="text"
+                    value={settingsForm.celery_result_backend}
+                    onChange={(e) => setSettingsForm({...settingsForm, celery_result_backend: e.target.value})}
+                    placeholder="redis://redis:6379/1"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Worker Concurrency</label>
+                  <input
+                    type="number"
+                    value={settingsForm.celery_worker_concurrency}
+                    onChange={(e) => setSettingsForm({...settingsForm, celery_worker_concurrency: e.target.value})}
+                    min="1"
+                    max="10"
+                  />
+                  <small>Number of parallel workers</small>
+                </div>
+                <div className="form-group">
+                  <label>Task Time Limit (seconds)</label>
+                  <input
+                    type="number"
+                    value={settingsForm.celery_task_time_limit}
+                    onChange={(e) => setSettingsForm({...settingsForm, celery_task_time_limit: e.target.value})}
+                    min="60"
+                    max="3600"
+                  />
+                </div>
+              </div>
+
+              <div className="section">
+                <h4>💾 Backup Configuration</h4>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.backup_enabled}
+                      onChange={(e) => setSettingsForm({...settingsForm, backup_enabled: e.target.checked})}
+                    />
+                    Enable Automatic Backups
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>Backup Schedule (cron)</label>
+                  <input
+                    type="text"
+                    value={settingsForm.backup_schedule}
+                    onChange={(e) => setSettingsForm({...settingsForm, backup_schedule: e.target.value})}
+                    placeholder="0 2 * * *"
+                  />
+                  <small>Cron expression (default: daily at 2 AM)</small>
+                </div>
+                <div className="form-group">
+                  <label>Retention Days</label>
+                  <input
+                    type="number"
+                    value={settingsForm.backup_retention_days}
+                    onChange={(e) => setSettingsForm({...settingsForm, backup_retention_days: e.target.value})}
+                    min="1"
+                    max="365"
+                  />
+                  <small>How long to keep backups</small>
+                </div>
+                <div className="form-group">
+                  <label>Backup Directory</label>
+                  <input
+                    type="text"
+                    value={settingsForm.backup_dir}
+                    onChange={(e) => setSettingsForm({...settingsForm, backup_dir: e.target.value})}
+                    placeholder="/home/ubuntu/fastapi-bizcard-crm-ready/backups"
+                  />
+                </div>
+              </div>
+
+              <div className="section">
+                <h4>📊 Monitoring Configuration</h4>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.prometheus_enabled}
+                      onChange={(e) => setSettingsForm({...settingsForm, prometheus_enabled: e.target.checked})}
+                    />
+                    Enable Prometheus
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.grafana_enabled}
+                      onChange={(e) => setSettingsForm({...settingsForm, grafana_enabled: e.target.checked})}
+                    />
+                    Enable Grafana
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>Metrics Retention (days)</label>
+                  <input
+                    type="number"
+                    value={settingsForm.metrics_retention_days}
+                    onChange={(e) => setSettingsForm({...settingsForm, metrics_retention_days: e.target.value})}
+                    min="1"
+                    max="90"
+                  />
+                  <small>How long to keep metrics data</small>
+                </div>
+              </div>
+
               <button type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? (t?.loading || 'Saving...') : (t?.save || 'Save Settings')}
               </button>
@@ -1075,6 +1336,16 @@ function AdminPanel({ t, lang }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Services Tab */}
+      {activeTab === 'services' && (
+        <ServiceManager />
+      )}
+
+      {/* Documentation Tab */}
+      {activeTab === 'documentation' && (
+        <Documentation />
       )}
     </div>
   );

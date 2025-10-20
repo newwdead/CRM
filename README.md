@@ -2,7 +2,7 @@
 
 > **Full-featured CRM system with OCR recognition and Telegram integration**
 
-![Version](https://img.shields.io/badge/version-1.8-blue)
+![Version](https://img.shields.io/badge/version-2.5-blue)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
 ![React](https://img.shields.io/badge/React-18-blue)
@@ -28,6 +28,9 @@ BizCard CRM is a modern web-based contact management system specializing in auto
 - ⚙️ **Web-based settings** for all system parameters
 - 🔐 **Secure authentication** with JWT tokens and role-based access
 - 🛡️ **Rate limiting** for API protection
+- 📖 **Integrated documentation** viewer in admin panel
+- 🔧 **Service management** with Docker integration
+- 📊 **System monitoring** with Prometheus and Grafana
 
 ---
 
@@ -94,6 +97,23 @@ BizCard CRM is a modern web-based contact management system specializing in auto
 - **Token expiration** (7 days default, configurable)
 - **User management** (admin panel for user administration)
 - **Profile management** (users can update their own profiles)
+
+### 📖 Admin Control Center (NEW in v2.5)
+- **Integrated Documentation Viewer**
+  - Read all project documentation directly in admin panel
+  - Beautiful Markdown rendering with GitHub Flavored Markdown
+  - Quick navigation between documents
+  - Auto-updating document list
+- **Service Management Dashboard**
+  - Real-time status monitoring of all Docker services
+  - One-click service restart capability
+  - Live log viewing for troubleshooting
+  - Service categorization (Core, Processing, Monitoring)
+- **Extended System Settings**
+  - Configure WhatsApp, Redis, Celery, Backup, Monitoring
+  - Web-based configuration for all services
+  - Settings persistence in database
+  - Validation and hints for all fields
 - **Admin privileges** for settings and user management
 - **Automatic admin creation** on first startup (admin/admin)
 - OCR provider status dashboard

@@ -11,7 +11,9 @@
     "react-tooltip": "^5.25.0",
     "framer-motion": "^10.16.16",
     "react-hotkeys-hook": "^4.4.1",
-    "react-beautiful-dnd": "^13.1.1"
+    "react-beautiful-dnd": "^13.1.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0"
   },
   "scripts": {
     "start": "react-scripts start",
