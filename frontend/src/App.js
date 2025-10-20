@@ -4,6 +4,7 @@ import ImportExport from './components/ImportExport';
 import UploadCard from './components/UploadCard';
 import ContactList from './components/ContactList';
 import ContactEdit from './components/ContactEdit';
+import Companies from './components/Companies';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import translations from './translations';
@@ -159,6 +160,12 @@ function App() {
             📇 {t.contacts}
           </button>
           <button
+            className={`nav-btn ${route === 'companies' ? 'active' : ''}`}
+            onClick={() => setRoute('companies')}
+          >
+            🏢 {t.companies || (lang === 'ru' ? 'Организации' : 'Companies')}
+          </button>
+          <button
             className={`nav-btn ${route === 'upload' ? 'active' : ''}`}
             onClick={() => setRoute('upload')}
           >
@@ -241,6 +248,10 @@ function App() {
 
         {route === 'contacts' && (
           <ContactList onEdit={(id) => { setEditId(id); setRoute('edit'); }} t={t} lang={lang} />
+        )}
+
+        {route === 'companies' && (
+          <Companies lang={lang} />
         )}
 
         {route === 'upload' && (

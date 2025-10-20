@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ContactCard from './ContactCard';
 
 export default function ContactList({ lang = 'ru', onEdit }) {
   const [contacts, setContacts] = useState([]);
@@ -8,6 +9,9 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   
   // Image Modal State
   const [viewingImage, setViewingImage] = useState(null);
+  
+  // Contact Card Modal State
+  const [viewingContact, setViewingContact] = useState(null);
   
   // Pagination States
   const [page, setPage] = useState(1);
@@ -140,7 +144,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
         return;
       }
       
-      const data = await res.json();
+    const data = await res.json();
       
       // Handle paginated response
       setContacts(data.items || []);
@@ -507,7 +511,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       {/* Contacts Table */}
       <div style={{ overflowX: 'auto' }}>
         <table>
-          <thead>
+        <thead>
             <tr>
               <th style={{ width: '40px' }}>
                 <input
@@ -516,6 +520,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   onChange={toggleAll}
                 />
               </th>
+              <th style={{ width: '50px' }}>№</th>
               <th>{t.uid}</th>
               <th>{t.name}</th>
               <th>{t.company}</th>
@@ -528,44 +533,49 @@ export default function ContactList({ lang = 'ru', onEdit }) {
               <th>{t.photo}</th>
               <th>{t.actions}</th>
             </tr>
-          </thead>
-          <tbody>
+        </thead>
+        <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                <td colSpan="14" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   {search || companyFilter || positionFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
                 </td>
               </tr>
             ) : (
-              contacts.map(c => (
-                <tr key={c.id}>
-                  <td>
+              contacts.map((c, index) => (
+                <tr 
+                  key={c.id}
+                  onClick={() => setViewingContact(c.id)}
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <td onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selected.includes(c.id)}
                       onChange={() => toggle(c.id)}
                     />
                   </td>
+                  <td style={{ textAlign: 'center', color: '#999' }}>
+                    {(page - 1) * limit + index + 1}
+                  </td>
                   <td>
                     {c.uid ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <code style={{ fontSize: '11px' }}>{c.uid.slice(0, 8)}</code>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard?.writeText(String(c.uid));
-                          }}
-                          className="secondary"
-                          style={{ padding: '2px 6px', fontSize: '11px' }}
-                        >
-                          📋
-                        </button>
-                      </div>
+                      <code style={{ fontSize: '11px', color: '#666' }}>{c.uid.slice(0, 8)}</code>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td><strong>{c.full_name || '—'}</strong></td>
+                  <td>
+                    <strong>
+                      {c.last_name || c.first_name ? (
+                        `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim()
+                      ) : (
+                        c.full_name || '—'
+                      )}
+                    </strong>
+                  </td>
                   <td>{c.company || '—'}</td>
                   <td>{c.position || '—'}</td>
                   <td>
@@ -605,7 +615,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                     {c.comment || '—'}
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    {c.photo_path ? (
+                {c.photo_path ? (
                       <img
                         src={`/files/${c.thumbnail_path || c.photo_path}`}
                         alt="Thumbnail"
@@ -628,15 +638,22 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                     )}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    <button onClick={() => onEdit?.(c.id)} className="secondary" style={{ padding: '4px 8px', fontSize: '12px' }}>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit?.(c.id);
+                      }} 
+                      className="secondary" 
+                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                    >
                       {t.edit}
                     </button>
-                  </td>
-                </tr>
+              </td>
+            </tr>
               ))
             )}
-          </tbody>
-        </table>
+        </tbody>
+      </table>
       </div>
       
       {/* Pagination */}
@@ -759,6 +776,18 @@ export default function ContactList({ lang = 'ru', onEdit }) {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Contact Card Modal */}
+      {viewingContact && (
+        <ContactCard
+          contactId={viewingContact}
+          lang={lang}
+          onClose={() => {
+            setViewingContact(null);
+            load(); // Reload in case of changes
+          }}
+        />
       )}
     </div>
   );
