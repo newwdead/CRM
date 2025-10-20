@@ -220,10 +220,14 @@ const SystemSettings = () => {
     if (!integration.configured) {
       return { color: '#ffc107', text: t.notConfigured, icon: '⚠️' };
     }
-    if (integration.connection_ok) {
+    if (integration.connection_ok === true) {
       return { color: '#28a745', text: t.configured, icon: '✅' };
     }
-    return { color: '#dc3545', text: 'Error', icon: '❌' };
+    if (integration.connection_ok === false) {
+      return { color: '#dc3545', text: 'Error', icon: '❌' };
+    }
+    // connection_ok === null (not tested yet)
+    return { color: '#6c757d', text: t.configured, icon: '🔵' };
   };
 
   const getIntegrationIcon = (id) => {
