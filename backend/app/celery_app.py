@@ -18,9 +18,9 @@ celery_app = Celery(
 
 # Configure Celery
 celery_app.conf.update(
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
+    task_serializer='pickle',  # Use pickle to support bytes data
+    accept_content=['json', 'pickle'],  # Accept both for compatibility
+    result_serializer='pickle',
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
@@ -33,11 +33,11 @@ celery_app.conf.update(
     result_expires=3600,  # Results expire after 1 hour
 )
 
-# Task routing (optional, for multiple queues)
-celery_app.conf.task_routes = {
-    'app.tasks.process_batch_upload': {'queue': 'batch_processing'},
-    'app.tasks.process_single_card': {'queue': 'card_processing'},
-}
+# Task routing - Disabled for now, using default queue
+# celery_app.conf.task_routes = {
+#     'app.tasks.process_batch_upload': {'queue': 'batch_processing'},
+#     'app.tasks.process_single_card': {'queue': 'card_processing'},
+# }
 
 # Beat schedule (for periodic tasks, if needed)
 celery_app.conf.beat_schedule = {

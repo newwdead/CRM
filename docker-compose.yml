@@ -62,6 +62,7 @@ services:
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
       - TZ=Europe/Berlin
+      - C_FORCE_ROOT=true
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0

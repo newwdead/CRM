@@ -28,6 +28,116 @@ logger = logging.getLogger(__name__)
 ocr_manager = OCRManager()
 
 
+def _process_card_sync(
+    image_data: bytes,
+    filename: str,
+    provider: str = 'auto',
+    user_id: int = None,
+    db: Session = None
+) -> Dict[str, Any]:
+    """
+    Synchronous version of process_single_card for use in batch processing.
+    Does not use Celery task context.
+    """
+    _db = db if db else SessionLocal()
+    try:
+        logger.info(f"Processing card (sync): {filename}")
+        
+        # Save file
+        file_ext = os.path.splitext(filename)[1].lower()
+        safe_name = f"{uuid.uuid4().hex}_{filename}"
+        save_path = os.path.join('/app/uploads', safe_name)
+        
+        with open(save_path, 'wb') as f:
+            f.write(image_data)
+        
+        # Create thumbnail
+        thumbnail_path = create_thumbnail(save_path, size=(200, 200), quality=85)
+        thumbnail_name = os.path.basename(thumbnail_path)
+        
+        # Try QR code first
+        qr_data = qr_utils.process_image_with_qr(image_data)
+        
+        data = None
+        raw_json = None
+        recognition_method = None
+        
+        if qr_data and any(qr_data.values()):
+            # QR code found
+            data = qr_data
+            recognition_method = 'qr_code'
+            raw_json = json.dumps({
+                'method': 'qr_code',
+                'data': qr_data
+            }, ensure_ascii=False)
+            logger.info(f"QR code extracted from {filename}")
+        else:
+            # Fallback to OCR
+            ocr_input = downscale_image_bytes(image_data, max_side=2000)
+            
+            preferred = None if provider == 'auto' else provider
+            ocr_result = ocr_manager.recognize(
+                ocr_input,
+                filename=filename,
+                preferred_provider=preferred
+            )
+            
+            data = ocr_result['data']
+            recognition_method = ocr_result['provider']
+            raw_json = json.dumps({
+                'method': 'ocr',
+                'provider': ocr_result['provider'],
+                'confidence': ocr_result.get('confidence', 0),
+                'raw_data': ocr_result.get('raw_data'),
+                'raw_text': ocr_result.get('raw_text'),
+            }, ensure_ascii=False)
+            
+            logger.info(f"OCR completed for {filename} with {recognition_method}")
+        
+        # Validate results
+        if not data or not any(data.values()):
+            raise Exception("No data could be extracted from the image")
+        
+        # Enhance data
+        data = enhance_ocr_result(data)
+        
+        # Attach metadata
+        data['uid'] = uuid.uuid4().hex
+        data['photo_path'] = safe_name
+        data['thumbnail_path'] = thumbnail_name
+        data['ocr_raw'] = raw_json
+        
+        # Save to database
+        contact = Contact(**data)
+        _db.add(contact)
+        _db.commit()
+        _db.refresh(contact)
+        
+        logger.info(f"Contact created: {contact.id} ({filename})")
+        
+        return {
+            'success': True,
+            'contact_id': contact.id,
+            'uid': contact.uid,
+            'filename': filename,
+            'recognition_method': recognition_method
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing {filename}: {e}")
+        # Clean up file on error
+        if 'save_path' in locals() and os.path.exists(save_path):
+            os.remove(save_path)
+        return {
+            'success': False,
+            'filename': filename,
+            'error': str(e)
+        }
+    finally:
+        if db is None and _db:
+            _db.close()
+
+
 class DatabaseTask(Task):
     """Base task with database session"""
     _db = None
@@ -64,6 +174,7 @@ def process_single_card(
         dict with contact data or error
     """
     try:
+        logger.info(f"✅ CELERY TASK STARTED: process_single_card for {filename} (data size: {len(image_data)} bytes)")
         logger.info(f"Processing card: {filename}")
         
         # Update task state
@@ -194,6 +305,7 @@ def process_batch_upload(
     }
     
     try:
+        logger.info(f"✅ CELERY TASK STARTED: process_batch_upload from {zip_path}")
         logger.info(f"Processing batch upload: {zip_path}")
         
         # Extract ZIP
@@ -244,8 +356,8 @@ def process_batch_upload(
                     # Read image data
                     image_data = zip_ref.read(filename)
                     
-                    # Process card
-                    result = process_single_card(
+                    # Process card synchronously (not as Celery task)
+                    result = _process_card_sync(
                         image_data,
                         os.path.basename(filename),
                         provider,
