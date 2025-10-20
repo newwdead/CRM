@@ -12,3 +12,12 @@ data/
 *.log
 backups/
 *.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Release archives
+release-*.zip
+*.tar.gz
