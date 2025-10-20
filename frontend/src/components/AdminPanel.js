@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Documentation from './Documentation';
 import ServiceManager from './ServiceManager';
+import SystemSettings from './SystemSettings';
 
 function AdminPanel({ t, lang }) {
   const [activeTab, setActiveTab] = useState('users');
@@ -64,7 +65,7 @@ function AdminPanel({ t, lang }) {
     if (activeTab === 'users') {
       fetchUsers();
       fetchPendingUsers();
-    } else if (activeTab === 'settings') {
+    } else if (activeTab === '_old_settings') {
       fetchSystemSettings();
       fetchEditableSettings();
     } else if (activeTab === 'backups') {
@@ -72,6 +73,7 @@ function AdminPanel({ t, lang }) {
     } else if (activeTab === 'resources') {
       fetchResources();
     }
+    // Note: 'settings' tab now uses SystemSettings component which fetches its own data
   }, [activeTab]);
 
   const fetchUsers = async () => {
@@ -764,6 +766,10 @@ function AdminPanel({ t, lang }) {
       )}
 
       {activeTab === 'settings' && (
+        <SystemSettings />
+      )}
+
+      {activeTab === '_old_settings' && (
         <div className="tab-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3>{t?.systemSettings || 'System Settings'}</h3>

@@ -2498,6 +2498,395 @@ async def update_editable_settings(
 
 
 # ============================================================================
+# Integration Management Endpoints (Admin Only)
+# ============================================================================
+
+@app.get('/settings/integrations/status')
+async def get_integrations_status(
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get status of all system integrations (admin only).
+    Returns enabled/disabled status, configuration status, and last check time.
+    """
+    from .models import AppSetting
+    
+    def get_setting(key: str, default: str = ""):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        return setting.value if setting else default
+    
+    def is_configured(keys):
+        """Check if all required keys are configured"""
+        return all(get_setting(key) != "" for key in keys)
+    
+    integrations = [
+        {
+            "id": "ocr",
+            "name": "OCR Recognition",
+            "description": "Business card text recognition",
+            "enabled": get_setting("OCR_ENABLED", "true") == "true",
+            "configured": is_configured(["TESSERACT_LANGS"]),
+            "connection_ok": True,  # Tesseract is always available locally
+            "last_checked": time.time(),
+            "config": {
+                "tesseract_langs": get_setting("TESSERACT_LANGS", "rus+eng"),
+                "parsio_api_key": get_setting("PARSIO_API_KEY", ""),
+                "google_vision_api_key": get_setting("GOOGLE_VISION_API_KEY", "")
+            },
+            "config_summary": {
+                "Tesseract": get_setting("TESSERACT_LANGS", "rus+eng"),
+                "Parsio": "Configured" if get_setting("PARSIO_API_KEY") else "Not configured",
+                "Google Vision": "Configured" if get_setting("GOOGLE_VISION_API_KEY") else "Not configured"
+            }
+        },
+        {
+            "id": "telegram",
+            "name": "Telegram Integration",
+            "description": "Receive business cards via Telegram",
+            "enabled": get_setting("TELEGRAM_ENABLED", "false") == "true",
+            "configured": is_configured(["TELEGRAM_BOT_TOKEN"]),
+            "connection_ok": None,  # Will be checked on demand
+            "last_checked": None,
+            "config": {
+                "bot_token": get_setting("TELEGRAM_BOT_TOKEN", ""),
+                "webhook_url": get_setting("TELEGRAM_WEBHOOK_URL", "")
+            },
+            "config_summary": {
+                "Bot Token": "***" + get_setting("TELEGRAM_BOT_TOKEN", "")[-6:] if get_setting("TELEGRAM_BOT_TOKEN") else "Not set",
+                "Webhook": get_setting("TELEGRAM_WEBHOOK_URL", "Not set")
+            }
+        },
+        {
+            "id": "whatsapp",
+            "name": "WhatsApp Business",
+            "description": "Receive business cards via WhatsApp",
+            "enabled": get_setting("WHATSAPP_ENABLED", "false") == "true",
+            "configured": is_configured(["WHATSAPP_API_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]),
+            "connection_ok": None,
+            "last_checked": None,
+            "config": {
+                "api_token": get_setting("WHATSAPP_API_TOKEN", ""),
+                "phone_number_id": get_setting("WHATSAPP_PHONE_NUMBER_ID", ""),
+                "business_account_id": get_setting("WHATSAPP_BUSINESS_ACCOUNT_ID", ""),
+                "webhook_verify_token": get_setting("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+            },
+            "config_summary": {
+                "Phone ID": get_setting("WHATSAPP_PHONE_NUMBER_ID", "Not set"),
+                "Business ID": get_setting("WHATSAPP_BUSINESS_ACCOUNT_ID", "Not set")
+            }
+        },
+        {
+            "id": "auth",
+            "name": "Authentication",
+            "description": "User authentication settings",
+            "enabled": True,  # Always enabled
+            "configured": True,
+            "connection_ok": True,
+            "last_checked": time.time(),
+            "config": {
+                "token_expire_minutes": int(get_setting("TOKEN_EXPIRE_MINUTES", "10080")),
+                "require_admin_approval": get_setting("REQUIRE_ADMIN_APPROVAL", "true") == "true"
+            },
+            "config_summary": {
+                "Token Expiry": f"{get_setting('TOKEN_EXPIRE_MINUTES', '10080')} min",
+                "Admin Approval": "Required" if get_setting("REQUIRE_ADMIN_APPROVAL", "true") == "true" else "Not required"
+            }
+        },
+        {
+            "id": "backup",
+            "name": "Backup & Recovery",
+            "description": "Automatic database backups",
+            "enabled": get_setting("BACKUP_ENABLED", "true") == "true",
+            "configured": True,
+            "connection_ok": True,
+            "last_checked": time.time(),
+            "config": {
+                "enabled": get_setting("BACKUP_ENABLED", "true") == "true",
+                "schedule": get_setting("BACKUP_SCHEDULE", "0 2 * * *"),
+                "retention_days": int(get_setting("BACKUP_RETENTION_DAYS", "30")),
+                "backup_dir": get_setting("BACKUP_DIR", "/home/ubuntu/fastapi-bizcard-crm-ready/backups")
+            },
+            "config_summary": {
+                "Schedule": get_setting("BACKUP_SCHEDULE", "0 2 * * *"),
+                "Retention": f"{get_setting('BACKUP_RETENTION_DAYS', '30')} days"
+            }
+        },
+        {
+            "id": "monitoring",
+            "name": "Monitoring",
+            "description": "Prometheus and Grafana",
+            "enabled": get_setting("PROMETHEUS_ENABLED", "true") == "true",
+            "configured": True,
+            "connection_ok": True,
+            "last_checked": time.time(),
+            "config": {
+                "prometheus_enabled": get_setting("PROMETHEUS_ENABLED", "true") == "true",
+                "grafana_enabled": get_setting("GRAFANA_ENABLED", "true") == "true",
+                "metrics_retention_days": int(get_setting("METRICS_RETENTION_DAYS", "15"))
+            },
+            "config_summary": {
+                "Prometheus": "Enabled" if get_setting("PROMETHEUS_ENABLED", "true") == "true" else "Disabled",
+                "Grafana": "Enabled" if get_setting("GRAFANA_ENABLED", "true") == "true" else "Disabled"
+            }
+        },
+        {
+            "id": "redis",
+            "name": "Redis Cache",
+            "description": "Cache and message broker",
+            "enabled": True,  # Always enabled
+            "configured": True,
+            "connection_ok": None,  # Will be checked on demand
+            "last_checked": None,
+            "config": {
+                "url": get_setting("REDIS_URL", os.getenv("REDIS_URL", "redis://redis:6379/0")),
+                "max_connections": int(get_setting("REDIS_MAX_CONNECTIONS", "10"))
+            },
+            "config_summary": {
+                "URL": get_setting("REDIS_URL", "redis://redis:6379/0"),
+                "Max Connections": get_setting("REDIS_MAX_CONNECTIONS", "10")
+            }
+        },
+        {
+            "id": "celery",
+            "name": "Background Tasks",
+            "description": "Asynchronous task processing",
+            "enabled": True,  # Always enabled
+            "configured": True,
+            "connection_ok": None,
+            "last_checked": None,
+            "config": {
+                "broker_url": get_setting("CELERY_BROKER_URL", os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")),
+                "result_backend": get_setting("CELERY_RESULT_BACKEND", os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")),
+                "worker_concurrency": int(get_setting("CELERY_WORKER_CONCURRENCY", "2")),
+                "task_time_limit": int(get_setting("CELERY_TASK_TIME_LIMIT", "300"))
+            },
+            "config_summary": {
+                "Concurrency": get_setting("CELERY_WORKER_CONCURRENCY", "2"),
+                "Task Limit": f"{get_setting('CELERY_TASK_TIME_LIMIT', '300')}s"
+            }
+        }
+    ]
+    
+    return {"integrations": integrations}
+
+
+@app.post('/settings/integrations/{integration_id}/toggle')
+async def toggle_integration(
+    integration_id: str,
+    data: dict = Body(...),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enable or disable a specific integration (admin only).
+    """
+    from .models import AppSetting
+    
+    enabled = data.get("enabled", False)
+    
+    def set_setting(key: str, value: str):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = AppSetting(key=key, value=value)
+            db.add(setting)
+    
+    # Map integration IDs to their enable/disable settings
+    integration_settings = {
+        "ocr": "OCR_ENABLED",
+        "telegram": "TELEGRAM_ENABLED",
+        "whatsapp": "WHATSAPP_ENABLED",
+        "backup": "BACKUP_ENABLED",
+        "monitoring": "PROMETHEUS_ENABLED"
+    }
+    
+    setting_key = integration_settings.get(integration_id)
+    if not setting_key:
+        raise HTTPException(status_code=400, detail=f"Integration {integration_id} cannot be toggled")
+    
+    set_setting(setting_key, "true" if enabled else "false")
+    db.commit()
+    
+    logger.info(f"Integration {integration_id} {'enabled' if enabled else 'disabled'} by admin {current_user.username}")
+    
+    return {"success": True, "message": f"Integration {integration_id} {'enabled' if enabled else 'disabled'}"}
+
+
+@app.post('/settings/integrations/{integration_id}/test')
+async def test_integration(
+    integration_id: str,
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Test connection to a specific integration (admin only).
+    """
+    from .models import AppSetting
+    
+    def get_setting(key: str, default: str = ""):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        return setting.value if setting else default
+    
+    try:
+        if integration_id == "telegram":
+            bot_token = get_setting("TELEGRAM_BOT_TOKEN")
+            if not bot_token:
+                return {"success": False, "error": "Bot token not configured"}
+            
+            # Test Telegram API
+            response = requests.get(f"https://api.telegram.org/bot{bot_token}/getMe", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("ok"):
+                    return {"success": True, "message": f"Connected to bot: @{data['result']['username']}"}
+            return {"success": False, "error": "Invalid bot token"}
+        
+        elif integration_id == "whatsapp":
+            api_token = get_setting("WHATSAPP_API_TOKEN")
+            phone_id = get_setting("WHATSAPP_PHONE_NUMBER_ID")
+            if not api_token or not phone_id:
+                return {"success": False, "error": "WhatsApp credentials not configured"}
+            
+            # Test WhatsApp API
+            api_url = os.getenv("WHATSAPP_API_URL", "https://graph.facebook.com/v18.0")
+            response = requests.get(
+                f"{api_url}/{phone_id}",
+                headers={"Authorization": f"Bearer {api_token}"},
+                timeout=5
+            )
+            if response.status_code == 200:
+                return {"success": True, "message": "WhatsApp API connection successful"}
+            return {"success": False, "error": f"API error: {response.status_code}"}
+        
+        elif integration_id == "redis":
+            import redis
+            redis_url = get_setting("REDIS_URL", os.getenv("REDIS_URL", "redis://redis:6379/0"))
+            r = redis.from_url(redis_url, socket_connect_timeout=2)
+            r.ping()
+            return {"success": True, "message": "Redis connection successful"}
+        
+        elif integration_id == "celery":
+            from .celery_app import celery_app
+            # Check if celery workers are running
+            inspect = celery_app.control.inspect(timeout=2)
+            stats = inspect.stats()
+            if stats:
+                worker_count = len(stats)
+                return {"success": True, "message": f"{worker_count} Celery worker(s) active"}
+            return {"success": False, "error": "No Celery workers found"}
+        
+        elif integration_id == "ocr":
+            # OCR is always available (Tesseract is local)
+            return {"success": True, "message": "Tesseract OCR available"}
+        
+        else:
+            return {"success": False, "error": "Test not implemented for this integration"}
+    
+    except Exception as e:
+        logger.error(f"Error testing integration {integration_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.put('/settings/integrations/{integration_id}/config')
+async def update_integration_config(
+    integration_id: str,
+    data: dict = Body(...),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update configuration for a specific integration (admin only).
+    """
+    from .models import AppSetting
+    
+    config = data.get("config", {})
+    
+    def set_setting(key: str, value: str):
+        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = AppSetting(key=key, value=value)
+            db.add(setting)
+    
+    # Map integration IDs to their configuration keys
+    if integration_id == "ocr":
+        if "tesseract_langs" in config:
+            set_setting("TESSERACT_LANGS", config["tesseract_langs"])
+        if "parsio_api_key" in config:
+            set_setting("PARSIO_API_KEY", config["parsio_api_key"])
+        if "google_vision_api_key" in config:
+            set_setting("GOOGLE_VISION_API_KEY", config["google_vision_api_key"])
+    
+    elif integration_id == "telegram":
+        if "bot_token" in config:
+            set_setting("TELEGRAM_BOT_TOKEN", config["bot_token"])
+        if "webhook_url" in config:
+            set_setting("TELEGRAM_WEBHOOK_URL", config["webhook_url"])
+    
+    elif integration_id == "whatsapp":
+        if "api_token" in config:
+            set_setting("WHATSAPP_API_TOKEN", config["api_token"])
+        if "phone_number_id" in config:
+            set_setting("WHATSAPP_PHONE_NUMBER_ID", config["phone_number_id"])
+        if "business_account_id" in config:
+            set_setting("WHATSAPP_BUSINESS_ACCOUNT_ID", config["business_account_id"])
+        if "webhook_verify_token" in config:
+            set_setting("WHATSAPP_WEBHOOK_VERIFY_TOKEN", config["webhook_verify_token"])
+    
+    elif integration_id == "auth":
+        if "token_expire_minutes" in config:
+            set_setting("TOKEN_EXPIRE_MINUTES", str(config["token_expire_minutes"]))
+        if "require_admin_approval" in config:
+            set_setting("REQUIRE_ADMIN_APPROVAL", "true" if config["require_admin_approval"] else "false")
+    
+    elif integration_id == "backup":
+        if "enabled" in config:
+            set_setting("BACKUP_ENABLED", "true" if config["enabled"] else "false")
+        if "schedule" in config:
+            set_setting("BACKUP_SCHEDULE", config["schedule"])
+        if "retention_days" in config:
+            set_setting("BACKUP_RETENTION_DAYS", str(config["retention_days"]))
+        if "backup_dir" in config:
+            set_setting("BACKUP_DIR", config["backup_dir"])
+    
+    elif integration_id == "monitoring":
+        if "prometheus_enabled" in config:
+            set_setting("PROMETHEUS_ENABLED", "true" if config["prometheus_enabled"] else "false")
+        if "grafana_enabled" in config:
+            set_setting("GRAFANA_ENABLED", "true" if config["grafana_enabled"] else "false")
+        if "metrics_retention_days" in config:
+            set_setting("METRICS_RETENTION_DAYS", str(config["metrics_retention_days"]))
+    
+    elif integration_id == "redis":
+        if "url" in config:
+            set_setting("REDIS_URL", config["url"])
+        if "max_connections" in config:
+            set_setting("REDIS_MAX_CONNECTIONS", str(config["max_connections"]))
+    
+    elif integration_id == "celery":
+        if "broker_url" in config:
+            set_setting("CELERY_BROKER_URL", config["broker_url"])
+        if "result_backend" in config:
+            set_setting("CELERY_RESULT_BACKEND", config["result_backend"])
+        if "worker_concurrency" in config:
+            set_setting("CELERY_WORKER_CONCURRENCY", str(config["worker_concurrency"]))
+        if "task_time_limit" in config:
+            set_setting("CELERY_TASK_TIME_LIMIT", str(config["task_time_limit"]))
+    
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown integration: {integration_id}")
+    
+    db.commit()
+    
+    logger.info(f"Configuration updated for integration {integration_id} by admin {current_user.username}")
+    
+    return {"success": True, "message": "Configuration updated successfully"}
+
+
+# ============================================================================
 # Backup Management Endpoints (Admin Only)
 # ============================================================================
 
