@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import ContactCard from './ContactCard';
+import { ContactListSkeleton } from './SkeletonLoader';
+import { Tooltip } from 'react-tooltip';
+import toast from 'react-hot-toast';
 
 export default function ContactList({ lang = 'ru', onEdit }) {
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState([]);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
+  const [loading, setLoading] = useState(true);
   
   // Image Modal State
   const [viewingImage, setViewingImage] = useState(null);
@@ -122,6 +126,8 @@ export default function ContactList({ lang = 'ru', onEdit }) {
 
   const load = async () => {
     try {
+      setLoading(true);
+      
       // Build query params
       const params = new URLSearchParams();
       if (search) params.append('q', search);
@@ -141,6 +147,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       
       if (!res.ok) {
         console.error('Failed to load contacts:', res.status);
+        toast.error(lang === 'ru' ? 'Ошибка загрузки контактов' : 'Failed to load contacts');
         return;
       }
       
@@ -159,6 +166,9 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       });
     } catch (error) {
       console.error('Error loading contacts:', error);
+      toast.error(lang === 'ru' ? 'Ошибка загрузки' : 'Loading error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -294,8 +304,15 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     }
   };
 
+  // Show skeleton while loading
+  if (loading) {
+    return <ContactListSkeleton rows={limit} />;
+  }
+
   return (
     <div className="card">
+      <Tooltip id="contact-tooltip" />
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0 }}>📇 {t.contacts}</h2>
         <div style={{ display: 'flex', gap: '8px' }}>

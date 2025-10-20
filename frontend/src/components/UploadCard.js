@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
   const [file, setFile] = useState(null);
   const [provider, setProvider] = useState(defaultProvider || 'auto');
-  const [error, setError] = useState(null);
-  const [showError, setShowError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [availableProviders, setAvailableProviders] = useState([]);
   const [lastResult, setLastResult] = useState(null);
@@ -70,35 +70,45 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
     }
   };
 
-  const handleFileSelect = (selectedFile) => {
-    if (selectedFile && selectedFile.type.startsWith('image/')) {
-      setFile(selectedFile);
-      setError(null);
-    } else {
-      setError(lang === 'ru' ? 'Выберите файл изображения!' : 'Please select an image file!');
-      setShowError(true);
+  // React Dropzone
+  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
+    if (rejectedFiles && rejectedFiles.length > 0) {
+      toast.error(lang === 'ru' ? 'Только изображения разрешены!' : 'Only images are allowed!', {
+        icon: '❌',
+        duration: 3000
+      });
+      return;
     }
-  };
+    
+    if (acceptedFiles && acceptedFiles.length > 0) {
+      setFile(acceptedFiles[0]);
+      toast.success(lang === 'ru' ? `Файл выбран: ${acceptedFiles[0].name}` : `File selected: ${acceptedFiles[0].name}`, {
+        icon: '📁',
+        duration: 2000
+      });
+    }
+  }, [lang]);
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    handleFileSelect(droppedFile);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    multiple: false,
+    noClick: false,
+    noKeyboard: false
+  });
 
   const upload = async () => {
     if (!file) {
-      setError(lang === 'ru' ? 'Выберите файл визитки!' : 'Choose a file!');
-      setShowError(true);
+      toast.error(lang === 'ru' ? 'Выберите файл визитки!' : 'Choose a file!', {
+        icon: '⚠️'
+      });
       return;
     }
 
     setUploading(true);
-    setError(null);
+    
+    // Show loading toast
+    const loadingToast = toast.loading(lang === 'ru' ? 'Обрабатываем визитку...' : 'Processing business card...');
 
     try {
       const fd = new FormData();
@@ -124,15 +134,13 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
         setFile(null);
         window.dispatchEvent(new Event('refresh-contacts'));
         
-        // Show notification if enabled
-        if (localStorage.getItem('app.notifications') === 'true' && 'Notification' in window) {
-          if (Notification.permission === 'granted') {
-            new Notification(t.success, {
-              body: data.full_name || t.extractedData,
-              icon: '/favicon.ico'
-            });
-          }
-        }
+        // Success toast
+        toast.success(lang === 'ru' ? 'Контакт успешно создан!' : 'Contact created successfully!', {
+          id: loadingToast,
+          icon: '✅',
+          duration: 4000
+        });
+        
       } else {
         let message = lang === 'ru' ? 'Ошибка загрузки' : 'Upload error';
         try {
@@ -141,12 +149,19 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
             message = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
           }
         } catch (_) {}
-        setError(message);
-        setShowError(true);
+        
+        toast.error(message, {
+          id: loadingToast,
+          icon: '❌',
+          duration: 5000
+        });
       }
     } catch (e) {
-      setError(e.message || 'Network error');
-      setShowError(true);
+      toast.error(e.message || 'Network error', {
+        id: loadingToast,
+        icon: '❌',
+        duration: 5000
+      });
     } finally {
       setUploading(false);
     }
@@ -163,38 +178,55 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
 
   return (
     <div className="card">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: 'var(--bg-color)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--border-color)',
+          },
+          success: {
+            style: {
+              background: 'var(--success-bg)',
+              color: 'var(--success-color)',
+            },
+          },
+          error: {
+            style: {
+              background: 'var(--error-bg)',
+              color: 'var(--error-color)',
+            },
+          },
+        }}
+      />
+      
       <h3>{t.title}</h3>
 
-      {/* Drag & Drop Zone */}
+      {/* Drag & Drop Zone with react-dropzone */}
       <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
+        {...getRootProps()}
         style={{
-          border: '2px dashed var(--border-color)',
+          border: `2px dashed ${isDragActive ? 'var(--primary-color)' : 'var(--border-color)'}`,
           borderRadius: 'var(--radius)',
           padding: '32px',
           textAlign: 'center',
-          backgroundColor: file ? 'var(--bg-secondary)' : 'var(--bg-color)',
+          backgroundColor: isDragActive ? 'var(--primary-light)' : (file ? 'var(--bg-secondary)' : 'var(--bg-color)'),
           cursor: 'pointer',
-          transition: 'all 0.2s',
-          marginBottom: '16px'
+          transition: 'all 0.3s ease',
+          marginBottom: '16px',
+          transform: isDragActive ? 'scale(1.02)' : 'scale(1)',
+          boxShadow: isDragActive ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
         }}
-        onClick={() => document.getElementById('file-input').click()}
       >
-        <input
-          id="file-input"
-          type="file"
-          accept="image/*"
-          onChange={(e) => handleFileSelect(e.target.files[0])}
-          style={{ display: 'none' }}
-        />
-        <div style={{ fontSize: '48px', marginBottom: '12px' }}>
-          {file ? '✅' : '📁'}
+        <input {...getInputProps()} />
+        <div style={{ fontSize: '48px', marginBottom: '12px', transition: 'transform 0.2s' }}>
+          {isDragActive ? '📥' : (file ? '✅' : '📁')}
         </div>
         <div style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-          {file ? t.fileSelected : t.dragDrop}
+          {isDragActive ? (lang === 'ru' ? 'Отпустите файл здесь' : 'Drop file here') : (file ? t.fileSelected : t.dragDrop)}
         </div>
-        {file && (
+        {file && !isDragActive && (
           <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-color)' }}>
             {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
           </div>
@@ -243,40 +275,6 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
           t.upload
         )}
       </button>
-
-      {/* Error Modal */}
-      {showError && (
-        <div className="modal-overlay" onClick={() => setShowError(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>{t.error}</h3>
-            <pre style={{
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              backgroundColor: 'var(--bg-secondary)',
-              padding: '12px',
-              borderRadius: 'var(--radius)',
-              maxHeight: '300px',
-              overflow: 'auto',
-              fontSize: '13px'
-            }}>
-              {error}
-            </pre>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button
-                className="secondary"
-                onClick={() => {
-                  navigator.clipboard?.writeText(String(error || ''));
-                }}
-              >
-                {t.copy}
-              </button>
-              <button onClick={() => setShowError(false)}>
-                {t.close}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Success Result Modal */}
       {showResult && lastResult && (

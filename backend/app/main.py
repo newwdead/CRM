@@ -545,6 +545,36 @@ def list_contacts(
         "pages": pages
     }
 
+@app.get('/contacts/search/')
+def search_contacts(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(10, ge=1, le=50, description="Max results (1-50)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Fast global search for SearchOverlay (Ctrl+K).
+    Searches across names, company, position, email, phone.
+    Returns minimal data for quick results.
+    """
+    search_term = f"%{q}%"
+    
+    # Search with relevance ranking
+    contacts = db.query(Contact).filter(
+        (Contact.full_name.ilike(search_term)) |
+        (Contact.first_name.ilike(search_term)) |
+        (Contact.last_name.ilike(search_term)) |
+        (Contact.company.ilike(search_term)) |
+        (Contact.position.ilike(search_term)) |
+        (Contact.email.ilike(search_term)) |
+        (Contact.phone.ilike(search_term))
+    ).limit(limit).all()
+    
+    return {
+        "items": contacts,
+        "total": len(contacts)
+    }
+
 @app.get('/contacts/{contact_id}')
 def get_contact_by_id(
     contact_id: int,

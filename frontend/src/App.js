@@ -7,6 +7,7 @@ import ContactEdit from './components/ContactEdit';
 import Companies from './components/Companies';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
+import SearchOverlay from './components/SearchOverlay';
 import translations from './translations';
 
 function App() {
@@ -284,6 +285,17 @@ function App() {
           </p>
         )}
       </footer>
+
+      {/* Global Search Overlay (Ctrl+K) */}
+      {isAuthenticated && (
+        <SearchOverlay 
+          lang={lang} 
+          onContactSelect={(contactId) => {
+            setEditId(contactId);
+            setRoute('edit');
+          }}
+        />
+      )}
     </div>
   );
 }
