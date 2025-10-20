@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import ContactCard from './ContactCard';
 import { ContactListSkeleton } from './SkeletonLoader';
 import TableSettings from './TableSettings';
+import OCREditor from './OCREditor';
+import OCREditorWithBlocks from './OCREditorWithBlocks';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
@@ -17,6 +19,9 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   
   // Contact Card Modal State
   const [viewingContact, setViewingContact] = useState(null);
+  
+  // OCR Editor State
+  const [editingOCR, setEditingOCR] = useState(null);
   
   // Pagination States
   const [page, setPage] = useState(1);
@@ -90,6 +95,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     comment: 'Комментарий',
     photo: 'Фото',
     edit: 'Редактировать',
+    ocrEdit: 'OCR',
     copy: 'Скопировать',
     apply: 'Применить',
     cancel: 'Отмена',
@@ -132,6 +138,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     comment: 'Comment',
     photo: 'Photo',
     edit: 'Edit',
+    ocrEdit: 'OCR',
     copy: 'Copy',
     apply: 'Apply',
     cancel: 'Cancel',
@@ -708,6 +715,23 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
+                        setEditingOCR(c);
+                      }} 
+                      className="primary" 
+                      style={{ 
+                        padding: '4px 8px', 
+                        fontSize: '12px',
+                        marginRight: '4px',
+                        backgroundColor: '#4CAF50'
+                      }}
+                      data-tooltip-id="ocr-tooltip"
+                      data-tooltip-content={lang === 'ru' ? 'Быстрое редактирование OCR' : 'Quick OCR Edit'}
+                    >
+                      📝 {t.ocrEdit}
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onEdit?.(c.id);
                       }} 
                       className="secondary" 
@@ -866,6 +890,29 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           lang={lang}
         />
       )}
+
+      {/* OCR Editor Modal */}
+      {editingOCR && (
+        <OCREditorWithBlocks
+          contact={editingOCR}
+          onSave={async (updatedData) => {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/contacts/${editingOCR.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(updatedData)
+            });
+            if (!response.ok) throw new Error('Failed to update contact');
+            await load(); // Reload contacts
+          }}
+          onClose={() => setEditingOCR(null)}
+        />
+      )}
+
+      <Tooltip id="ocr-tooltip" place="top" />
     </div>
   );
 }

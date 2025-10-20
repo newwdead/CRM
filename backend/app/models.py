@@ -67,14 +67,16 @@ class Contact(Base):
     company = Column(String, nullable=True, index=True)  # Added index for grouping
     position = Column(String, nullable=True)
     email = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    address = Column(String, nullable=True)
+    phone = Column(String, nullable=True)  # Основной телефон (для обратной совместимости)
+    address = Column(String, nullable=True)  # Основной адрес
     website = Column(String, nullable=True)
     
     # Additional CRM fields
     phone_mobile = Column(String, nullable=True)  # Мобильный телефон
     phone_work = Column(String, nullable=True)  # Рабочий телефон
+    phone_additional = Column(String, nullable=True)  # Дополнительный телефон
     fax = Column(String, nullable=True)  # Факс
+    address_additional = Column(String, nullable=True)  # Дополнительный адрес
     department = Column(String, nullable=True)  # Отдел
     birthday = Column(String, nullable=True)  # День рождения
     source = Column(String, nullable=True)  # Источник контакта
@@ -111,3 +113,30 @@ class AuditLog(Base):
     entity_type = Column(String, nullable=False, default='contact')  # 'contact', 'tag', 'group'
     changes = Column(String, nullable=True)  # JSON string of changes
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+class OCRCorrection(Base):
+    """
+    Store OCR corrections for training and improving recognition accuracy.
+    Each record represents a manual correction of OCR text block.
+    """
+    __tablename__ = "ocr_corrections"
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey('contacts.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    
+    # Original OCR data
+    original_text = Column(String, nullable=False)  # What OCR recognized
+    original_box = Column(String, nullable=False)  # JSON: {x, y, width, height}
+    original_confidence = Column(Integer, nullable=True)  # Confidence score (0-100)
+    
+    # Corrected data
+    corrected_text = Column(String, nullable=False)  # What user corrected it to
+    corrected_field = Column(String, nullable=False)  # Which field: 'first_name', 'company', etc.
+    
+    # Metadata for training
+    image_path = Column(String, nullable=True)  # Path to original image
+    ocr_provider = Column(String, nullable=True)  # 'tesseract', 'parsio', 'google'
+    language = Column(String, nullable=True)  # 'rus', 'eng', 'rus+eng'
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

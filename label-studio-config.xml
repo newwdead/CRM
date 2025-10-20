@@ -1,0 +1,69 @@
+<View>
+  <Header value="Business Card OCR Correction"/>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  
+  <View>
+    <Header value="Text Fields"/>
+    
+    <Rectangle name="first_name" toName="image" strokeWidth="3"/>
+    <Label name="first_name_label" toName="first_name">
+      <Label value="First Name" background="#3b82f6"/>
+    </Label>
+    
+    <Rectangle name="last_name" toName="image" strokeWidth="3"/>
+    <Label name="last_name_label" toName="last_name">
+      <Label value="Last Name" background="#8b5cf6"/>
+    </Label>
+    
+    <Rectangle name="middle_name" toName="image" strokeWidth="3"/>
+    <Label name="middle_name_label" toName="middle_name">
+      <Label value="Middle Name" background="#a855f7"/>
+    </Label>
+    
+    <Rectangle name="company" toName="image" strokeWidth="3"/>
+    <Label name="company_label" toName="company">
+      <Label value="Company" background="#10b981"/>
+    </Label>
+    
+    <Rectangle name="position" toName="image" strokeWidth="3"/>
+    <Label name="position_label" toName="position">
+      <Label value="Position" background="#14b8a6"/>
+    </Label>
+    
+    <Rectangle name="email" toName="image" strokeWidth="3"/>
+    <Label name="email_label" toName="email">
+      <Label value="Email" background="#f59e0b"/>
+    </Label>
+    
+    <Rectangle name="phone" toName="image" strokeWidth="3"/>
+    <Label name="phone_label" toName="phone">
+      <Label value="Phone" background="#ef4444"/>
+    </Label>
+    
+    <Rectangle name="phone_mobile" toName="image" strokeWidth="3"/>
+    <Label name="phone_mobile_label" toName="phone_mobile">
+      <Label value="Mobile Phone" background="#ec4899"/>
+    </Label>
+    
+    <Rectangle name="phone_work" toName="image" strokeWidth="3"/>
+    <Label name="phone_work_label" toName="phone_work">
+      <Label value="Work Phone" background="#f97316"/>
+    </Label>
+    
+    <Rectangle name="address" toName="image" strokeWidth="3"/>
+    <Label name="address_label" toName="address">
+      <Label value="Address" background="#06b6d4"/>
+    </Label>
+    
+    <Rectangle name="website" toName="image" strokeWidth="3"/>
+    <Label name="website_label" toName="website">
+      <Label value="Website" background="#6366f1"/>
+    </Label>
+  </View>
+  
+  <View>
+    <Header value="Extracted Text"/>
+    <TextArea name="extracted_text" toName="image" rows="5" editable="true" maxSubmissions="1" />
+  </View>
+</View>
+

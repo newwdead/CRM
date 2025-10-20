@@ -20,6 +20,7 @@ from . import ocr_utils  # Enhanced OCR parsing
 from . import qr_utils  # QR code scanning
 from . import duplicate_utils  # Duplicate detection
 from . import auth_utils
+from . import image_processing  # Image preprocessing and multi-card detection
 from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
 import io, csv, tempfile, pandas as pd, os, uuid, json, requests, time, subprocess, glob
@@ -388,58 +389,59 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         img_res.raise_for_status()
         content = img_res.content
 
-        # Save to uploads
-        safe_name = f"{uuid.uuid4().hex}_tg_{os.path.basename(file_path)}"
-        save_path = os.path.join('uploads', safe_name)
-        with open(save_path, 'wb') as f:
-            f.write(content)
+        # STEP 0: Image preprocessing - detect and split multiple cards
+        logger.info("Telegram: Processing image with auto_crop=True, detect_multi=True")
+        processed_cards = image_processing.process_business_card_image(
+            content,
+            auto_crop=True,
+            detect_multi=True,
+            enhance=False
+        )
         
-        # Create thumbnail
-        thumbnail_full_path = create_thumbnail(save_path, size=(200, 200), quality=85)
-        thumbnail_name = os.path.basename(thumbnail_full_path)
-
-        # OCR (downscale first to reduce memory footprint)
+        logger.info(f"Telegram: {len(processed_cards)} card(s) detected")
+        
+        # Process each detected card
+        created_contacts = []
         provider = get_setting(db, 'tg.provider', 'auto') or 'auto'
-        ocr_input = downscale_image_bytes(content, max_side=2000)
         
-        # Use OCRManager with automatic fallback
-        preferred = None if provider == 'auto' else provider
-        try:
-            ocr_result = ocr_manager.recognize(
-                ocr_input,
-                filename=os.path.basename(file_path),
-                preferred_provider=preferred
+        for idx, card_bytes in enumerate(processed_cards[:5]):  # Limit to 5 cards
+            logger.info(f"Telegram: Processing card {idx + 1}/{len(processed_cards)}")
+            
+            # Save card to uploads
+            card_safe_name = f"{uuid.uuid4().hex}_tg_card{idx+1 if len(processed_cards) > 1 else ''}_{os.path.basename(file_path)}"
+            card_save_path = os.path.join('uploads', card_safe_name)
+            with open(card_save_path, 'wb') as f:
+                f.write(card_bytes)
+            
+            # Create thumbnail
+            card_thumbnail_path = create_thumbnail(card_save_path, size=(200, 200), quality=85)
+            card_thumbnail_name = os.path.basename(card_thumbnail_path)
+            
+            # Process card using helper function
+            card_data = process_single_card(
+                card_bytes,
+                card_safe_name,
+                card_thumbnail_name,
+                provider,
+                os.path.basename(file_path),
+                db
             )
             
-            data = ocr_result['data']
-            raw_json = json.dumps({
-                'provider': ocr_result['provider'],
-                'confidence': ocr_result.get('confidence', 0),
-                'raw_data': ocr_result.get('raw_data'),
-                'raw_text': ocr_result.get('raw_text'),
-            }, ensure_ascii=False)
-            
-            logger.info(f"Telegram OCR successful with {ocr_result['provider']}")
-            
-        except Exception as e:
-            logger.error(f"Telegram OCR failed: {e}")
-            raise HTTPException(status_code=500, detail=f'OCR failed: {str(e)}')
-
-        if not any(data.values()):
-            raise HTTPException(status_code=400, detail='OCR extracted no data')
-
-        # Enhance OCR data: parse names, detect company/position swap
-        data = ocr_utils.enhance_ocr_result(data)
+            if card_data:
+                created_contacts.append(card_data)
+                logger.info(f"Telegram: Card {idx + 1} created, contact_id={card_data['id']}")
         
-        data['uid'] = uuid.uuid4().hex
-        data['photo_path'] = safe_name
-        data['thumbnail_path'] = thumbnail_name
-        data['ocr_raw'] = raw_json
-        contact = Contact(**data)
-        db.add(contact)
-        db.commit()
-        db.refresh(contact)
-        return {'created_id': contact.id}
+        # Return result
+        if len(created_contacts) == 0:
+            raise HTTPException(status_code=400, detail='No cards could be processed')
+        elif len(created_contacts) == 1:
+            return {'created_id': created_contacts[0]['id']}
+        else:
+            return {
+                'created_ids': [c['id'] for c in created_contacts],
+                'count': len(created_contacts),
+                'message': f'{len(created_contacts)} business cards detected and processed'
+            }
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -791,6 +793,114 @@ def get_contact_by_id(
         raise HTTPException(status_code=404, detail='Contact not found')
     return contact
 
+@app.get('/contacts/{contact_id}/ocr-blocks')
+def get_contact_ocr_blocks(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get OCR bounding boxes and text blocks for a contact's image.
+    Returns coordinates and text for visual editing.
+    """
+    from . import tesseract_boxes
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.photo_path:
+        raise HTTPException(status_code=400, detail='Contact has no image')
+    
+    # Read image file
+    image_path = os.path.join('uploads', contact.photo_path)
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail='Image file not found')
+    
+    try:
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+        
+        # Get Tesseract language from settings
+        tesseract_langs = get_setting(db, 'TESSERACT_LANGS', 'rus+eng')
+        
+        # Extract blocks
+        result = tesseract_boxes.get_text_blocks(image_bytes, lang=tesseract_langs)
+        
+        # Group into lines for easier visualization
+        lines = tesseract_boxes.group_blocks_by_line(result['blocks'])
+        
+        return {
+            'contact_id': contact_id,
+            'image_width': result['image_width'],
+            'image_height': result['image_height'],
+            'blocks': result['blocks'],  # Word-level blocks
+            'lines': lines,  # Line-level grouped blocks
+            'current_data': {
+                'first_name': contact.first_name,
+                'last_name': contact.last_name,
+                'middle_name': contact.middle_name,
+                'company': contact.company,
+                'position': contact.position,
+                'email': contact.email,
+                'phone': contact.phone,
+                'phone_mobile': contact.phone_mobile,
+                'phone_work': contact.phone_work,
+                'phone_additional': contact.phone_additional,
+                'address': contact.address,
+                'address_additional': contact.address_additional,
+                'website': contact.website
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error extracting OCR blocks: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to extract OCR blocks: {str(e)}")
+
+
+@app.post('/contacts/{contact_id}/ocr-corrections')
+def save_ocr_correction(
+    contact_id: int,
+    correction_data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Save OCR correction for training purposes.
+    Stores original OCR text, corrected text, and field assignment.
+    """
+    from .models import OCRCorrection
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    # Create correction record
+    correction = OCRCorrection(
+        contact_id=contact_id,
+        user_id=current_user.id,
+        original_text=correction_data.get('original_text', ''),
+        original_box=json.dumps(correction_data.get('original_box', {})),
+        original_confidence=correction_data.get('original_confidence'),
+        corrected_text=correction_data.get('corrected_text', ''),
+        corrected_field=correction_data.get('corrected_field', ''),
+        image_path=contact.photo_path,
+        ocr_provider=correction_data.get('ocr_provider', 'tesseract'),
+        language=correction_data.get('language', 'rus+eng')
+    )
+    
+    db.add(correction)
+    db.commit()
+    
+    logger.info(f"OCR correction saved: {correction_data.get('original_text')} → {correction_data.get('corrected_text')} (field: {correction_data.get('corrected_field')})")
+    
+    return {
+        'success': True,
+        'message': 'Correction saved for training',
+        'correction_id': correction.id
+    }
+
+
 @app.get('/contacts/uid/{uid}')
 def get_contact_by_uid(
     uid: str,
@@ -888,6 +998,128 @@ def delete_contact(
     db.commit()
     return {'deleted': contact_id}
 
+
+# ==============================================================================
+# Helper function for processing a single business card
+# ==============================================================================
+
+def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str, 
+                       provider: str, filename: str, db: Session) -> dict:
+    """
+    Process a single business card image (QR + OCR).
+    Returns contact data dict or None on failure.
+    """
+    try:
+        # STEP 1: Try QR code scanning first
+        data = None
+        raw_json = None
+        raw_text = ""
+        recognition_method = None
+        
+        logger.info("Attempting QR code scan...")
+        qr_data = qr_utils.process_image_with_qr(card_bytes)
+        
+        if qr_data and any(qr_data.values()):
+            # QR code found
+            data = qr_data
+            recognition_method = 'qr_code'
+            raw_json = json.dumps({
+                'method': 'qr_code',
+                'data': qr_data
+            }, ensure_ascii=False)
+            qr_scan_counter.labels(status='success').inc()
+            logger.info("QR code extracted successfully")
+        else:
+            # No QR code - fallback to OCR
+            qr_scan_counter.labels(status='not_found').inc()
+            logger.info("No QR code found, falling back to OCR...")
+            
+            # Prepare for OCR
+            ocr_input = downscale_image_bytes(card_bytes, max_side=2000)
+            preferred = None if provider == 'auto' else provider
+            
+            try:
+                start_time = time.time()
+                ocr_result = ocr_manager.recognize(
+                    ocr_input,
+                    filename=filename,
+                    preferred_provider=preferred
+                )
+                processing_time = time.time() - start_time
+                
+                # Update metrics
+                used_provider = ocr_result['provider']
+                ocr_processing_time.labels(provider=used_provider).observe(processing_time)
+                ocr_processing_counter.labels(provider=used_provider, status='success').inc()
+                
+                data = ocr_result['data']
+                recognition_method = ocr_result['provider']
+                raw_text = ocr_result.get('raw_text', '')  # Get raw text for enhanced parsing
+                raw_json = json.dumps({
+                    'method': 'ocr',
+                    'provider': ocr_result['provider'],
+                    'confidence': ocr_result.get('confidence', 0),
+                    'raw_data': ocr_result.get('raw_data'),
+                    'raw_text': raw_text,
+                }, ensure_ascii=False)
+                
+                logger.info(f"OCR successful with {used_provider}, confidence: {ocr_result.get('confidence', 0)}")
+                
+            except Exception as e:
+                ocr_processing_counter.labels(provider=preferred or 'auto', status='failed').inc()
+                logger.error(f"OCR failed: {e}")
+                return None
+        
+        # Validate results
+        if not data or not any(data.values()):
+            logger.warning("No data extracted from card")
+            return None
+        
+        # Enhance data with improved parsing (pass raw_text for phone/address extraction)
+        data = ocr_utils.enhance_ocr_result(data, raw_text=raw_text)
+        
+        # Attach metadata
+        data['uid'] = uuid.uuid4().hex
+        data['photo_path'] = safe_name
+        data['thumbnail_path'] = thumbnail_name
+        data['ocr_raw'] = raw_json
+        
+        # Save to database
+        contact = Contact(**data)
+        db.add(contact)
+        db.commit()
+        db.refresh(contact)
+        
+        logger.info(f"Contact created: {contact.id} ({filename})")
+        
+        # Return contact data
+        return {
+            "id": contact.id,
+            "uid": contact.uid,
+            "full_name": contact.full_name,
+            "first_name": contact.first_name,
+            "last_name": contact.last_name,
+            "middle_name": contact.middle_name,
+            "company": contact.company,
+            "position": contact.position,
+            "email": contact.email,
+            "phone": contact.phone,
+            "phone_mobile": contact.phone_mobile,
+            "phone_work": contact.phone_work,
+            "phone_additional": contact.phone_additional,
+            "address": contact.address,
+            "address_additional": contact.address_additional,
+            "website": contact.website,
+            "photo_path": contact.photo_path,
+            "thumbnail_path": contact.thumbnail_path,
+            "recognition_method": recognition_method,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing card: {e}")
+        return None
+
+
 # --- Upload OCR ---
 @app.post('/upload/')
 @limiter.limit("60/minute")  # 60 uploads per minute per IP
@@ -895,6 +1127,8 @@ def upload_card(
     request: Request,
     file: UploadFile = File(...),
     provider: str = Query('auto', enum=['auto', 'tesseract', 'parsio', 'google']),
+    auto_crop: bool = Query(True, description="Automatically crop business card boundaries"),
+    detect_multi: bool = Query(True, description="Detect multiple cards in single image"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -910,9 +1144,65 @@ def upload_card(
             raise HTTPException(status_code=400, detail="File too large. Maximum size is 20MB")
         file.file.seek(0)
         
-        # Save uploaded file to disk
+        # Read image content
         content = file.file.read()
         file.file.seek(0)
+        
+        # STEP 0: Image preprocessing - crop and detect multiple cards
+        logger.info(f"Processing image with auto_crop={auto_crop}, detect_multi={detect_multi}")
+        processed_cards = image_processing.process_business_card_image(
+            content, 
+            auto_crop=auto_crop,
+            detect_multi=detect_multi,
+            enhance=False  # Keep false to preserve original quality
+        )
+        
+        logger.info(f"Image processing complete: {len(processed_cards)} card(s) detected")
+        
+        # If multiple cards detected, handle each one
+        if len(processed_cards) > 1:
+            logger.info(f"Multiple cards detected ({len(processed_cards)}), processing each separately")
+            created_contacts = []
+            
+            for idx, card_bytes in enumerate(processed_cards[:5]):  # Limit to 5 cards
+                logger.info(f"Processing card {idx + 1}/{len(processed_cards)}")
+                
+                # Save card to disk
+                card_safe_name = f"{uuid.uuid4().hex}_card{idx+1}_{os.path.basename(file.filename or 'upload')}"
+                card_save_path = os.path.join('uploads', card_safe_name)
+                with open(card_save_path, 'wb') as f:
+                    f.write(card_bytes)
+                
+                # Create thumbnail
+                card_thumbnail_path = create_thumbnail(card_save_path, size=(200, 200), quality=85)
+                card_thumbnail_name = os.path.basename(card_thumbnail_path)
+                
+                # Process card (QR + OCR)
+                card_data = process_single_card(
+                    card_bytes, 
+                    card_safe_name, 
+                    card_thumbnail_name,
+                    provider, 
+                    file.filename,
+                    db
+                )
+                
+                if card_data:
+                    created_contacts.append(card_data)
+            
+            # Update metrics
+            contacts_created_counter.inc(len(created_contacts))
+            contacts_total.set(db.query(Contact).count())
+            
+            return {
+                "message": f"{len(created_contacts)} business cards detected and processed",
+                "contacts": created_contacts
+            }
+        
+        # Single card - use processed image
+        content = processed_cards[0]
+        
+        # Save processed file to disk
         safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename or 'upload')}"
         save_path = os.path.join('uploads', safe_name)
         with open(save_path, 'wb') as f:
@@ -922,105 +1212,22 @@ def upload_card(
         thumbnail_full_path = create_thumbnail(save_path, size=(200, 200), quality=85)
         thumbnail_name = os.path.basename(thumbnail_full_path)
         
-        # STEP 1: Try QR code scanning first (priority)
-        data = None
-        raw_json = None
-        recognition_method = None
+        # Process single card (QR + OCR)
+        contact_dict = process_single_card(
+            content,
+            safe_name,
+            thumbnail_name,
+            provider,
+            file.filename,
+            db
+        )
         
-        logger.info("Attempting QR code scan...")
-        qr_data = qr_utils.process_image_with_qr(content)
-        
-        if qr_data and any(qr_data.values()):
-            # QR code found and parsed successfully
-            data = qr_data
-            recognition_method = 'qr_code'
-            raw_json = json.dumps({
-                'method': 'qr_code',
-                'data': qr_data
-            }, ensure_ascii=False)
-            qr_scan_counter.labels(status='success').inc()
-            logger.info(f"QR code extracted successfully: {list(data.keys())}")
-        else:
-            # No QR code or empty data - fallback to OCR
-            qr_scan_counter.labels(status='not_found').inc()
-            logger.info("No QR code found, falling back to OCR...")
-            
-            # Prepare data for OCR (downscale to reduce memory footprint)
-            ocr_input = downscale_image_bytes(content, max_side=2000)
-
-            # Run OCR via OCRManager with automatic fallback
-            preferred = None if provider == 'auto' else provider
-            
-            try:
-                # Track OCR processing time
-                start_time = time.time()
-                ocr_result = ocr_manager.recognize(
-                    ocr_input,
-                    filename=file.filename,
-                    preferred_provider=preferred
-                )
-                processing_time = time.time() - start_time
-                
-                # Update Prometheus metrics
-                used_provider = ocr_result['provider']
-                ocr_processing_time.labels(provider=used_provider).observe(processing_time)
-                ocr_processing_counter.labels(provider=used_provider, status='success').inc()
-                
-                data = ocr_result['data']
-                recognition_method = ocr_result['provider']
-                raw_json = json.dumps({
-                    'method': 'ocr',
-                    'provider': ocr_result['provider'],
-                    'confidence': ocr_result.get('confidence', 0),
-                    'raw_data': ocr_result.get('raw_data'),
-                    'raw_text': ocr_result.get('raw_text'),
-                }, ensure_ascii=False)
-                
-                logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}, time: {processing_time:.2f}s")
-                
-            except Exception as e:
-                # Track OCR failure
-                ocr_processing_counter.labels(provider=preferred or 'auto', status='failed').inc()
-                logger.error(f"OCR failed: {e}")
-                raise HTTPException(status_code=500, detail=f"OCR/QR extraction failed: {str(e)}")
-        
-        # Validate results
-        if not data or not any(data.values()):
+        if not contact_dict:
             raise HTTPException(status_code=400, detail="No text could be extracted from the image (neither QR nor OCR)")
         
-        # Enhance data: parse names, detect company/position swap
-        data = ocr_utils.enhance_ocr_result(data)
-        
-        # Attach stored metadata
-        data['uid'] = uuid.uuid4().hex
-        data['photo_path'] = safe_name
-        data['thumbnail_path'] = thumbnail_name
-        data['ocr_raw'] = raw_json
-        contact = Contact(**data)
-        db.add(contact)
-        db.commit()
-        db.refresh(contact)
-        
-        # Update contact metrics
+        # Update metrics
         contacts_created_counter.inc()
         contacts_total.set(db.query(Contact).count())
-        
-        # Add recognition method info to response
-        contact_dict = {
-            "id": contact.id,
-            "uid": contact.uid,
-            "full_name": contact.full_name,
-            "company": contact.company,
-            "position": contact.position,
-            "email": contact.email,
-            "phone": contact.phone,
-            "address": contact.address,
-            "comment": contact.comment,
-            "website": contact.website,
-            "photo_path": contact.photo_path,
-            "thumbnail_path": contact.thumbnail_path,
-            "recognition_method": recognition_method,
-        }
         
         return contact_dict
         

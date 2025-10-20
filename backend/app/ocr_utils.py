@@ -103,26 +103,49 @@ def detect_company_and_position(text: str, current_company: Optional[str] = None
     return result
 
 
-def enhance_ocr_result(ocr_data: Dict) -> Dict:
+def enhance_ocr_result(ocr_data: Dict, raw_text: str = "") -> Dict:
     """
-    Enhance OCR result with improved name parsing and company/position detection.
+    Enhance OCR result with improved parsing.
     
     This function:
-    1. Parses full_name into components
-    2. Detects and fixes swapped company/position
-    3. Cleans and normalizes data
+    1. Parses full_name into components (first, last, middle names)
+    2. Extracts and categorizes multiple phone numbers
+    3. Extracts multiple addresses
+    4. Detects and fixes swapped company/position
+    5. Cleans and normalizes data
     """
     result = ocr_data.copy()
     
-    # Parse full name
+    # Parse full name into components
     if 'full_name' in result and result['full_name']:
         name_parts = parse_russian_name(result['full_name'])
         result.update(name_parts)
     
+    # Parse multiple phone numbers from raw text
+    if raw_text:
+        phone_data = parse_phone_numbers(raw_text)
+        # Only update if we found something better
+        if phone_data.get('phone_mobile') and not result.get('phone_mobile'):
+            result['phone_mobile'] = phone_data['phone_mobile']
+        if phone_data.get('phone_work') and not result.get('phone_work'):
+            result['phone_work'] = phone_data['phone_work']
+        if phone_data.get('phone_additional') and not result.get('phone_additional'):
+            result['phone_additional'] = phone_data['phone_additional']
+        if phone_data.get('phone') and not result.get('phone'):
+            result['phone'] = phone_data['phone']
+    
+    # Extract addresses from raw text
+    if raw_text:
+        address_data = extract_addresses(raw_text)
+        if address_data.get('address') and not result.get('address'):
+            result['address'] = address_data['address']
+        if address_data.get('address_additional') and not result.get('address_additional'):
+            result['address_additional'] = address_data['address_additional']
+    
     # Detect and fix company/position swap
     if 'company' in result or 'position' in result:
         corrected = detect_company_and_position(
-            "",  # We don't have full text here
+            raw_text,
             result.get('company'),
             result.get('position')
         )
@@ -140,27 +163,164 @@ def enhance_ocr_result(ocr_data: Dict) -> Dict:
     return result
 
 
-def parse_phone_numbers(phone: Optional[str]) -> Dict[str, Optional[str]]:
+def is_mobile_phone(phone: str) -> bool:
     """
-    Parse multiple phone numbers and categorize them.
+    Determine if a phone number is mobile (cellular) based on patterns.
+    
+    Rules:
+    - Russian mobile: +7 9XX, 8 9XX
+    - International mobile: typically longer (10+ digits)
+    - Landline: shorter, often has area codes like (495), (812), etc.
+    """
+    # Clean phone number
+    digits_only = re.sub(r'\D', '', phone)
+    
+    # Russian mobile patterns
+    if digits_only.startswith('79') or digits_only.startswith('89'):
+        return True
+    
+    # If starts with +7 and second digit is 9, it's mobile
+    if phone.startswith('+7') and len(digits_only) > 1 and digits_only[1] == '9':
+        return True
+    
+    # Landline indicators (Russian area codes)
+    landline_codes = ['495', '499', '812', '843', '846', '383']  # Moscow, SPb, Kazan, etc.
+    for code in landline_codes:
+        if code in digits_only[:5]:
+            return False
+    
+    # If 10+ digits and no landline indicators, likely mobile
+    if len(digits_only) >= 10:
+        return True
+    
+    return False
+
+
+def parse_phone_numbers(text: str) -> Dict[str, Optional[str]]:
+    """
+    Extract and categorize multiple phone numbers from text.
     
     Returns:
-        Dict with keys: phone (main), phone_mobile, phone_work
+        Dict with keys: phone, phone_mobile, phone_work, phone_additional
     """
-    if not phone:
-        return {"phone": None, "phone_mobile": None, "phone_work": None}
+    if not text:
+        return {
+            "phone": None,
+            "phone_mobile": None,
+            "phone_work": None,
+            "phone_additional": None
+        }
     
-    # Split by common separators
-    phones = re.split(r'[,;/|]', phone)
-    phones = [p.strip() for p in phones if p.strip()]
+    # Regex patterns for phone numbers
+    phone_patterns = [
+        r'\+\d{1,3}[\s\-]?\(?\d{1,4}\)?[\s\-]?\d{1,4}[\s\-]?\d{1,4}[\s\-]?\d{1,4}',  # International
+        r'\d{1}\s?\(\d{3,4}\)\s?\d{3}[\-\s]?\d{2}[\-\s]?\d{2}',  # 8 (XXX) XXX-XX-XX
+        r'\+\d[\s\-]?\d{3}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}',  # +7 XXX XXX XX XX
+        r'\d{10,15}'  # Simple 10-15 digit numbers
+    ]
     
-    result = {"phone": None, "phone_mobile": None, "phone_work": None}
+    phones = []
+    for pattern in phone_patterns:
+        found = re.findall(pattern, text)
+        phones.extend(found)
     
-    if len(phones) > 0:
-        result["phone"] = phones[0]
-    if len(phones) > 1:
-        result["phone_mobile"] = phones[1]
-    if len(phones) > 2:
-        result["phone_work"] = phones[2]
+    # Remove duplicates and clean
+    phones = list(dict.fromkeys([p.strip() for p in phones if p.strip()]))
+    
+    result = {
+        "phone": None,
+        "phone_mobile": None,
+        "phone_work": None,
+        "phone_additional": None
+    }
+    
+    mobile_phones = []
+    work_phones = []
+    
+    for phone in phones:
+        if is_mobile_phone(phone):
+            mobile_phones.append(phone)
+        else:
+            work_phones.append(phone)
+    
+    # Assign phones to fields
+    if mobile_phones:
+        result["phone_mobile"] = mobile_phones[0]
+        result["phone"] = mobile_phones[0]  # Main phone is mobile if available
+        
+        if len(mobile_phones) > 1:
+            if not work_phones:  # Second mobile becomes work if no work phones
+                result["phone_work"] = mobile_phones[1]
+            else:
+                result["phone_additional"] = mobile_phones[1]
+    
+    if work_phones:
+        result["phone_work"] = work_phones[0]
+        if not result["phone"]:  # If no mobile, work becomes main
+            result["phone"] = work_phones[0]
+        
+        if len(work_phones) > 1:
+            result["phone_additional"] = work_phones[1]
+    
+    return result
+
+
+def extract_addresses(text: str) -> Dict[str, Optional[str]]:
+    """
+    Extract addresses from text.
+    
+    Addresses often contain:
+    - Street names (ул., улица, пр., проспект, etc.)
+    - Building/house numbers (д., дом, строение, корп.)
+    - City names (г., город, Москва, СПб, etc.)
+    
+    Returns:
+        Dict with keys: address, address_additional
+    """
+    if not text:
+        return {"address": None, "address_additional": None}
+    
+    # Address indicators
+    address_keywords = [
+        r'адрес[:\s]+',
+        r'ул\.?\s+',
+        r'улица\s+',
+        r'пр\.?\s+',
+        r'проспект\s+',
+        r'пер\.?\s+',
+        r'переулок\s+',
+        r'наб\.?\s+',
+        r'набережная\s+',
+        r'г\.?\s+',
+        r'город\s+',
+        r'д\.?\s+\d+',
+        r'дом\s+\d+',
+        r'корп\.?\s+\d+',
+        r'стр\.?\s+\d+',
+        r'office\s+',
+        r'офис\s+'
+    ]
+    
+    addresses = []
+    lines = text.split('\n')
+    
+    for line in lines:
+        line_lower = line.lower()
+        # Check if line contains address keywords
+        for keyword in address_keywords:
+            if re.search(keyword, line_lower):
+                # This line likely contains an address
+                addresses.append(line.strip())
+                break
+    
+    # Remove duplicates
+    addresses = list(dict.fromkeys(addresses))
+    
+    result = {"address": None, "address_additional": None}
+    
+    if len(addresses) > 0:
+        result["address"] = addresses[0]
+    if len(addresses) > 1:
+        result["address_additional"] = addresses[1]
     
     return result

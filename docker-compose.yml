@@ -97,6 +97,25 @@ services:
     ports:
       - '127.0.0.1:3000:80'
 
+  label-studio:
+    image: heartexlabs/label-studio:latest
+    container_name: bizcard-label-studio
+    environment:
+      - LABEL_STUDIO_HOST=http://localhost:8081
+      - LABEL_STUDIO_USERNAME=admin@ibbase.ru
+      - LABEL_STUDIO_PASSWORD=labelstudio2024
+      - LABEL_STUDIO_USER_TOKEN=${LABEL_STUDIO_TOKEN:-}
+      - LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
+      - LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files
+    volumes:
+      - label_studio_data:/label-studio/data
+      - ./uploads:/label-studio/files:ro  # Read-only access to business card images
+    ports:
+      - '127.0.0.1:8081:8080'
+    restart: unless-stopped
+    command: label-studio start --init
+
 volumes:
   postgres_data:
   redis_data:
+  label_studio_data:
