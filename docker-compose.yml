@@ -41,6 +41,10 @@ services:
       - PARSIO_AUTH_HEADER_NAME=${PARSIO_AUTH_HEADER_NAME:-Authorization}
       - PARSIO_AUTH_HEADER_VALUE=${PARSIO_AUTH_HEADER_VALUE:-Bearer {key}}
       - PARSIO_TIMEOUT=${PARSIO_TIMEOUT:-30}
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL:-https://graph.facebook.com/v18.0}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-ibbase_verify_token_2024}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
@@ -67,6 +71,10 @@ services:
       - PARSIO_AUTH_HEADER_NAME=${PARSIO_AUTH_HEADER_NAME:-Authorization}
       - PARSIO_AUTH_HEADER_VALUE=${PARSIO_AUTH_HEADER_VALUE:-Bearer {key}}
       - PARSIO_TIMEOUT=${PARSIO_TIMEOUT:-30}
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL:-https://graph.facebook.com/v18.0}
+      - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-ibbase_verify_token_2024}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
