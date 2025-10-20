@@ -134,10 +134,21 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
         setFile(null);
         window.dispatchEvent(new Event('refresh-contacts'));
         
-        // Success toast
-        toast.success(lang === 'ru' ? 'Контакт успешно создан!' : 'Contact created successfully!', {
+        // Success toast with recognition method
+        const method = data.recognition_method;
+        let successMessage = lang === 'ru' ? 'Контакт успешно создан!' : 'Contact created successfully!';
+        let successIcon = '✅';
+        
+        if (method === 'qr_code') {
+          successMessage += lang === 'ru' ? ' (из QR-кода)' : ' (from QR code)';
+          successIcon = '📱';
+        } else if (method) {
+          successMessage += ` (${method})`;
+        }
+        
+        toast.success(successMessage, {
           id: loadingToast,
-          icon: '✅',
+          icon: successIcon,
           duration: 4000
         });
         

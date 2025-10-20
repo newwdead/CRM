@@ -17,6 +17,7 @@ from .database import engine, Base, get_db
 from .models import Contact, AppSetting, User
 from .ocr_providers import OCRManager
 from . import ocr_utils  # Enhanced OCR parsing
+from . import qr_utils  # QR code scanning
 from . import auth_utils
 from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
@@ -38,6 +39,7 @@ limiter = Limiter(key_func=get_remote_address)
 # Prometheus metrics
 ocr_processing_counter = Counter('ocr_processing_total', 'Total OCR processing requests', ['provider', 'status'])
 ocr_processing_time = Histogram('ocr_processing_seconds', 'OCR processing time', ['provider'])
+qr_scan_counter = Counter('qr_scan_total', 'QR code scans', ['status'])
 contacts_total = Gauge('contacts_total', 'Total number of contacts')
 contacts_created_counter = Counter('contacts_created_total', 'Total contacts created')
 users_total = Gauge('users_total', 'Total number of users')
@@ -721,48 +723,73 @@ def upload_card(
         thumbnail_full_path = create_thumbnail(save_path, size=(200, 200), quality=85)
         thumbnail_name = os.path.basename(thumbnail_full_path)
         
-        # Prepare data for OCR (downscale to reduce memory footprint)
-        ocr_input = downscale_image_bytes(content, max_side=2000)
-
-        # Run OCR via OCRManager with automatic fallback
-        preferred = None if provider == 'auto' else provider
+        # STEP 1: Try QR code scanning first (priority)
+        data = None
+        raw_json = None
+        recognition_method = None
         
-        try:
-            # Track OCR processing time
-            start_time = time.time()
-            ocr_result = ocr_manager.recognize(
-                ocr_input,
-                filename=file.filename,
-                preferred_provider=preferred
-            )
-            processing_time = time.time() - start_time
-            
-            # Update Prometheus metrics
-            used_provider = ocr_result['provider']
-            ocr_processing_time.labels(provider=used_provider).observe(processing_time)
-            ocr_processing_counter.labels(provider=used_provider, status='success').inc()
-            
-            data = ocr_result['data']
+        logger.info("Attempting QR code scan...")
+        qr_data = qr_utils.process_image_with_qr(content)
+        
+        if qr_data and any(qr_data.values()):
+            # QR code found and parsed successfully
+            data = qr_data
+            recognition_method = 'qr_code'
             raw_json = json.dumps({
-                'provider': ocr_result['provider'],
-                'confidence': ocr_result.get('confidence', 0),
-                'raw_data': ocr_result.get('raw_data'),
-                'raw_text': ocr_result.get('raw_text'),
+                'method': 'qr_code',
+                'data': qr_data
             }, ensure_ascii=False)
+            qr_scan_counter.labels(status='success').inc()
+            logger.info(f"QR code extracted successfully: {list(data.keys())}")
+        else:
+            # No QR code or empty data - fallback to OCR
+            qr_scan_counter.labels(status='not_found').inc()
+            logger.info("No QR code found, falling back to OCR...")
             
-            logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}, time: {processing_time:.2f}s")
+            # Prepare data for OCR (downscale to reduce memory footprint)
+            ocr_input = downscale_image_bytes(content, max_side=2000)
+
+            # Run OCR via OCRManager with automatic fallback
+            preferred = None if provider == 'auto' else provider
             
-        except Exception as e:
-            # Track OCR failure
-            ocr_processing_counter.labels(provider=preferred or 'auto', status='failed').inc()
-            logger.error(f"OCR failed: {e}")
-            raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
+            try:
+                # Track OCR processing time
+                start_time = time.time()
+                ocr_result = ocr_manager.recognize(
+                    ocr_input,
+                    filename=file.filename,
+                    preferred_provider=preferred
+                )
+                processing_time = time.time() - start_time
+                
+                # Update Prometheus metrics
+                used_provider = ocr_result['provider']
+                ocr_processing_time.labels(provider=used_provider).observe(processing_time)
+                ocr_processing_counter.labels(provider=used_provider, status='success').inc()
+                
+                data = ocr_result['data']
+                recognition_method = ocr_result['provider']
+                raw_json = json.dumps({
+                    'method': 'ocr',
+                    'provider': ocr_result['provider'],
+                    'confidence': ocr_result.get('confidence', 0),
+                    'raw_data': ocr_result.get('raw_data'),
+                    'raw_text': ocr_result.get('raw_text'),
+                }, ensure_ascii=False)
+                
+                logger.info(f"OCR successful with {ocr_result['provider']}, confidence: {ocr_result.get('confidence', 0)}, time: {processing_time:.2f}s")
+                
+            except Exception as e:
+                # Track OCR failure
+                ocr_processing_counter.labels(provider=preferred or 'auto', status='failed').inc()
+                logger.error(f"OCR failed: {e}")
+                raise HTTPException(status_code=500, detail=f"OCR/QR extraction failed: {str(e)}")
         
-        # Validate OCR results
-        if not any(data.values()):
-            raise HTTPException(status_code=400, detail="No text could be extracted from the image")
+        # Validate results
+        if not data or not any(data.values()):
+            raise HTTPException(status_code=400, detail="No text could be extracted from the image (neither QR nor OCR)")
         
-        # Enhance OCR data: parse names, detect company/position swap
+        # Enhance data: parse names, detect company/position swap
         data = ocr_utils.enhance_ocr_result(data)
         
         # Attach stored metadata
@@ -779,7 +806,7 @@ def upload_card(
         contacts_created_counter.inc()
         contacts_total.set(db.query(Contact).count())
         
-        # Add provider info to response
+        # Add recognition method info to response
         contact_dict = {
             "id": contact.id,
             "uid": contact.uid,
@@ -793,8 +820,7 @@ def upload_card(
             "website": contact.website,
             "photo_path": contact.photo_path,
             "thumbnail_path": contact.thumbnail_path,
-            "ocr_provider": ocr_result['provider'],
-            "ocr_confidence": ocr_result.get('confidence', 0),
+            "recognition_method": recognition_method,
         }
         
         return contact_dict

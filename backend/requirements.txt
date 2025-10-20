@@ -17,3 +17,6 @@ slowapi
 prometheus-fastapi-instrumentator
 prometheus-client
 reportlab
+pyzbar
+opencv-python-headless
+vobject

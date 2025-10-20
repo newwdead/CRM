@@ -1,11 +1,12 @@
 FROM python:3.10-slim
 
-# Install Tesseract, PostgreSQL client, and image codecs for Pillow (JPEG/PNG/TIFF/WebP/JPEG2000)
+# Install Tesseract, PostgreSQL client, QR/barcode libs, and image codecs for Pillow (JPEG/PNG/TIFF/WebP/JPEG2000)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-rus \
     libtesseract-dev \
     libleptonica-dev \
+    libzbar0 \
     libjpeg62-turbo \
     zlib1g \
     libfreetype6 \
