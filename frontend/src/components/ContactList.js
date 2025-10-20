@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ContactCard from './ContactCard';
 import { ContactListSkeleton } from './SkeletonLoader';
+import TableSettings from './TableSettings';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
@@ -37,6 +38,37 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   });
   const [showNewContact, setShowNewContact] = useState(false);
   const [stats, setStats] = useState({ total: 0, withEmail: 0, withPhone: 0 });
+  
+  // Table Settings State
+  const [showTableSettings, setShowTableSettings] = useState(false);
+  const [tableColumns, setTableColumns] = useState(() => {
+    // Try to load from localStorage
+    const saved = localStorage.getItem('table_columns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse table columns:', e);
+      }
+    }
+    
+    // Default columns configuration
+    return [
+      { key: 'select', label: '☑️', visible: true, order: 0, width: '40' },
+      { key: 'number', label: '№', visible: true, order: 1, width: '50' },
+      { key: 'uid', label: lang === 'ru' ? 'UID' : 'UID', visible: true, order: 2, width: 'auto' },
+      { key: 'name', label: lang === 'ru' ? 'Имя' : 'Name', visible: true, order: 3, width: 'auto' },
+      { key: 'company', label: lang === 'ru' ? 'Компания' : 'Company', visible: true, order: 4, width: 'auto' },
+      { key: 'position', label: lang === 'ru' ? 'Должность' : 'Position', visible: true, order: 5, width: 'auto' },
+      { key: 'email', label: 'Email', visible: true, order: 6, width: 'auto' },
+      { key: 'phone', label: lang === 'ru' ? 'Телефон' : 'Phone', visible: true, order: 7, width: 'auto' },
+      { key: 'address', label: lang === 'ru' ? 'Адрес' : 'Address', visible: false, order: 8, width: 'auto' },
+      { key: 'website', label: lang === 'ru' ? 'Сайт' : 'Website', visible: false, order: 9, width: 'auto' },
+      { key: 'comment', label: lang === 'ru' ? 'Комментарий' : 'Comment', visible: false, order: 10, width: 'auto' },
+      { key: 'photo', label: lang === 'ru' ? 'Фото' : 'Photo', visible: true, order: 11, width: 'auto' },
+      { key: 'actions', label: lang === 'ru' ? 'Действия' : 'Actions', visible: true, order: 12, width: 'auto' },
+    ];
+  });
 
   const t = lang === 'ru' ? {
     contacts: 'Контакты',
@@ -304,6 +336,17 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     }
   };
 
+  // Handle table settings save
+  const handleSaveTableSettings = (newColumns) => {
+    setTableColumns(newColumns);
+    localStorage.setItem('table_columns', JSON.stringify(newColumns));
+  };
+
+  // Get visible columns sorted by order
+  const visibleColumns = tableColumns
+    .filter(col => col.visible)
+    .sort((a, b) => a.order - b.order);
+
   // Show skeleton while loading
   if (loading) {
     return <ContactListSkeleton rows={limit} />;
@@ -330,6 +373,13 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: '200px' }}
         />
+        <button 
+          onClick={() => setShowTableSettings(true)}
+          className="secondary"
+          title={lang === 'ru' ? 'Настройка таблицы' : 'Table Settings'}
+        >
+          ⚙️ {lang === 'ru' ? 'Таблица' : 'Table'}
+        </button>
         <button 
           onClick={() => setShowFilters(!showFilters)}
           className="secondary"
@@ -804,6 +854,16 @@ export default function ContactList({ lang = 'ru', onEdit }) {
             setViewingContact(null);
             load(); // Reload in case of changes
           }}
+        />
+      )}
+
+      {/* Table Settings Modal */}
+      {showTableSettings && (
+        <TableSettings
+          columns={tableColumns}
+          onSave={handleSaveTableSettings}
+          onClose={() => setShowTableSettings(false)}
+          lang={lang}
         />
       )}
     </div>
