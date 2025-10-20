@@ -30,8 +30,8 @@ services:
     container_name: bizcard-backend
     environment:
       - TZ=Europe/Berlin
-      - APP_VERSION=v2.7
-      - APP_MESSAGE=Advanced Navigation & Routing
+      - APP_VERSION=v2.8
+      - APP_MESSAGE=UX Enhancements & Fixes
       - SERVER_HOST=ibbase.ru
       - DOMAIN=ibbase.ru
       - USE_HTTPS=true
