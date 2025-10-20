@@ -113,6 +113,19 @@ class ContactResponse(ContactBase):
     id: int
     tags: List['TagResponse'] = []
     groups: List['GroupResponse'] = []
+    thumbnail_path: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class PaginatedContactsResponse(BaseModel):
+    """Schema for paginated contacts response."""
+    items: List[ContactResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int
     
     class Config:
         from_attributes = True

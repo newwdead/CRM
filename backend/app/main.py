@@ -146,6 +146,54 @@ def downscale_image_bytes(data: bytes, max_side: int = 2000) -> bytes:
         # if Pillow cannot open, return original
         return data
 
+def create_thumbnail(image_path: str, size: tuple = (200, 200), quality: int = 85) -> str:
+    """
+    Create a thumbnail for the given image.
+    
+    Args:
+        image_path: Path to the original image
+        size: Thumbnail size (width, height), default (200, 200)
+        quality: JPEG quality (1-100), default 85
+    
+    Returns:
+        Path to the created thumbnail
+    """
+    try:
+        # Generate thumbnail filename
+        path_obj = Path(image_path)
+        thumb_name = f"{path_obj.stem}_thumb{path_obj.suffix}"
+        thumb_path = path_obj.parent / thumb_name
+        
+        # Open image and create thumbnail
+        with Image.open(image_path) as img:
+            # Convert to RGB if necessary (for PNG with transparency, etc.)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # Create white background
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                if 'A' in img.mode:
+                    background.paste(img, mask=img.split()[-1])  # Use alpha channel as mask
+                else:
+                    background.paste(img)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Create thumbnail maintaining aspect ratio
+            img.thumbnail(size, Image.Resampling.LANCZOS)
+            
+            # Save thumbnail
+            img.save(str(thumb_path), 'JPEG', quality=quality, optimize=True)
+            
+        logger.info(f"Thumbnail created: {thumb_path}")
+        return str(thumb_path)
+    
+    except Exception as e:
+        logger.error(f"Failed to create thumbnail for {image_path}: {e}")
+        # Return original path if thumbnail creation fails
+        return image_path
+
 # Pydantic models for validation
 class ContactCreate(BaseModel):
     full_name: Optional[str] = None
@@ -342,6 +390,10 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         save_path = os.path.join('uploads', safe_name)
         with open(save_path, 'wb') as f:
             f.write(content)
+        
+        # Create thumbnail
+        thumbnail_full_path = create_thumbnail(save_path, size=(200, 200), quality=85)
+        thumbnail_name = os.path.basename(thumbnail_full_path)
 
         # OCR (downscale first to reduce memory footprint)
         provider = get_setting(db, 'tg.provider', 'auto') or 'auto'
@@ -375,6 +427,7 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
 
         data['uid'] = uuid.uuid4().hex
         data['photo_path'] = safe_name
+        data['thumbnail_path'] = thumbnail_name
         data['ocr_raw'] = raw_json
         contact = Contact(**data)
         db.add(contact)
@@ -387,7 +440,7 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- CRUD ---
-@app.get('/contacts/', response_model=List[schemas.ContactResponse])
+@app.get('/contacts/', response_model=schemas.PaginatedContactsResponse)
 def list_contacts(
     q: str = Query(None, description="Search query (full-text search across all fields)"),
     company: str = Query(None, description="Filter by company"),
@@ -396,11 +449,13 @@ def list_contacts(
     groups: str = Query(None, description="Filter by group names (comma-separated)"),
     sort_by: str = Query('id', description="Sort field: id, full_name, company, position"),
     sort_order: str = Query('desc', description="Sort order: asc, desc"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page (1-100)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get list of contacts with advanced search and filtering.
+    Get paginated list of contacts with advanced search and filtering.
     
     Parameters:
     - q: Full-text search across all fields (name, company, position, email, phone)
@@ -410,6 +465,8 @@ def list_contacts(
     - groups: Filter by group names (comma-separated, e.g., "partners,customers")
     - sort_by: Field to sort by (id, full_name, company, position)
     - sort_order: Sort direction (asc, desc)
+    - page: Page number (starts from 1)
+    - limit: Items per page (1-100, default 20)
     """
     from .models import Tag, Group
     
@@ -467,7 +524,23 @@ def list_contacts(
     else:
         query = query.order_by(sort_field.desc())
     
-    return query.all()
+    # Get total count before pagination
+    total = query.count()
+    
+    # Calculate pagination
+    pages = (total + limit - 1) // limit  # Ceiling division
+    offset = (page - 1) * limit
+    
+    # Apply pagination
+    items = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages
+    }
 
 @app.get('/contacts/uid/{uid}')
 def get_contact_by_uid(
@@ -596,6 +669,10 @@ def upload_card(
         with open(save_path, 'wb') as f:
             f.write(content)
         
+        # Create thumbnail (200x200, quality 85%)
+        thumbnail_full_path = create_thumbnail(save_path, size=(200, 200), quality=85)
+        thumbnail_name = os.path.basename(thumbnail_full_path)
+        
         # Prepare data for OCR (downscale to reduce memory footprint)
         ocr_input = downscale_image_bytes(content, max_side=2000)
 
@@ -640,6 +717,7 @@ def upload_card(
         # Attach stored metadata
         data['uid'] = uuid.uuid4().hex
         data['photo_path'] = safe_name
+        data['thumbnail_path'] = thumbnail_name
         data['ocr_raw'] = raw_json
         contact = Contact(**data)
         db.add(contact)
@@ -663,6 +741,7 @@ def upload_card(
             "comment": contact.comment,
             "website": contact.website,
             "photo_path": contact.photo_path,
+            "thumbnail_path": contact.thumbnail_path,
             "ocr_provider": ocr_result['provider'],
             "ocr_confidence": ocr_result.get('confidence', 0),
         }

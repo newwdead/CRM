@@ -6,6 +6,15 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   
+  // Image Modal State
+  const [viewingImage, setViewingImage] = useState(null);
+  
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  
   // Search & Filter States
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
@@ -116,6 +125,8 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       if (positionFilter) params.append('position', positionFilter);
       params.append('sort_by', sortBy);
       params.append('sort_order', sortOrder);
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
 
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/contacts/?${params.toString()}`, {
@@ -130,13 +141,17 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       }
       
       const data = await res.json();
-      setContacts(data);
+      
+      // Handle paginated response
+      setContacts(data.items || []);
+      setTotal(data.total || 0);
+      setPages(data.pages || 1);
       
       // Calculate stats
       setStats({
-        total: data.length,
-        withEmail: data.filter(c => c.email).length,
-        withPhone: data.filter(c => c.phone).length
+        total: data.total || 0,
+        withEmail: (data.items || []).filter(c => c.email).length,
+        withPhone: (data.items || []).filter(c => c.phone).length
       });
     } catch (error) {
       console.error('Error loading contacts:', error);
@@ -145,6 +160,11 @@ export default function ContactList({ lang = 'ru', onEdit }) {
 
   useEffect(() => {
     load();
+  }, [search, companyFilter, positionFilter, sortBy, sortOrder, page]);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (page !== 1) setPage(1);
   }, [search, companyFilter, positionFilter, sortBy, sortOrder]);
 
   useEffect(() => {
@@ -494,15 +514,24 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {c.photo_path && (
-                      <a
-                        href={`/files/${c.photo_path}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ marginRight: '8px', textDecoration: 'none' }}
+                      <img
+                        src={`/files/${c.thumbnail_path || c.photo_path}`}
+                        alt="Thumbnail"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingImage(c.photo_path);
+                        }}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          marginRight: '8px',
+                          border: '1px solid #ddd'
+                        }}
                         title={t.photo}
-                      >
-                        🖼️
-                      </a>
+                      />
                     )}
                     <button onClick={() => onEdit?.(c.id)} className="secondary" style={{ padding: '4px 8px', fontSize: '12px' }}>
                       {t.edit}
@@ -572,6 +601,128 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           </tbody>
         </table>
       </div>
+      
+      {/* Pagination */}
+      {pages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '10px',
+          marginTop: '20px',
+          padding: '15px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px'
+        }}>
+          <button
+            onClick={() => setPage(1)}
+            disabled={page === 1}
+            style={{
+              padding: '6px 12px',
+              fontSize: '14px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer',
+              opacity: page === 1 ? 0.5 : 1
+            }}
+          >
+            ⏮️ {lang === 'ru' ? 'Первая' : 'First'}
+          </button>
+          <button
+            onClick={() => setPage(page - 1)}
+            disabled={page === 1}
+            style={{
+              padding: '6px 12px',
+              fontSize: '14px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer',
+              opacity: page === 1 ? 0.5 : 1
+            }}
+          >
+            ◀️ {lang === 'ru' ? 'Назад' : 'Previous'}
+          </button>
+          <span style={{
+            padding: '0 15px',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}>
+            {lang === 'ru' ? 'Страница' : 'Page'} {page} {lang === 'ru' ? 'из' : 'of'} {pages}
+          </span>
+          <button
+            onClick={() => setPage(page + 1)}
+            disabled={page === pages}
+            style={{
+              padding: '6px 12px',
+              fontSize: '14px',
+              cursor: page === pages ? 'not-allowed' : 'pointer',
+              opacity: page === pages ? 0.5 : 1
+            }}
+          >
+            {lang === 'ru' ? 'Вперед' : 'Next'} ▶️
+          </button>
+          <button
+            onClick={() => setPage(pages)}
+            disabled={page === pages}
+            style={{
+              padding: '6px 12px',
+              fontSize: '14px',
+              cursor: page === pages ? 'not-allowed' : 'pointer',
+              opacity: page === pages ? 0.5 : 1
+            }}
+          >
+            {lang === 'ru' ? 'Последняя' : 'Last'} ⏭️
+          </button>
+        </div>
+      )}
+      
+      {/* Image Viewer Modal */}
+      {viewingImage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => setViewingImage(null)}
+        >
+          <button
+            onClick={() => setViewingImage(null)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              fontSize: '24px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            ✕
+          </button>
+          <img
+            src={`/files/${viewingImage}`}
+            alt="Full size"
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              objectFit: 'contain',
+              borderRadius: '8px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
