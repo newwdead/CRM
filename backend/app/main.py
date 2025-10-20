@@ -18,6 +18,7 @@ from .models import Contact, AppSetting, User
 from .ocr_providers import OCRManager
 from . import ocr_utils  # Enhanced OCR parsing
 from . import qr_utils  # QR code scanning
+from . import duplicate_utils  # Duplicate detection
 from . import auth_utils
 from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
@@ -576,6 +577,204 @@ def search_contacts(
         "items": contacts,
         "total": len(contacts)
     }
+
+
+@app.get('/duplicates/')
+def find_duplicate_contacts(
+    threshold: float = Query(0.6, ge=0.0, le=1.0, description="Similarity threshold (0.0-1.0)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Find potential duplicate contacts.
+    Returns groups of similar contacts with similarity scores.
+    
+    Args:
+        threshold: Minimum similarity score (default 0.6)
+    
+    Returns:
+        List of duplicate groups with contacts and scores
+    """
+    try:
+        # Get all contacts
+        contacts = db.query(Contact).all()
+        
+        # Convert to dicts for duplicate_utils
+        contacts_data = []
+        for c in contacts:
+            contact_dict = {
+                'id': c.id,
+                'uid': c.uid,
+                'full_name': c.full_name,
+                'first_name': c.first_name,
+                'last_name': c.last_name,
+                'middle_name': c.middle_name,
+                'company': c.company,
+                'position': c.position,
+                'department': c.department,
+                'email': c.email,
+                'phone': c.phone,
+                'phone_mobile': c.phone_mobile,
+                'phone_work': c.phone_work,
+                'address': c.address,
+                'website': c.website,
+                'tags': [{'id': t.id, 'name': t.name} for t in c.tags],
+                'groups': [{'id': g.id, 'name': g.name} for g in c.groups],
+            }
+            contacts_data.append(contact_dict)
+        
+        # Find duplicates
+        duplicates = duplicate_utils.find_duplicates(contacts_data, threshold=threshold)
+        
+        logger.info(f"Found {len(duplicates)} duplicate groups with threshold {threshold}")
+        
+        return {
+            "duplicates": duplicates,
+            "total_groups": len(duplicates),
+            "threshold": threshold
+        }
+        
+    except Exception as e:
+        logger.error(f"Error finding duplicates: {e}")
+        raise HTTPException(status_code=500, detail=f"Error finding duplicates: {str(e)}")
+
+
+@app.post('/duplicates/merge')
+def merge_duplicate_contacts(
+    primary_id: int = Body(..., description="Primary contact ID (will be kept)"),
+    secondary_id: int = Body(..., description="Secondary contact ID (will be deleted)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Merge two duplicate contacts.
+    Primary contact is kept and updated with data from secondary.
+    Secondary contact is deleted.
+    
+    Operation is logged in audit log.
+    """
+    try:
+        # Get contacts
+        primary = db.query(Contact).filter(Contact.id == primary_id).first()
+        secondary = db.query(Contact).filter(Contact.id == secondary_id).first()
+        
+        if not primary:
+            raise HTTPException(status_code=404, detail=f"Primary contact {primary_id} not found")
+        if not secondary:
+            raise HTTPException(status_code=404, detail=f"Secondary contact {secondary_id} not found")
+        
+        if primary.id == secondary.id:
+            raise HTTPException(status_code=400, detail="Cannot merge contact with itself")
+        
+        # Convert to dicts for merging
+        primary_dict = {
+            'id': primary.id,
+            'full_name': primary.full_name,
+            'first_name': primary.first_name,
+            'last_name': primary.last_name,
+            'middle_name': primary.middle_name,
+            'company': primary.company,
+            'position': primary.position,
+            'department': primary.department,
+            'email': primary.email,
+            'phone': primary.phone,
+            'phone_mobile': primary.phone_mobile,
+            'phone_work': primary.phone_work,
+            'fax': primary.fax,
+            'address': primary.address,
+            'website': primary.website,
+            'birthday': primary.birthday,
+            'source': primary.source,
+            'status': primary.status,
+            'priority': primary.priority,
+            'comment': primary.comment,
+            'tags': primary.tags,
+            'groups': primary.groups,
+        }
+        
+        secondary_dict = {
+            'id': secondary.id,
+            'full_name': secondary.full_name,
+            'first_name': secondary.first_name,
+            'last_name': secondary.last_name,
+            'middle_name': secondary.middle_name,
+            'company': secondary.company,
+            'position': secondary.position,
+            'department': secondary.department,
+            'email': secondary.email,
+            'phone': secondary.phone,
+            'phone_mobile': secondary.phone_mobile,
+            'phone_work': secondary.phone_work,
+            'fax': secondary.fax,
+            'address': secondary.address,
+            'website': secondary.website,
+            'birthday': secondary.birthday,
+            'source': secondary.source,
+            'status': secondary.status,
+            'priority': secondary.priority,
+            'comment': secondary.comment,
+            'tags': secondary.tags,
+            'groups': secondary.groups,
+        }
+        
+        # Merge data
+        merged_data = duplicate_utils.merge_contacts(primary_dict, secondary_dict)
+        
+        # Apply updates to primary contact
+        for key, value in merged_data.items():
+            if key not in ['tag_ids', 'group_ids']:
+                setattr(primary, key, value)
+        
+        # Merge tags
+        if 'tag_ids' in merged_data:
+            from .models import Tag
+            primary.tags = db.query(Tag).filter(Tag.id.in_(merged_data['tag_ids'])).all()
+        
+        # Merge groups
+        if 'group_ids' in merged_data:
+            from .models import Group
+            primary.groups = db.query(Group).filter(Group.id.in_(merged_data['group_ids'])).all()
+        
+        # Create audit log entry
+        from .models import AuditLog
+        audit_entry = AuditLog(
+            contact_id=primary.id,
+            action='merge',
+            user_id=current_user.id,
+            changes=json.dumps({
+                'merged_from': secondary.id,
+                'merged_from_uid': secondary.uid,
+                'merged_data': merged_data
+            }, ensure_ascii=False)
+        )
+        db.add(audit_entry)
+        
+        # Delete secondary contact
+        db.delete(secondary)
+        
+        # Commit changes
+        db.commit()
+        db.refresh(primary)
+        
+        # Update metrics
+        contacts_total.set(db.query(Contact).count())
+        
+        logger.info(f"Successfully merged contact {secondary_id} into {primary_id} by user {current_user.username}")
+        
+        return {
+            "success": True,
+            "primary_id": primary.id,
+            "merged_contact": primary,
+            "message": f"Contact {secondary_id} merged into {primary_id}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error merging contacts: {e}")
+        raise HTTPException(status_code=500, detail=f"Error merging contacts: {str(e)}")
+
 
 @app.get('/contacts/{contact_id}')
 def get_contact_by_id(

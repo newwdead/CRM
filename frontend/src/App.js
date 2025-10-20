@@ -5,6 +5,7 @@ import UploadCard from './components/UploadCard';
 import ContactList from './components/ContactList';
 import ContactEdit from './components/ContactEdit';
 import Companies from './components/Companies';
+import DuplicateFinder from './components/DuplicateFinder';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import SearchOverlay from './components/SearchOverlay';
@@ -167,6 +168,12 @@ function App() {
             🏢 {t.companies || (lang === 'ru' ? 'Организации' : 'Companies')}
           </button>
           <button
+            className={`nav-btn ${route === 'duplicates' ? 'active' : ''}`}
+            onClick={() => setRoute('duplicates')}
+          >
+            🔍 {lang === 'ru' ? 'Дубликаты' : 'Duplicates'}
+          </button>
+          <button
             className={`nav-btn ${route === 'upload' ? 'active' : ''}`}
             onClick={() => setRoute('upload')}
           >
@@ -253,6 +260,10 @@ function App() {
 
         {route === 'companies' && (
           <Companies lang={lang} />
+        )}
+
+        {route === 'duplicates' && (
+          <DuplicateFinder lang={lang} />
         )}
 
         {route === 'upload' && (
