@@ -583,8 +583,8 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       )}
 
       {/* Contacts Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <table style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>
             <tr>
               <th style={{ width: '40px' }}>
@@ -595,17 +595,17 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                 />
               </th>
               <th style={{ width: '50px' }}>№</th>
-              <th>{t.uid}</th>
-              <th>{t.name}</th>
-              <th>{t.company}</th>
-              <th>{t.position}</th>
-              <th>{t.email}</th>
-              <th>{t.phone}</th>
-              <th>{t.address}</th>
-              <th>{t.website}</th>
-              <th>{t.comment}</th>
-              <th>{t.photo}</th>
-              <th>{t.actions}</th>
+              <th style={{ width: '80px' }}>{t.uid}</th>
+              <th style={{ width: '150px' }}>{t.name}</th>
+              <th style={{ width: '140px' }}>{t.company}</th>
+              <th style={{ width: '120px' }}>{t.position}</th>
+              <th style={{ width: '180px' }}>{t.email}</th>
+              <th style={{ width: '130px' }}>{t.phone}</th>
+              <th style={{ width: '150px' }}>{t.address}</th>
+              <th style={{ width: '60px' }}>{t.website}</th>
+              <th style={{ width: '120px' }}>{t.comment}</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>{t.photo}</th>
+              <th style={{ width: '100px' }}>{t.actions}</th>
             </tr>
         </thead>
         <tbody>
@@ -634,50 +634,50 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   <td style={{ textAlign: 'center', color: '#999' }}>
                     {(page - 1) * limit + index + 1}
                   </td>
-                  <td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.uid}>
                     {c.uid ? (
-                      <code style={{ fontSize: '11px', color: '#666' }}>{c.uid.slice(0, 8)}</code>
+                      <code style={{ fontSize: '10px', color: '#666' }}>{c.uid.slice(0, 8)}</code>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td>
-                    <strong>
-                      {c.last_name || c.first_name ? (
-                        `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim()
-                      ) : (
-                        c.full_name || '—'
-                      )}
-                    </strong>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }} title={c.last_name || c.first_name ? `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim() : c.full_name}>
+                    {c.last_name || c.first_name ? (
+                      `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim()
+                    ) : (
+                      c.full_name || '—'
+                    )}
                   </td>
-                  <td>{c.company || '—'}</td>
-                  <td>{c.position || '—'}</td>
-                  <td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.company}>{c.company || '—'}</td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.position}>{c.position || '—'}</td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.email}>
                     {c.email ? (
-                      <a href={`mailto:${c.email}`} style={{ color: 'var(--primary-color)' }}>
+                      <a href={`mailto:${c.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
                         {c.email}
                       </a>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.phone}>
                     {c.phone ? (
-                      <a href={`tel:${c.phone}`} style={{ color: 'var(--primary-color)' }}>
+                      <a href={`tel:${c.phone}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
                         {c.phone}
                       </a>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td>{c.address || '—'}</td>
-                  <td>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.address}>{c.address || '—'}</td>
+                  <td style={{ textAlign: 'center' }}>
                     {c.website ? (
                       <a
                         href={c.website}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: 'var(--primary-color)' }}
+                        style={{ color: 'var(--primary-color)', fontSize: '18px', textDecoration: 'none' }}
+                        title={c.website}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         🔗
                       </a>
@@ -685,7 +685,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                       '—'
                     )}
                   </td>
-                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.comment}>
                     {c.comment || '—'}
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -719,25 +719,14 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                       }} 
                       className="primary" 
                       style={{ 
-                        padding: '4px 8px', 
-                        fontSize: '12px',
-                        marginRight: '4px',
+                        padding: '6px 12px', 
+                        fontSize: '13px',
                         backgroundColor: '#4CAF50'
                       }}
                       data-tooltip-id="ocr-tooltip"
-                      data-tooltip-content={lang === 'ru' ? 'Быстрое редактирование OCR' : 'Quick OCR Edit'}
+                      data-tooltip-content={lang === 'ru' ? 'Редактирование OCR' : 'OCR Editor'}
                     >
                       📝 {t.ocrEdit}
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit?.(c.id);
-                      }} 
-                      className="secondary" 
-                      style={{ padding: '4px 8px', fontSize: '12px' }}
-                    >
-                      {t.edit}
                     </button>
               </td>
             </tr>
@@ -896,17 +885,37 @@ export default function ContactList({ lang = 'ru', onEdit }) {
         <OCREditorWithBlocks
           contact={editingOCR}
           onSave={async (updatedData) => {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/contacts/${editingOCR.id}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(updatedData)
-            });
-            if (!response.ok) throw new Error('Failed to update contact');
-            await load(); // Reload contacts
+            try {
+              const token = localStorage.getItem('token');
+              const response = await fetch(`/api/contacts/${editingOCR.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(updatedData)
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to update contact');
+              }
+              
+              // Get updated contact data from server
+              const updatedContact = await response.json();
+              
+              // Reload the full contact list to ensure consistency
+              await load();
+              
+              // Close the editor after successful save
+              setEditingOCR(null);
+              
+              toast.success(lang === 'ru' ? 'Контакт обновлён' : 'Contact updated');
+            } catch (error) {
+              console.error('Error updating contact:', error);
+              toast.error(lang === 'ru' ? `Ошибка: ${error.message}` : `Error: ${error.message}`);
+              throw error; // Re-throw to let OCREditor handle it too
+            }
           }}
           onClose={() => setEditingOCR(null)}
         />

@@ -268,13 +268,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     setSaving(true);
     try {
       await onSave(editedData);
-      toast.success(t.messages.saved);
-      onClose();
+      // Success toast is shown by the parent component
+      // onClose() is called by the parent after successful save
     } catch (error) {
       console.error('Save error:', error);
       toast.error(t.messages.error);
-    } finally {
-      setSaving(false);
+      setSaving(false); // Re-enable the button on error
     }
   };
 
