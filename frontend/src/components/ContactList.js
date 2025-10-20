@@ -216,9 +216,16 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   const deleteSelected = async () => {
     if (!selected.length) return alert(t.nothingSelected);
     if (!window.confirm(`${t.confirmDelete} (${selected.length})`)) return;
+    
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     await fetch('/api/contacts/delete_bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(selected)
     });
     setSelected([]);
@@ -230,9 +237,16 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       Object.entries(bulkEditData).filter(([k, v]) => v && v.trim() !== '')
     );
     if (!Object.keys(fields).length) return alert(t.fillAtLeastOne);
+    
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     await fetch('/api/contacts/update_bulk', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ ids: selected, fields })
     });
     setSelected([]);
@@ -244,9 +258,16 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   const createNew = async () => {
     const empty = Object.values(newContact).every(v => !v);
     if (empty) return alert(t.fillAtLeastOne);
+    
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     await fetch('/api/contacts/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(newContact)
     });
     setNewContact({

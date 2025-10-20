@@ -104,7 +104,18 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
       const fd = new FormData();
       fd.append('file', file);
       const url = `/api/upload/?provider=${encodeURIComponent(provider)}`;
-      const res = await fetch(url, { method: 'POST', body: fd });
+      
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const res = await fetch(url, { 
+        method: 'POST', 
+        headers,
+        body: fd 
+      });
 
       if (res.ok) {
         const data = await res.json();
