@@ -64,6 +64,8 @@ jobs:
               --exclude='uploads' \
               --exclude='data' \
               --exclude='*.db' \
+              --exclude='*.tar.gz' \
+              --warning=no-file-changed \
               -czf ibbase-${{ steps.meta.outputs.tag }}.tar.gz .
           
           echo "Created archive: ibbase-${{ steps.meta.outputs.tag }}.tar.gz"
