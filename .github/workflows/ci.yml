@@ -5,6 +5,12 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+# Cancel old runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -12,40 +18,110 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install backend deps
+          cache: 'pip'  # Built-in pip caching
+      
+      - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-      - name: Quick import checks
+      
+      - name: Install linters
+        run: |
+          pip install flake8 black
+      
+      - name: Run flake8
+        run: |
+          cd backend
+          flake8 app/ --max-line-length=120 --exclude=__pycache__,migrations --statistics
+        continue-on-error: true  # Don't fail build, just warn
+      
+      - name: Check code formatting with black
+        run: |
+          cd backend
+          black app/ --check --diff
+        continue-on-error: true  # Don't fail build, just warn
+      
+      - name: Import checks
         run: |
           python - << 'PY'
           import fastapi, sqlalchemy, pandas
-          print('Imports OK')
+          print('✅ Backend imports OK')
           PY
+      
+      - name: Build backend Docker image
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Test backend Docker build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: ibbase/backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
       - name: Use Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Cache npm (frontend)
-        uses: actions/cache@v4
-        with:
-          path: frontend/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-      - name: Install and build
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
         working-directory: frontend
         run: |
-          mkdir -p .npm
-          if [ -f package-lock.json ]; then npm ci --cache .npm; else npm install --cache .npm; fi
-          npm run build
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      
+      - name: Run ESLint
+        working-directory: frontend
+        run: |
+          npm run lint || echo "⚠️ ESLint not configured, skipping..."
+        continue-on-error: true
+      
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      
+      - name: Build frontend Docker image
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Test frontend Docker build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: ibbase/frontend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 7
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Validate docker-compose.yml
+        run: |
+          docker compose config
+          echo "✅ docker-compose.yml is valid"
