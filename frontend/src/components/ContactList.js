@@ -265,17 +265,29 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    await fetch('/api/contacts/', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(newContact)
-    });
-    setNewContact({
-      full_name: '', company: '', position: '', email: '',
-      phone: '', address: '', comment: '', website: ''
-    });
-    setShowNewContact(false);
-    await load();
+    try {
+      const res = await fetch('/api/contacts/', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(newContact)
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Error: ${error.detail || 'Failed to create contact'}`);
+        return;
+      }
+      
+      setNewContact({
+        full_name: '', company: '', position: '', email: '',
+        phone: '', address: '', comment: '', website: ''
+      });
+      setShowNewContact(false);
+      await load();
+    } catch (error) {
+      console.error('Error creating contact:', error);
+      alert('Network error. Please try again.');
+    }
   };
 
   return (
@@ -504,7 +516,6 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   onChange={toggleAll}
                 />
               </th>
-              <th>{t.actions}</th>
               <th>{t.uid}</th>
               <th>{t.name}</th>
               <th>{t.company}</th>
@@ -514,12 +525,14 @@ export default function ContactList({ lang = 'ru', onEdit }) {
               <th>{t.address}</th>
               <th>{t.website}</th>
               <th>{t.comment}</th>
+              <th>{t.photo}</th>
+              <th>{t.actions}</th>
             </tr>
           </thead>
           <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   {search || companyFilter || positionFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
                 </td>
               </tr>
@@ -532,31 +545,6 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                       checked={selected.includes(c.id)}
                       onChange={() => toggle(c.id)}
                     />
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    {c.photo_path && (
-                      <img
-                        src={`/files/${c.thumbnail_path || c.photo_path}`}
-                        alt="Thumbnail"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewingImage(c.photo_path);
-                        }}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          objectFit: 'cover',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          marginRight: '8px',
-                          border: '1px solid #ddd'
-                        }}
-                        title={t.photo}
-                      />
-                    )}
-                    <button onClick={() => onEdit?.(c.id)} className="secondary" style={{ padding: '4px 8px', fontSize: '12px' }}>
-                      {t.edit}
-                    </button>
                   </td>
                   <td>
                     {c.uid ? (
@@ -615,6 +603,34 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   </td>
                   <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.comment || '—'}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {c.photo_path ? (
+                      <img
+                        src={`/files/${c.thumbnail_path || c.photo_path}`}
+                        alt="Thumbnail"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingImage(c.photo_path);
+                        }}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #ddd'
+                        }}
+                        title={t.photo}
+                      />
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button onClick={() => onEdit?.(c.id)} className="secondary" style={{ padding: '4px 8px', fontSize: '12px' }}>
+                      {t.edit}
+                    </button>
                   </td>
                 </tr>
               ))
