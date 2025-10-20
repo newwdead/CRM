@@ -30,8 +30,11 @@ services:
     container_name: bizcard-backend
     environment:
       - TZ=Europe/Berlin
-      - APP_VERSION=v2.4
-      - APP_MESSAGE=Automation & UX Enhancements
+      - APP_VERSION=v2.5
+      - APP_MESSAGE=Control Center
+      - SERVER_HOST=95.163.183.25
+      - DOMAIN=ibbase.ru
+      - USE_HTTPS=false
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -50,6 +53,8 @@ services:
       - ./uploads:/app/uploads
       - ./backups:/home/ubuntu/fastapi-bizcard-crm-ready/backups
       - ./scripts:/home/ubuntu/fastapi-bizcard-crm-ready/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - .:/home/ubuntu/fastapi-bizcard-crm-ready:ro
     ports:
       - '8000:8000'
     depends_on:

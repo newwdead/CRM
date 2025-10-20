@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import OCRSettings from './OCRSettings';
-import TelegramSettings from './TelegramSettings';
 
 export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChangeLang, onChangeProvider }) {
   const [activeTab, setActiveTab] = useState('general');
@@ -9,7 +8,6 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
     title: '⚙️ Настройки',
     generalTab: 'Общие',
     ocrTab: 'OCR Провайдеры',
-    telegramTab: 'Telegram',
     interfaceLanguage: 'Язык интерфейса',
     defaultProvider: 'Провайдер OCR по умолчанию',
     auto: 'Авто (рекомендуется)',
@@ -26,7 +24,6 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
     title: '⚙️ Settings',
     generalTab: 'General',
     ocrTab: 'OCR Providers',
-    telegramTab: 'Telegram',
     interfaceLanguage: 'Interface Language',
     defaultProvider: 'Default OCR Provider',
     auto: 'Auto (recommended)',
@@ -94,12 +91,10 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
           >
             {t.ocrTab}
           </button>
-          <button
-            className={`tab ${activeTab === 'telegram' ? 'active' : ''}`}
-            onClick={() => setActiveTab('telegram')}
-          >
-            {t.telegramTab}
-          </button>
+        </div>
+        
+        <div className="alert info" style={{ marginTop: '16px', marginBottom: '16px' }}>
+          ℹ️ {lang === 'ru' ? 'Настройки Telegram теперь доступны в Админ Панели → System Settings' : 'Telegram settings are now available in Admin Panel → System Settings'}
         </div>
 
         {/* Tab Content */}
@@ -184,12 +179,6 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
         {activeTab === 'ocr' && (
           <div>
             <OCRSettings lang={lang} />
-          </div>
-        )}
-
-        {activeTab === 'telegram' && (
-          <div>
-            <TelegramSettings lang={lang} />
           </div>
         )}
       </div>

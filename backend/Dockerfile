@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Install Tesseract, PostgreSQL client, QR/barcode libs, and image codecs for Pillow (JPEG/PNG/TIFF/WebP/JPEG2000)
+# Install Tesseract, PostgreSQL client, QR/barcode libs, image codecs for Pillow, and Docker CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-rus \
@@ -17,6 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     gzip \
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
