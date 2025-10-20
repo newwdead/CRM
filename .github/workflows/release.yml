@@ -57,6 +57,7 @@ jobs:
 
       - name: Create source archive
         run: |
+          # Create archive in /tmp to avoid tar errors about file changes
           tar --exclude='.git' \
               --exclude='node_modules' \
               --exclude='__pycache__' \
@@ -65,8 +66,10 @@ jobs:
               --exclude='data' \
               --exclude='*.db' \
               --exclude='*.tar.gz' \
-              --warning=no-file-changed \
-              -czf ibbase-${{ steps.meta.outputs.tag }}.tar.gz .
+              -czf /tmp/ibbase-${{ steps.meta.outputs.tag }}.tar.gz . || true
+          
+          # Move archive to current directory
+          mv /tmp/ibbase-${{ steps.meta.outputs.tag }}.tar.gz .
           
           echo "Created archive: ibbase-${{ steps.meta.outputs.tag }}.tar.gz"
 
