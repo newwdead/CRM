@@ -17,6 +17,10 @@ function AdminPanel({ t, lang }) {
     full_name: '',
     password: ''
   });
+  
+  // Reset password state
+  const [resettingPassword, setResettingPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
 
   // Editing settings state
   const [editingSettings, setEditingSettings] = useState(false);
@@ -254,6 +258,45 @@ function AdminPanel({ t, lang }) {
       }
     } catch (error) {
       setError('Network error');
+    }
+  };
+  
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    
+    try {
+      const response = await fetch(`/api/auth/users/${resettingPassword.id}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ new_password: newPassword })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuccess(data.message || `Password reset successfully for user: ${resettingPassword.username}`);
+        setResettingPassword(null);
+        setNewPassword('');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        const data = await response.json();
+        setError(data.detail || 'Failed to reset password');
+      }
+    } catch (error) {
+      setError('Network error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -534,6 +577,13 @@ function AdminPanel({ t, lang }) {
                             {user.is_admin ? '👤' : '🛡️'}
                           </button>
                           <button
+                            className="btn btn-warning btn-sm"
+                            onClick={() => setResettingPassword(user)}
+                            title="Reset password"
+                          >
+                            🔑
+                          </button>
+                          <button
                             className="btn btn-danger btn-sm"
                             onClick={() => handleDeleteUser(user.id, user.username)}
                             title="Delete user"
@@ -590,6 +640,45 @@ function AdminPanel({ t, lang }) {
                     </button>
                     <button type="submit" className="btn btn-primary">
                       Save Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {/* Reset Password Modal */}
+          {resettingPassword && (
+            <div className="modal-overlay" onClick={() => setResettingPassword(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>🔑 Reset Password: {resettingPassword.username}</h3>
+                  <button className="btn-close" onClick={() => setResettingPassword(null)}>✕</button>
+                </div>
+                <form onSubmit={handleResetPassword}>
+                  <div className="form-group">
+                    <label>New Password (minimum 6 characters)</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      minLength={6}
+                      required
+                    />
+                    <small style={{ color: '#666', fontSize: '0.85em', marginTop: '5px', display: 'block' }}>
+                      User will be able to log in with this new password immediately.
+                    </small>
+                  </div>
+                  <div className="modal-actions">
+                    <button type="button" className="btn" onClick={() => {
+                      setResettingPassword(null);
+                      setNewPassword('');
+                    }}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-warning" disabled={loading}>
+                      {loading ? 'Resetting...' : 'Reset Password'}
                     </button>
                   </div>
                 </form>

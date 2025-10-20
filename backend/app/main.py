@@ -1643,6 +1643,37 @@ async def toggle_admin(
     return user
 
 
+@app.post('/auth/users/{user_id}/reset-password')
+async def reset_user_password(
+    user_id: int,
+    new_password: str = Body(..., embed=True, min_length=6),
+    current_user: User = Depends(auth_utils.get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset user password (admin only).
+    Sets a new password for the specified user.
+    Requires valid JWT token with admin privileges.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Hash the new password
+    user.hashed_password = auth_utils.get_password_hash(new_password)
+    db.commit()
+    
+    logger.info(f"Password reset by admin {current_user.username} for user: {user.username}")
+    
+    return {
+        "success": True,
+        "message": f"Password reset successful for user: {user.username}"
+    }
+
+
 @app.patch('/auth/users/{user_id}/activate', response_model=schemas.UserResponse)
 async def activate_user(
     user_id: int,
