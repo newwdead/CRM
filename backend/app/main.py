@@ -3367,30 +3367,70 @@ async def list_documentation(
 ):
     """
     List available documentation files (admin only).
+    Automatically scans for all .md files in project root.
     """
     docs_root = Path("/home/ubuntu/fastapi-bizcard-crm-ready")
     
-    available_docs = []
-    doc_files = [
-        ("PRODUCTION_DEPLOYMENT.md", "Руководство по Production Deployment", "production"),
-        ("README.md", "Основная документация проекта", "readme"),
-        ("TELEGRAM_SETUP.md", "Настройка Telegram интеграции", "telegram"),
-        ("WHATSAPP_SETUP.md", "Настройка WhatsApp интеграции", "whatsapp"),
-        ("MONITORING_SETUP.md", "Настройка мониторинга", "monitoring")
-    ]
+    # Mapping of filenames to descriptions and categories
+    doc_metadata = {
+        "PRODUCTION_DEPLOYMENT.md": ("Руководство по Production Deployment", "production"),
+        "README.md": ("Основная документация проекта", "readme"),
+        "TELEGRAM_SETUP.md": ("Настройка Telegram интеграции", "telegram"),
+        "TELEGRAM_CONFIGURATION.md": ("Конфигурация Telegram бота", "telegram"),
+        "WHATSAPP_SETUP.md": ("Настройка WhatsApp интеграции", "whatsapp"),
+        "MONITORING_SETUP.md": ("Настройка мониторинга", "monitoring"),
+        "SSL_SETUP.md": ("Настройка SSL/HTTPS", "production"),
+        "SSL_SETUP_QUICK.md": ("Быстрая настройка SSL", "production"),
+        "SYSTEM_SETTINGS_GUIDE.md": ("Руководство по системным настройкам", "settings"),
+        "GITHUB_WORKFLOWS_GUIDE.md": ("Руководство по GitHub Actions", "development"),
+        "GITHUB_ACTIONS_ANALYSIS.md": ("Анализ GitHub Actions", "development"),
+        "WORKFLOWS_EXPLAINED_RU.md": ("Workflows - объяснение простыми словами", "development"),
+        "OCR_TRAINING_GUIDE.md": ("Руководство по обучению OCR", "ocr"),
+        "OCR_MULTISELECT_GUIDE.md": ("Мультивыбор в OCR редакторе", "ocr"),
+        "CELERY_FIX_LOG.md": ("Лог исправления Celery", "development"),
+        "GIT_STRUCTURE_ANALYSIS.md": ("Анализ структуры Git репозитория", "development"),
+        "GIT_CLEANUP_SUCCESS.md": ("Очистка Git репозитория", "development"),
+    }
     
-    for filename, description, category in doc_files:
-        doc_path = docs_root / filename
-        if doc_path.exists():
-            stat = doc_path.stat()
-            available_docs.append({
-                "filename": filename,
-                "description": description,
-                "category": category,
-                "size": stat.st_size,
-                "last_modified": stat.st_mtime,
-                "last_modified_human": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
-            })
+    # Auto-detect for RELEASE_NOTES_*.md files
+    available_docs = []
+    
+    # Scan all .md files in project root
+    for md_file in sorted(docs_root.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        filename = md_file.name
+        
+        # Get metadata if available, otherwise generate generic
+        if filename in doc_metadata:
+            description, category = doc_metadata[filename]
+        elif filename.startswith("RELEASE_NOTES_"):
+            # Auto-detect release notes
+            version = filename.replace("RELEASE_NOTES_", "").replace(".md", "")
+            description = f"Release Notes {version}"
+            category = "releases"
+        elif filename.startswith("TEST_RESULTS_"):
+            # Auto-detect test results
+            version = filename.replace("TEST_RESULTS_", "").replace(".md", "")
+            description = f"Test Results {version}"
+            category = "testing"
+        elif filename.startswith("DEPLOYMENT_"):
+            # Auto-detect deployment docs
+            version = filename.replace("DEPLOYMENT_", "").replace(".md", "")
+            description = f"Deployment {version}"
+            category = "production"
+        else:
+            # Generic document
+            description = filename.replace("_", " ").replace(".md", "")
+            category = "other"
+        
+        stat = md_file.stat()
+        available_docs.append({
+            "filename": filename,
+            "description": description,
+            "category": category,
+            "size": stat.st_size,
+            "last_modified": stat.st_mtime,
+            "last_modified_human": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+        })
     
     return {
         "documents": available_docs,
