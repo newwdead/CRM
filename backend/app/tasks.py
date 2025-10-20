@@ -1,0 +1,329 @@
+"""
+Celery tasks for async processing
+"""
+import os
+import io
+import uuid
+import json
+import time
+import zipfile
+import logging
+from typing import List, Dict, Any
+from datetime import datetime, timedelta
+
+from celery import Task
+from sqlalchemy.orm import Session
+
+from .celery_app import celery_app
+from .database import SessionLocal
+from .models import Contact
+from .ocr_manager import OCRManager
+from .ocr_utils import enhance_ocr_result
+from . import qr_utils
+from .image_utils import downscale_image_bytes, create_thumbnail
+
+logger = logging.getLogger(__name__)
+
+# Initialize OCR manager
+ocr_manager = OCRManager()
+
+
+class DatabaseTask(Task):
+    """Base task with database session"""
+    _db = None
+
+    def after_return(self, *args, **kwargs):
+        if self._db is not None:
+            self._db.close()
+
+    @property
+    def db(self) -> Session:
+        if self._db is None:
+            self._db = SessionLocal()
+        return self._db
+
+
+@celery_app.task(bind=True, base=DatabaseTask, name='app.tasks.process_single_card')
+def process_single_card(
+    self,
+    image_data: bytes,
+    filename: str,
+    provider: str = 'auto',
+    user_id: int = None
+) -> Dict[str, Any]:
+    """
+    Process a single business card image.
+    
+    Args:
+        image_data: Binary image data
+        filename: Original filename
+        provider: OCR provider ('auto', 'tesseract', 'parsio', 'google')
+        user_id: User ID for audit
+        
+    Returns:
+        dict with contact data or error
+    """
+    try:
+        logger.info(f"Processing card: {filename}")
+        
+        # Update task state
+        self.update_state(state='PROCESSING', meta={'status': 'Scanning image...'})
+        
+        # Save file
+        file_ext = os.path.splitext(filename)[1].lower()
+        safe_name = f"{uuid.uuid4().hex}_{filename}"
+        save_path = os.path.join('/app/uploads', safe_name)
+        
+        with open(save_path, 'wb') as f:
+            f.write(image_data)
+        
+        # Create thumbnail
+        thumbnail_path = create_thumbnail(save_path, size=(200, 200), quality=85)
+        thumbnail_name = os.path.basename(thumbnail_path)
+        
+        # Try QR code first
+        self.update_state(state='PROCESSING', meta={'status': 'Looking for QR code...'})
+        qr_data = qr_utils.process_image_with_qr(image_data)
+        
+        data = None
+        raw_json = None
+        recognition_method = None
+        
+        if qr_data and any(qr_data.values()):
+            # QR code found
+            data = qr_data
+            recognition_method = 'qr_code'
+            raw_json = json.dumps({
+                'method': 'qr_code',
+                'data': qr_data
+            }, ensure_ascii=False)
+            logger.info(f"QR code extracted from {filename}")
+        else:
+            # Fallback to OCR
+            self.update_state(state='PROCESSING', meta={'status': 'Running OCR...'})
+            
+            ocr_input = downscale_image_bytes(image_data, max_side=2000)
+            
+            preferred = None if provider == 'auto' else provider
+            ocr_result = ocr_manager.recognize(
+                ocr_input,
+                filename=filename,
+                preferred_provider=preferred
+            )
+            
+            data = ocr_result['data']
+            recognition_method = ocr_result['provider']
+            raw_json = json.dumps({
+                'method': 'ocr',
+                'provider': ocr_result['provider'],
+                'confidence': ocr_result.get('confidence', 0),
+                'raw_data': ocr_result.get('raw_data'),
+                'raw_text': ocr_result.get('raw_text'),
+            }, ensure_ascii=False)
+            
+            logger.info(f"OCR completed for {filename} with {recognition_method}")
+        
+        # Validate results
+        if not data or not any(data.values()):
+            raise Exception("No data could be extracted from the image")
+        
+        # Enhance data
+        self.update_state(state='PROCESSING', meta={'status': 'Enhancing data...'})
+        data = enhance_ocr_result(data)
+        
+        # Attach metadata
+        data['uid'] = uuid.uuid4().hex
+        data['photo_path'] = safe_name
+        data['thumbnail_path'] = thumbnail_name
+        data['ocr_raw'] = raw_json
+        
+        # Save to database
+        self.update_state(state='PROCESSING', meta={'status': 'Saving to database...'})
+        contact = Contact(**data)
+        self.db.add(contact)
+        self.db.commit()
+        self.db.refresh(contact)
+        
+        logger.info(f"Contact created: {contact.id} ({filename})")
+        
+        return {
+            'success': True,
+            'contact_id': contact.id,
+            'uid': contact.uid,
+            'filename': filename,
+            'recognition_method': recognition_method
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing {filename}: {e}")
+        # Clean up file on error
+        if 'save_path' in locals() and os.path.exists(save_path):
+            os.remove(save_path)
+        return {
+            'success': False,
+            'filename': filename,
+            'error': str(e)
+        }
+
+
+@celery_app.task(bind=True, name='app.tasks.process_batch_upload')
+def process_batch_upload(
+    self,
+    zip_path: str,
+    provider: str = 'auto',
+    user_id: int = None
+) -> Dict[str, Any]:
+    """
+    Process a batch of business cards from a ZIP archive.
+    
+    Args:
+        zip_path: Path to ZIP file
+        provider: OCR provider
+        user_id: User ID for audit
+        
+    Returns:
+        dict with results summary
+    """
+    results = {
+        'total': 0,
+        'success': 0,
+        'failed': 0,
+        'skipped': 0,
+        'contacts': [],
+        'errors': []
+    }
+    
+    try:
+        logger.info(f"Processing batch upload: {zip_path}")
+        
+        # Extract ZIP
+        self.update_state(
+            state='PROCESSING',
+            meta={
+                'status': 'Extracting ZIP archive...',
+                'progress': 0,
+                'total': 0,
+                'processed': 0
+            }
+        )
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            file_list = zip_ref.namelist()
+            
+            # Filter image files
+            image_files = [
+                f for f in file_list
+                if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'))
+                and not f.startswith('__MACOSX')
+                and not f.startswith('.')
+            ]
+            
+            results['total'] = len(image_files)
+            
+            if not image_files:
+                raise Exception("No image files found in ZIP archive")
+            
+            logger.info(f"Found {len(image_files)} images in ZIP")
+            
+            # Process each image
+            for idx, filename in enumerate(image_files):
+                try:
+                    # Update progress
+                    progress = int((idx / len(image_files)) * 100)
+                    self.update_state(
+                        state='PROCESSING',
+                        meta={
+                            'status': f'Processing {filename}...',
+                            'progress': progress,
+                            'total': len(image_files),
+                            'processed': idx,
+                            'current_file': filename
+                        }
+                    )
+                    
+                    # Read image data
+                    image_data = zip_ref.read(filename)
+                    
+                    # Process card
+                    result = process_single_card(
+                        image_data,
+                        os.path.basename(filename),
+                        provider,
+                        user_id
+                    )
+                    
+                    if result['success']:
+                        results['success'] += 1
+                        results['contacts'].append(result)
+                    else:
+                        results['failed'] += 1
+                        results['errors'].append({
+                            'filename': filename,
+                            'error': result.get('error', 'Unknown error')
+                        })
+                    
+                    # Small delay to prevent overwhelming the system
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing {filename}: {e}")
+                    results['failed'] += 1
+                    results['errors'].append({
+                        'filename': filename,
+                        'error': str(e)
+                    })
+        
+        # Clean up ZIP file
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+        
+        logger.info(
+            f"Batch processing completed: {results['success']} success, "
+            f"{results['failed']} failed, {results['total']} total"
+        )
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Batch processing failed: {e}")
+        # Clean up ZIP file on error
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+        raise
+
+
+@celery_app.task(name='app.tasks.cleanup_old_results')
+def cleanup_old_results():
+    """
+    Clean up old Celery results from Redis.
+    Runs periodically via Celery Beat.
+    """
+    try:
+        from celery.result import AsyncResult
+        import redis
+        
+        redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/1'))
+        
+        # Get all keys matching celery task pattern
+        keys = redis_client.keys('celery-task-meta-*')
+        
+        cleaned = 0
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        
+        for key in keys:
+            try:
+                # Check if result is older than 24 hours
+                ttl = redis_client.ttl(key)
+                if ttl == -1:  # No expiry set
+                    redis_client.delete(key)
+                    cleaned += 1
+            except Exception as e:
+                logger.warning(f"Error cleaning up key {key}: {e}")
+        
+        logger.info(f"Cleaned up {cleaned} old Celery results")
+        return {'cleaned': cleaned}
+        
+    except Exception as e:
+        logger.error(f"Cleanup task failed: {e}")
+        return {'error': str(e)}
+

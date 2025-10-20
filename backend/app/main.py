@@ -1029,6 +1029,122 @@ def upload_card(
             raise e
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
+
+# --- Batch Upload (ZIP) ---
+@app.post('/batch-upload/')
+@limiter.limit("10/hour")  # Limit batch uploads to prevent abuse
+def batch_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    provider: str = Query('auto', enum=['auto', 'tesseract', 'parsio', 'google']),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Upload a ZIP archive containing multiple business card images.
+    Returns a task ID for tracking progress.
+    """
+    try:
+        # Validate file type
+        if not file.content_type or 'zip' not in file.content_type.lower():
+            if not file.filename or not file.filename.lower().endswith('.zip'):
+                raise HTTPException(status_code=400, detail="File must be a ZIP archive")
+        
+        # Check file size (100MB max for ZIP)
+        limit = 100 * 1024 * 1024
+        content = file.file.read(limit + 1)
+        if len(content) > limit:
+            raise HTTPException(status_code=400, detail="ZIP file too large. Maximum size is 100MB")
+        
+        # Save ZIP file
+        zip_name = f"{uuid.uuid4().hex}_batch.zip"
+        zip_path = os.path.join('uploads', zip_name)
+        with open(zip_path, 'wb') as f:
+            f.write(content)
+        
+        # Import Celery task
+        from .tasks import process_batch_upload
+        
+        # Queue batch processing task
+        task = process_batch_upload.delay(
+            zip_path=zip_path,
+            provider=provider,
+            user_id=current_user.id
+        )
+        
+        logger.info(f"Batch upload queued: {task.id} by user {current_user.username}")
+        
+        return {
+            "task_id": task.id,
+            "status": "queued",
+            "message": "Batch processing started. Use /batch-status/{task_id} to track progress."
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Batch upload failed: {str(e)}")
+
+
+@app.get('/batch-status/{task_id}')
+def get_batch_status(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get status of a batch processing task.
+    """
+    try:
+        from celery.result import AsyncResult
+        
+        task = AsyncResult(task_id)
+        
+        if task.state == 'PENDING':
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'Waiting in queue...',
+                'progress': 0
+            }
+        elif task.state == 'PROCESSING':
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': task.info.get('status', 'Processing...'),
+                'progress': task.info.get('progress', 0),
+                'total': task.info.get('total', 0),
+                'processed': task.info.get('processed', 0),
+                'current_file': task.info.get('current_file', '')
+            }
+        elif task.state == 'SUCCESS':
+            result = task.result
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'Completed',
+                'progress': 100,
+                'result': result
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'Failed',
+                'error': str(task.info)
+            }
+        else:
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': str(task.info)
+            }
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
+
+
 # --- Export CSV ---
 @app.get('/contacts/export')
 def export_csv(

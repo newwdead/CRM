@@ -11,14 +11,31 @@ services:
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:7-alpine
+    container_name: bizcard-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build: ./backend
     container_name: bizcard-backend
     environment:
       - TZ=Europe/Berlin
-      - APP_VERSION=v2.3
-      - APP_MESSAGE=Enhanced CRM with full contact cards
+      - APP_VERSION=v2.4
+      - APP_MESSAGE=Automation & UX Enhancements
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - PARSIO_API_URL=${PARSIO_API_URL:-}
       - PARSIO_API_KEY=${PARSIO_API_KEY:-}
       - PARSIO_AUTH_HEADER_NAME=${PARSIO_AUTH_HEADER_NAME:-Authorization}
@@ -33,6 +50,30 @@ services:
       - '8000:8000'
     depends_on:
       - db
+      - redis
+
+  celery-worker:
+    build: ./backend
+    container_name: bizcard-celery-worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - TZ=Europe/Berlin
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - PARSIO_API_URL=${PARSIO_API_URL:-}
+      - PARSIO_API_KEY=${PARSIO_API_KEY:-}
+      - PARSIO_AUTH_HEADER_NAME=${PARSIO_AUTH_HEADER_NAME:-Authorization}
+      - PARSIO_AUTH_HEADER_VALUE=${PARSIO_AUTH_HEADER_VALUE:-Bearer {key}}
+      - PARSIO_TIMEOUT=${PARSIO_TIMEOUT:-30}
+    volumes:
+      - ./backend/app:/app/app
+      - ./uploads:/app/uploads
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -47,3 +88,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import LoginPage from './components/LoginPage';
 import ImportExport from './components/ImportExport';
 import UploadCard from './components/UploadCard';
+import BatchUpload from './components/BatchUpload';
 import ContactList from './components/ContactList';
 import ContactEdit from './components/ContactEdit';
 import Companies from './components/Companies';
@@ -180,6 +181,12 @@ function App() {
             📤 {t.uploadCard}
           </button>
           <button
+            className={`nav-btn ${route === 'batch-upload' ? 'active' : ''}`}
+            onClick={() => setRoute('batch-upload')}
+          >
+            📦 {lang === 'ru' ? 'Пакетная' : 'Batch'}
+          </button>
+          <button
             className={`nav-btn ${route === 'import-export' ? 'active' : ''}`}
             onClick={() => setRoute('import-export')}
           >
@@ -268,6 +275,10 @@ function App() {
 
         {route === 'upload' && (
           <UploadCard t={t} lang={lang} />
+        )}
+
+        {route === 'batch-upload' && (
+          <BatchUpload lang={lang} />
         )}
 
         {route === 'import-export' && (
