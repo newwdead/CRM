@@ -542,6 +542,21 @@ def list_contacts(
         "pages": pages
     }
 
+@app.get('/contacts/{contact_id}')
+def get_contact_by_id(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get a single contact by ID.
+    Requires valid JWT token.
+    """
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    return contact
+
 @app.get('/contacts/uid/{uid}')
 def get_contact_by_uid(
     uid: str,
