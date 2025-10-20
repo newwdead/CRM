@@ -41,8 +41,8 @@ export default function Companies({ lang = 'ru' }) {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      // Load all contacts
-      const res = await fetch('/api/contacts/?limit=1000', {
+      // Load all contacts with pagination parameters
+      const res = await fetch('/api/contacts/?page=1&limit=100&sort_by=company&sort_order=asc', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to load contacts');
