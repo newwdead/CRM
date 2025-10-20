@@ -113,13 +113,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.component }}
           tags: |
-            type=semver,pattern={{version}},value=${{ needs.create-release.outputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.create-release.outputs.tag }}
+            type=raw,value=${{ needs.create-release.outputs.version }}
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=ibbase-${{ matrix.component }}
             org.opencontainers.image.description=Business Card CRM - ${{ matrix.component }}
             org.opencontainers.image.vendor=ibbase
+            org.opencontainers.image.version=${{ needs.create-release.outputs.version }}
       
       - name: Build and push ${{ matrix.component }} image
         uses: docker/build-push-action@v5
