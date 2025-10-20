@@ -4,8 +4,6 @@ import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
 const Documentation = () => {
   const [documents, setDocuments] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -55,7 +53,7 @@ const Documentation = () => {
   const fetchDocumentsList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/documentation`, {
+      const response = await fetch('/api/documentation', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -81,7 +79,7 @@ const Documentation = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/documentation/${filename}`, {
+      const response = await fetch(`/api/documentation/${filename}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
 const ServiceManager = () => {
   const [services, setServices] = useState([]);
   const [categorizedServices, setCategorizedServices] = useState({});
@@ -96,7 +94,7 @@ const ServiceManager = () => {
   const fetchServicesStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/services/status`, {
+      const response = await fetch('/api/services/status', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -119,7 +117,7 @@ const ServiceManager = () => {
     const toastId = toast.loading(t.messages.restarting);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/services/${serviceName}/restart`, {
+      const response = await fetch(`/api/services/${serviceName}/restart`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -147,7 +145,7 @@ const ServiceManager = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/services/logs/${serviceName}?lines=200`, {
+      const response = await fetch(`/api/services/logs/${serviceName}?lines=200`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
