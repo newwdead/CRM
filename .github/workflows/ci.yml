@@ -50,7 +50,7 @@ jobs:
         run: |
           python - << 'PY'
           import fastapi, sqlalchemy, pandas
-          print('✅ Backend imports OK')
+          print('Backend imports OK')
           PY
       
       - name: Build backend Docker image
@@ -87,7 +87,7 @@ jobs:
       - name: Run ESLint
         working-directory: frontend
         run: |
-          npm run lint || echo "⚠️ ESLint not configured, skipping..."
+          npm run lint || echo "ESLint not configured, skipping..."
         continue-on-error: true
       
       - name: Build frontend
@@ -123,5 +123,5 @@ jobs:
       
       - name: Validate docker-compose.yml
         run: |
-          docker compose config
-          echo "✅ docker-compose.yml is valid"
+          docker compose config > /dev/null
+          echo "docker-compose.yml is valid"
