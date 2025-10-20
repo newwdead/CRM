@@ -80,7 +80,17 @@ curl -X POST "https://api.telegram.org/bot8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_
 #### База Данных
 ```sql
 -- Проверить настройки Telegram
-SELECT key, value FROM app_settings WHERE key LIKE '%TELEGRAM%';
+SELECT key, value FROM app_settings 
+WHERE key LIKE '%TELEGRAM%' OR key LIKE 'tg.%' 
+ORDER BY key;
+
+-- Текущие настройки:
+-- TELEGRAM_BOT_TOKEN   = 8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_1Qw9Pm5s (для Admin Panel)
+-- TELEGRAM_WEBHOOK_URL = https://ibbase.ru/telegram/webhook (для Admin Panel)
+-- TELEGRAM_ENABLED     = true (для Admin Panel)
+-- tg.enabled           = true (для webhook handler)
+-- tg.token             = 8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_1Qw9Pm5s (для webhook handler)
+-- tg.provider          = auto (для webhook handler)
 
 -- Обновить webhook URL
 UPDATE app_settings 
@@ -91,6 +101,9 @@ WHERE key = 'TELEGRAM_WEBHOOK_URL';
 UPDATE app_settings 
 SET value = 'true' 
 WHERE key = 'TELEGRAM_ENABLED';
+
+-- Синхронизировать настройки для webhook handler
+UPDATE app_settings SET value = 'true' WHERE key = 'tg.enabled';
 ```
 
 #### Nginx Configuration
@@ -219,6 +232,12 @@ curl -X POST "https://api.telegram.org/bot8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_
 
 ### 📝 История Изменений
 
+**2025-10-20 (v2.5.1)**
+- ✅ Исправлен статус интеграции в Admin Panel
+- ✅ getStatusBadge теперь различает null (не тестировано) и false (ошибка)
+- ✅ Добавлены настройки tg.* для webhook handler
+- ✅ Синхронизированы настройки TELEGRAM_* и tg.*
+
 **2025-10-20**
 - ✅ Исправлен webhook URL: `www.ibbase.ru` → `ibbase.ru`
 - ✅ Установлен webhook через Telegram API
@@ -226,10 +245,11 @@ curl -X POST "https://api.telegram.org/bot8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_
 - ✅ Интеграция активирована и работает
 
 **Настроено:**
-- Bot Token в базе данных
+- Bot Token в базе данных (TELEGRAM_BOT_TOKEN + tg.token)
 - Webhook URL на production домен
 - HTTPS endpoint в Nginx
 - OCR распознавание для русского и английского
+- Admin Panel интеграция
 
 ### 📞 Поддержка
 
