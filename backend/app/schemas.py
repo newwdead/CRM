@@ -86,14 +86,33 @@ class UserUpdate(BaseModel):
 class ContactBase(BaseModel):
     """Base contact schema."""
     uid: Optional[str] = None
+    
+    # Name fields
     full_name: Optional[str] = None
+    last_name: Optional[str] = None
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    
+    # Contact info
     company: Optional[str] = None
     position: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    comment: Optional[str] = None
     website: Optional[str] = None
+    
+    # Additional CRM fields
+    phone_mobile: Optional[str] = None
+    phone_work: Optional[str] = None
+    fax: Optional[str] = None
+    department: Optional[str] = None
+    birthday: Optional[str] = None
+    source: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    
+    # Notes and files
+    comment: Optional[str] = None
     photo_path: Optional[str] = None
     ocr_raw: Optional[str] = None
 
@@ -114,6 +133,8 @@ class ContactResponse(ContactBase):
     tags: List['TagResponse'] = []
     groups: List['GroupResponse'] = []
     thumbnail_path: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

@@ -56,17 +56,40 @@ class Contact(Base):
     __tablename__ = "contacts"
     id = Column(Integer, primary_key=True, index=True)
     uid = Column(String, unique=True, index=True, nullable=True)
-    full_name = Column(String, nullable=True)
-    company = Column(String, nullable=True)
+    
+    # Name fields (ФИО)
+    full_name = Column(String, nullable=True)  # Полное имя (для обратной совместимости)
+    last_name = Column(String, nullable=True)  # Фамилия
+    first_name = Column(String, nullable=True)  # Имя
+    middle_name = Column(String, nullable=True)  # Отчество
+    
+    # Contact info
+    company = Column(String, nullable=True, index=True)  # Added index for grouping
     position = Column(String, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
-    comment = Column(String, nullable=True)
     website = Column(String, nullable=True)
+    
+    # Additional CRM fields
+    phone_mobile = Column(String, nullable=True)  # Мобильный телефон
+    phone_work = Column(String, nullable=True)  # Рабочий телефон
+    fax = Column(String, nullable=True)  # Факс
+    department = Column(String, nullable=True)  # Отдел
+    birthday = Column(String, nullable=True)  # День рождения
+    source = Column(String, nullable=True)  # Источник контакта
+    status = Column(String, nullable=True, default='active')  # Статус (active, inactive, lead, client)
+    priority = Column(String, nullable=True)  # Приоритет (low, medium, high, vip)
+    
+    # Notes and files
+    comment = Column(String, nullable=True)
     photo_path = Column(String, nullable=True)
     thumbnail_path = Column(String, nullable=True)
     ocr_raw = Column(String, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
     tags = relationship('Tag', secondary=contact_tags, back_populates='contacts')

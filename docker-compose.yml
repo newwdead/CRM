@@ -16,6 +16,8 @@ services:
     container_name: bizcard-backend
     environment:
       - TZ=Europe/Berlin
+      - APP_VERSION=v2.3
+      - APP_MESSAGE=Enhanced CRM with full contact cards
       - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
       - PARSIO_API_URL=${PARSIO_API_URL:-}
       - PARSIO_API_KEY=${PARSIO_API_KEY:-}

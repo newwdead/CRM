@@ -17,6 +17,7 @@ from .database import engine, Base, get_db
 from .models import Contact, AppSetting, User
 from .ocr_utils import ocr_image_fileobj, ocr_parsio  # Legacy support
 from .ocr_providers import OCRManager
+from . import ocr_utils  # Enhanced OCR parsing
 from . import auth_utils
 from .auth_utils import get_current_active_user, get_current_admin_user
 from . import schemas
@@ -425,6 +426,9 @@ def telegram_webhook(update: dict = Body(...), db: Session = Depends(get_db)):
         if not any(data.values()):
             raise HTTPException(status_code=400, detail='OCR extracted no data')
 
+        # Enhance OCR data: parse names, detect company/position swap
+        data = ocr_utils.enhance_ocr_result(data)
+        
         data['uid'] = uuid.uuid4().hex
         data['photo_path'] = safe_name
         data['thumbnail_path'] = thumbnail_name
@@ -728,6 +732,9 @@ def upload_card(
         # Validate OCR results
         if not any(data.values()):
             raise HTTPException(status_code=400, detail="No text could be extracted from the image")
+        
+        # Enhance OCR data: parse names, detect company/position swap
+        data = ocr_utils.enhance_ocr_result(data)
         
         # Attach stored metadata
         data['uid'] = uuid.uuid4().hex
