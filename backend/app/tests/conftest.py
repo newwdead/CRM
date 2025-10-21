@@ -85,14 +85,14 @@ def db_session(test_db):
 def auth_token(client, test_user_data):
     """Create a regular user and return auth token"""
     # Register user
-    client.post("/register", json=test_user_data)
+    client.post("/auth/register", json=test_user_data)
     
     # Login and get token
     login_data = {
         "username": test_user_data["username"],
         "password": test_user_data["password"]
     }
-    response = client.post("/token", data=login_data)
+    response = client.post("/auth/login", data=login_data)
     return response.json()["access_token"]
 
 
@@ -121,6 +121,6 @@ def admin_auth_token(client, test_db):
         "username": "admin",
         "password": "adminpass123"
     }
-    response = client.post("/token", data=login_data)
+    response = client.post("/auth/login", data=login_data)
     return response.json()["access_token"]
 
