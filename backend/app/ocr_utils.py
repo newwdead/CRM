@@ -204,7 +204,7 @@ def parse_phone_numbers(text: str) -> Dict[str, Optional[str]]:
         Dict with keys: phone, phone_mobile, phone_work, phone_additional
     """
     if not text:
-        return {
+    return {
             "phone": None,
             "phone_mobile": None,
             "phone_work": None,
@@ -251,7 +251,7 @@ def parse_phone_numbers(text: str) -> Dict[str, Optional[str]]:
         if len(mobile_phones) > 1:
             if not work_phones:  # Second mobile becomes work if no work phones
                 result["phone_work"] = mobile_phones[1]
-            else:
+                            else:
                 result["phone_additional"] = mobile_phones[1]
     
     if work_phones:
@@ -311,7 +311,7 @@ def extract_addresses(text: str) -> Dict[str, Optional[str]]:
             if re.search(keyword, line_lower):
                 # This line likely contains an address
                 addresses.append(line.strip())
-                break
+                                break
     
     # Remove duplicates
     addresses = list(dict.fromkeys(addresses))

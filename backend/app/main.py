@@ -1332,7 +1332,7 @@ def upload_card(
         
         return contact_dict
         
-    except Exception as e:
+            except Exception as e:
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
