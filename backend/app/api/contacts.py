@@ -508,8 +508,13 @@ def save_ocr_correction(
     correction = OCRCorrection(
         contact_id=contact_id,
         original_text=correction_data.get('original_text'),
+        original_box=correction_data.get('original_box', '{}'),
+        original_confidence=correction_data.get('original_confidence'),
         corrected_text=correction_data.get('corrected_text'),
-        field_name=correction_data.get('field_name'),
+        corrected_field=correction_data.get('field_name'),
+        image_path=contact.photo_path,
+        ocr_provider=correction_data.get('ocr_provider'),
+        language=correction_data.get('language'),
         user_id=current_user.id
     )
     
