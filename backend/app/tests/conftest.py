@@ -85,14 +85,16 @@ def db_session(test_db):
 def auth_token(client, test_user_data):
     """Create a regular user and return auth token"""
     # Register user
-    client.post("/auth/register", json=test_user_data)
+    register_response = client.post("/auth/register", json=test_user_data)
+    assert register_response.status_code in [200, 201], f"Registration failed: {register_response.text}"
     
-    # Login and get token
+    # Login and get token (OAuth2PasswordRequestForm expects form data)
     login_data = {
         "username": test_user_data["username"],
         "password": test_user_data["password"]
     }
     response = client.post("/auth/login", data=login_data)
+    assert response.status_code == 200, f"Login failed: {response.text}"
     return response.json()["access_token"]
 
 
@@ -115,12 +117,14 @@ def admin_auth_token(client, test_db):
     )
     test_db.add(admin_user)
     test_db.commit()
+    test_db.refresh(admin_user)
     
-    # Login and get token
+    # Login and get token (OAuth2PasswordRequestForm expects form data)
     login_data = {
         "username": "admin",
         "password": "adminpass123"
     }
     response = client.post("/auth/login", data=login_data)
+    assert response.status_code == 200, f"Admin login failed: {response.text}"
     return response.json()["access_token"]
 
