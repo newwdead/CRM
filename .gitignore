@@ -21,4 +21,3 @@ backups/
 # Release archives
 release-*.zip
 *.tar.gz
-frontend/package-lock.json
