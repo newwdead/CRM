@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Documentation from './Documentation';
 import ServiceManager from './ServiceManager';
 import SystemSettings from './SystemSettings';
+import DuplicatesPanel from './DuplicatesPanel';
 
 function AdminPanel({ t, lang }) {
   const [activeTab, setActiveTab] = useState('users');
@@ -544,6 +545,12 @@ function AdminPanel({ t, lang }) {
           onClick={() => setActiveTab('services')}
         >
           🔧 Services
+        </button>
+        <button
+          className={`tab ${activeTab === 'duplicates' ? 'active' : ''}`}
+          onClick={() => setActiveTab('duplicates')}
+        >
+          ⚠️ Duplicates
         </button>
         <button
           className={`tab ${activeTab === 'documentation' ? 'active' : ''}`}
@@ -1350,6 +1357,10 @@ function AdminPanel({ t, lang }) {
       )}
 
       {/* Documentation Tab */}
+      {activeTab === 'duplicates' && (
+        <DuplicatesPanel lang={lang} />
+      )}
+
       {activeTab === 'documentation' && (
         <Documentation />
       )}

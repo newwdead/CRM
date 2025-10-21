@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import update, text
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import timedelta
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -18,7 +18,7 @@ from .models import Contact, AppSetting, User
 from .ocr_providers import OCRManager
 from . import ocr_utils  # Enhanced OCR parsing
 from . import qr_utils  # QR code scanning
-# from . import duplicate_utils  # Duplicate detection (will be used in v2.12)
+from . import duplicate_utils  # Duplicate detection
 from . import auth_utils
 from . import image_processing  # Image preprocessing and multi-card detection
 from .auth_utils import get_current_active_user, get_current_admin_user
@@ -954,6 +954,73 @@ def create_contact(
     # Update contact metrics
     contacts_created_counter.inc()
     contacts_total.set(db.query(Contact).count())
+    
+    # Auto-detect duplicates if enabled
+    try:
+        duplicate_enabled = get_system_setting(db, 'duplicate_detection_enabled', 'true')
+        if duplicate_enabled.lower() == 'true':
+            threshold = float(get_system_setting(db, 'duplicate_similarity_threshold', '0.75'))
+            
+            # Get existing contacts for comparison
+            existing_contacts = db.query(Contact).filter(Contact.id != contact.id).all()
+            
+            # Convert to dict for comparison
+            contact_dict = {
+                'id': contact.id,
+                'full_name': contact.full_name,
+                'first_name': contact.first_name,
+                'last_name': contact.last_name,
+                'middle_name': contact.middle_name,
+                'email': contact.email,
+                'phone': contact.phone,
+                'phone_mobile': contact.phone_mobile,
+                'phone_work': contact.phone_work,
+                'company': contact.company,
+                'position': contact.position,
+            }
+            
+            existing_dicts = [{
+                'id': c.id,
+                'full_name': c.full_name,
+                'first_name': c.first_name,
+                'last_name': c.last_name,
+                'middle_name': c.middle_name,
+                'email': c.email,
+                'phone': c.phone,
+                'phone_mobile': c.phone_mobile,
+                'phone_work': c.phone_work,
+                'company': c.company,
+                'position': c.position,
+            } for c in existing_contacts]
+            
+            # Find duplicates
+            duplicates = duplicate_utils.find_duplicates_for_new_contact(contact_dict, existing_dicts, threshold)
+            
+            # Save duplicates to database
+            for existing_contact_dict, score, field_scores in duplicates:
+                existing_id = existing_contact_dict['id']
+                id1, id2 = sorted([contact.id, existing_id])
+                
+                # Check if already exists
+                existing_dup = db.query(DuplicateContact).filter(
+                    (DuplicateContact.contact_id_1 == id1) & (DuplicateContact.contact_id_2 == id2)
+                ).first()
+                
+                if not existing_dup:
+                    new_dup = DuplicateContact(
+                        contact_id_1=id1,
+                        contact_id_2=id2,
+                        similarity_score=score,
+                        match_fields=field_scores,
+                        status='pending',
+                        auto_detected=True
+                    )
+                    db.add(new_dup)
+            
+            db.commit()
+    except Exception as e:
+        # Don't fail contact creation if duplicate detection fails
+        print(f"Duplicate detection error: {e}")
     
     return contact
 
@@ -3620,3 +3687,386 @@ async def get_service_logs(
         raise HTTPException(status_code=504, detail="Log retrieval timed out")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get logs: {str(e)}")
+
+# ============================================================================
+# Duplicate Detection & Merging Endpoints
+# ============================================================================
+
+@app.get('/api/duplicates')
+def get_duplicates(
+    status: str = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get list of detected duplicate contacts.
+    Optional filter by status: pending, reviewed, merged, ignored
+    """
+    from .models import DuplicateContact
+    
+    query = db.query(DuplicateContact)
+    
+    if status:
+        query = query.filter(DuplicateContact.status == status)
+    
+    duplicates = query.order_by(
+        DuplicateContact.similarity_score.desc(),
+        DuplicateContact.detected_at.desc()
+    ).limit(limit).all()
+    
+    result = []
+    for dup in duplicates:
+        result.append({
+            'id': dup.id,
+            'contact_id_1': dup.contact_id_1,
+            'contact_id_2': dup.contact_id_2,
+            'contact_1': {
+                'id': dup.contact_1.id,
+                'full_name': dup.contact_1.full_name or f"{dup.contact_1.first_name or ''} {dup.contact_1.last_name or ''}".strip(),
+                'email': dup.contact_1.email,
+                'phone': dup.contact_1.phone,
+                'company': dup.contact_1.company,
+            },
+            'contact_2': {
+                'id': dup.contact_2.id,
+                'full_name': dup.contact_2.full_name or f"{dup.contact_2.first_name or ''} {dup.contact_2.last_name or ''}".strip(),
+                'email': dup.contact_2.email,
+                'phone': dup.contact_2.phone,
+                'company': dup.contact_2.company,
+            },
+            'similarity_score': dup.similarity_score,
+            'match_fields': dup.match_fields if dup.match_fields else {},  # Already a dict from jsonb
+            'status': dup.status,
+            'auto_detected': dup.auto_detected,
+            'detected_at': dup.detected_at.isoformat() if dup.detected_at else None,
+        })
+    
+    return {
+        'duplicates': result,
+        'total': len(result)
+    }
+
+
+@app.get('/api/contacts/{contact_id}/duplicates')
+def get_contact_duplicates(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get duplicates for a specific contact.
+    Returns list of potential duplicates with similarity scores.
+    """
+    from .models import DuplicateContact
+    
+    # Get duplicates where this contact is involved
+    duplicates = db.query(DuplicateContact).filter(
+        ((DuplicateContact.contact_id_1 == contact_id) | (DuplicateContact.contact_id_2 == contact_id)) &
+        (DuplicateContact.status == 'pending')
+    ).order_by(DuplicateContact.similarity_score.desc()).all()
+    
+    result = []
+    for dup in duplicates:
+        other_contact = dup.contact_2 if dup.contact_id_1 == contact_id else dup.contact_1
+        result.append({
+            'duplicate_id': dup.id,
+            'contact': {
+                'id': other_contact.id,
+                'full_name': other_contact.full_name or f"{other_contact.first_name or ''} {other_contact.last_name or ''}".strip(),
+                'email': other_contact.email,
+                'phone': other_contact.phone,
+                'company': other_contact.company,
+            },
+            'similarity_score': dup.similarity_score,
+            'match_fields': dup.match_fields,
+            'auto_detected': dup.auto_detected,
+            'detected_at': dup.detected_at.isoformat() if dup.detected_at else None
+        })
+    
+    return {'duplicates': result, 'total': len(result)}
+
+
+@app.post('/api/duplicates/find')
+def find_duplicates_manual(
+    threshold: float = 0.75,
+    contact_ids: List[int] = Body(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Manually trigger duplicate detection.
+    If contact_ids provided, check only those contacts.
+    Otherwise, check all contacts.
+    """
+    from .models import DuplicateContact
+    
+    # Get contacts to check
+    if contact_ids:
+        contacts = db.query(Contact).filter(Contact.id.in_(contact_ids)).all()
+    else:
+        contacts = db.query(Contact).all()
+    
+    if len(contacts) < 2:
+        return {'message': 'Need at least 2 contacts to find duplicates', 'found': 0}
+    
+    # Convert to dicts for comparison
+    contact_dicts = []
+    for c in contacts:
+        contact_dicts.append({
+            'id': c.id,
+            'full_name': c.full_name,
+            'first_name': c.first_name,
+            'last_name': c.last_name,
+            'email': c.email,
+            'phone': c.phone,
+            'company': c.company,
+            'position': c.position,
+        })
+    
+    # Find duplicates
+    duplicates = duplicate_utils.find_duplicate_contacts(contact_dicts, threshold)
+    
+    # Save to database
+    saved_count = 0
+    for contact1, contact2, score, field_scores in duplicates:
+        # Check if already exists
+        existing = db.query(DuplicateContact).filter(
+            DuplicateContact.contact_id_1 == min(contact1['id'], contact2['id']),
+            DuplicateContact.contact_id_2 == max(contact1['id'], contact2['id'])
+        ).first()
+        
+        if not existing:
+            dup = DuplicateContact(
+                contact_id_1=min(contact1['id'], contact2['id']),
+                contact_id_2=max(contact1['id'], contact2['id']),
+                similarity_score=score,
+                match_fields=field_scores,  # SQLAlchemy will auto-serialize to jsonb
+                status='pending',
+                auto_detected=False
+            )
+            db.add(dup)
+            saved_count += 1
+    
+    db.commit()
+    
+    return {
+        'message': f'Found {len(duplicates)} potential duplicates',
+        'found': len(duplicates),
+        'saved': saved_count,
+        'threshold': threshold
+    }
+
+
+@app.post('/api/contacts/{contact_id_1}/merge/{contact_id_2}')
+def merge_contacts_endpoint(
+    contact_id_1: int,
+    contact_id_2: int,
+    selected_fields: Dict[str, str] = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Merge two contacts.
+    selected_fields: dict mapping field_name -> 'primary' or 'secondary'
+    Example: {'email': 'primary', 'phone': 'secondary', 'company': 'keep_both'}
+    """
+    from .models import DuplicateContact
+    
+    # Get contacts
+    contact1 = db.query(Contact).filter(Contact.id == contact_id_1).first()
+    contact2 = db.query(Contact).filter(Contact.id == contact_id_2).first()
+    
+    if not contact1 or not contact2:
+        raise HTTPException(status_code=404, detail='One or both contacts not found')
+    
+    # Convert to dicts
+    c1_dict = {
+        'full_name': contact1.full_name,
+        'first_name': contact1.first_name,
+        'last_name': contact1.last_name,
+        'middle_name': contact1.middle_name,
+        'email': contact1.email,
+        'phone': contact1.phone,
+        'phone_mobile': contact1.phone_mobile,
+        'phone_work': contact1.phone_work,
+        'company': contact1.company,
+        'position': contact1.position,
+        'department': contact1.department,
+        'address': contact1.address,
+        'address_additional': contact1.address_additional,
+        'website': contact1.website,
+        'birthday': contact1.birthday,
+        'comment': contact1.comment,
+        'source': contact1.source,
+        'status': contact1.status,
+        'priority': contact1.priority,
+    }
+    
+    c2_dict = {
+        'full_name': contact2.full_name,
+        'first_name': contact2.first_name,
+        'last_name': contact2.last_name,
+        'middle_name': contact2.middle_name,
+        'email': contact2.email,
+        'phone': contact2.phone,
+        'phone_mobile': contact2.phone_mobile,
+        'phone_work': contact2.phone_work,
+        'company': contact2.company,
+        'position': contact2.position,
+        'department': contact2.department,
+        'address': contact2.address,
+        'address_additional': contact2.address_additional,
+        'website': contact2.website,
+        'birthday': contact2.birthday,
+        'comment': contact2.comment,
+        'source': contact2.source,
+        'status': contact2.status,
+        'priority': contact2.priority,
+    }
+    
+    # Merge
+    merged = duplicate_utils.merge_contacts(c1_dict, c2_dict, selected_fields)
+    
+    # Update primary contact
+    for field, value in merged.items():
+        if hasattr(contact1, field):
+            setattr(contact1, field, value)
+    
+    # Update duplicate record
+    dup = db.query(DuplicateContact).filter(
+        DuplicateContact.contact_id_1 == min(contact_id_1, contact_id_2),
+        DuplicateContact.contact_id_2 == max(contact_id_1, contact_id_2)
+    ).first()
+    
+    if dup:
+        dup.status = 'merged'
+        dup.reviewed_at = func.now()
+        dup.reviewed_by = current_user.id
+        dup.merged_into = contact_id_1
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=contact_id_1,
+        user=current_user,
+        action='merged',
+        entity_type='contact',
+        changes={'merged_from': contact_id_2, 'selected_fields': selected_fields}
+    )
+    
+    # Delete secondary contact
+    db.delete(contact2)
+    
+    db.commit()
+    db.refresh(contact1)
+    
+    return {
+        'message': 'Contacts merged successfully',
+        'merged_contact_id': contact_id_1,
+        'deleted_contact_id': contact_id_2
+    }
+
+
+@app.put('/api/duplicates/{duplicate_id}/status')
+def update_duplicate_status(
+    duplicate_id: int,
+    status: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Update duplicate status: pending, reviewed, ignored
+    """
+    from .models import DuplicateContact
+    
+    if status not in ['pending', 'reviewed', 'ignored']:
+        raise HTTPException(status_code=400, detail='Invalid status')
+    
+    dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
+    if not dup:
+        raise HTTPException(status_code=404, detail='Duplicate not found')
+    
+    dup.status = status
+    dup.reviewed_at = func.now()
+    dup.reviewed_by = current_user.id
+    
+    db.commit()
+    
+    return {'message': 'Status updated', 'duplicate_id': duplicate_id, 'status': status}
+
+
+@app.get('/api/contacts/{contact_id}/duplicates')
+def get_contact_duplicates(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get all potential duplicates for a specific contact.
+    """
+    from .models import DuplicateContact
+    
+    # Check contact exists
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    # Find duplicates where this contact is involved
+    duplicates = db.query(DuplicateContact).filter(
+        (DuplicateContact.contact_id_1 == contact_id) | 
+        (DuplicateContact.contact_id_2 == contact_id)
+    ).filter(
+        DuplicateContact.status.in_(['pending', 'reviewed'])
+    ).all()
+    
+    result = []
+    for dup in duplicates:
+        # Get the other contact
+        other_id = dup.contact_id_2 if dup.contact_id_1 == contact_id else dup.contact_id_1
+        other = db.query(Contact).filter(Contact.id == other_id).first()
+        
+        if other:
+            result.append({
+                'duplicate_id': dup.id,
+                'other_contact': {
+                    'id': other.id,
+                    'full_name': other.full_name or f"{other.first_name or ''} {other.last_name or ''}".strip(),
+                    'email': other.email,
+                    'phone': other.phone,
+                    'company': other.company,
+                },
+                'similarity_score': dup.similarity_score,
+                'match_fields': json.loads(dup.match_fields) if dup.match_fields else {},
+                'status': dup.status,
+            })
+    
+    return {
+        'contact_id': contact_id,
+        'duplicates': result,
+        'count': len(result)
+    }
+
+
+@app.post('/api/duplicates/{duplicate_id}/ignore')
+def ignore_duplicate(
+    duplicate_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Mark a duplicate as ignored (convenience endpoint for marking false positives).
+    """
+    from .models import DuplicateContact
+    
+    dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
+    if not dup:
+        raise HTTPException(status_code=404, detail='Duplicate not found')
+    
+    dup.status = 'ignored'
+    dup.reviewed_at = func.now()
+    dup.reviewed_by = current_user.id
+    
+    db.commit()
+    
+    return {'message': 'Duplicate marked as ignored', 'duplicate_id': duplicate_id}

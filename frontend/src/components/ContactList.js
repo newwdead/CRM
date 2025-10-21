@@ -4,6 +4,7 @@ import { ContactListSkeleton } from './SkeletonLoader';
 import TableSettings from './TableSettings';
 import OCREditor from './OCREditor';
 import OCREditorWithBlocks from './OCREditorWithBlocks';
+import DuplicateMergeModal from './DuplicateMergeModal';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
@@ -22,6 +23,11 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   
   // OCR Editor State
   const [editingOCR, setEditingOCR] = useState(null);
+  
+  // Duplicates State
+  const [duplicates, setDuplicates] = useState([]);
+  const [duplicateMap, setDuplicateMap] = useState({});  // Map: contactId -> count of duplicates
+  const [mergingContact, setMergingContact] = useState(null);  // Contact for which we're showing merge modal
   
   // Pagination States
   const [page, setPage] = useState(1);
@@ -211,8 +217,35 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     }
   };
 
+  const loadDuplicates = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/duplicates?status=pending&limit=1000', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setDuplicates(data.duplicates || []);
+        
+        // Build a map of contact IDs to duplicate counts
+        const map = {};
+        (data.duplicates || []).forEach(dup => {
+          map[dup.contact_id_1] = (map[dup.contact_id_1] || 0) + 1;
+          map[dup.contact_id_2] = (map[dup.contact_id_2] || 0) + 1;
+        });
+        setDuplicateMap(map);
+      }
+    } catch (error) {
+      console.error('Error loading duplicates:', error);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadDuplicates();
   }, [search, companyFilter, positionFilter, sortBy, sortOrder, page]);
   
   // Reset to page 1 when filters change
@@ -654,6 +687,32 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                     ) : (
                       c.full_name || '—'
                     )}
+                    {duplicateMap[c.id] && (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMergingContact(c);
+                        }}
+                        style={{
+                          marginLeft: '8px',
+                          backgroundColor: '#ff9800',
+                          color: 'white',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+                        title={lang === 'ru' ? `Найдено ${duplicateMap[c.id]} возможных дубликат(ов). Нажмите для объединения.` : `Found ${duplicateMap[c.id]} possible duplicate(s). Click to merge.`}
+                        data-tooltip-id="duplicate-tooltip"
+                        data-tooltip-content={lang === 'ru' ? `Найдено ${duplicateMap[c.id]} возможных дубликат(ов). Нажмите для объединения.` : `Found ${duplicateMap[c.id]} possible duplicate(s). Click to merge.`}
+                      >
+                        ⚠️ {duplicateMap[c.id]}
+                      </span>
+                    )}
                   </td>
                   <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.company}>{c.company || '—'}</td>
                   <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.position}>{c.position || '—'}</td>
@@ -928,7 +987,22 @@ export default function ContactList({ lang = 'ru', onEdit }) {
         />
       )}
 
+      {/* Duplicate Merge Modal */}
+      {mergingContact && (
+        <DuplicateMergeModal
+          lang={lang}
+          contact={mergingContact}
+          duplicates={duplicates}
+          onClose={() => setMergingContact(null)}
+          onMerged={() => {
+            load();
+            loadDuplicates();
+          }}
+        />
+      )}
+
       <Tooltip id="ocr-tooltip" place="top" />
+      <Tooltip id="duplicate-tooltip" place="top" />
     </div>
   );
 }

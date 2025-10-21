@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Table, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Table, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -133,7 +133,7 @@ class DuplicateContact(Base):
     contact_id_1 = Column(Integer, ForeignKey('contacts.id', ondelete='CASCADE'), nullable=False, index=True)
     contact_id_2 = Column(Integer, ForeignKey('contacts.id', ondelete='CASCADE'), nullable=False, index=True)
     similarity_score = Column(Float, nullable=False, index=True)  # 0.0 to 1.0
-    match_fields = Column(String, nullable=True)  # JSON string: {"name": 0.95, "email": 1.0}
+    match_fields = Column(JSON, nullable=True)  # JSON object: {"name": 0.95, "email": 1.0}
     status = Column(String(20), default='pending', index=True)  # pending, reviewed, merged, ignored
     auto_detected = Column(Boolean, default=False)
     detected_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
