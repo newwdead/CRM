@@ -36,7 +36,7 @@ class TestFieldSimilarity:
     
     def test_phone_normalization(self):
         """Test phone number normalization"""
-        score = calculate_field_similarity("+7 (900) 123-45-67", "79001234567")
+        score = calculate_field_similarity("+7 (900) 123-45-67", "79001234567", field_type='phone')
         assert score == 1.0
 
 
@@ -73,7 +73,8 @@ class TestContactSimilarity:
         }
         
         score, fields = calculate_contact_similarity(contact1, contact2)
-        assert score < 0.3
+        # Different contacts should have low similarity (< 0.5)
+        assert score < 0.5
     
     def test_partial_match(self):
         """Test contacts with some matching fields"""

@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import timedelta
 import logging
-import os
 
 from ..database import get_db
 from ..models import User
@@ -77,7 +76,7 @@ async def register(request: Request, user_data: schemas.UserRegister, db: Sessio
 
 
 @router.post('/login', response_model=schemas.Token)
-@limiter.limit("10000/minute" if os.getenv("TESTING") == "1" else "30/minute")  # Higher limit for tests
+@limiter.limit("30/minute")  # 30 login attempts per minute per IP
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),

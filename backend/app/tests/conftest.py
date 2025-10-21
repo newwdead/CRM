@@ -44,14 +44,16 @@ def client(test_db):
     
     app.dependency_overrides[get_db] = override_get_db
     
-    # Disable rate limiting for tests
-    import os
-    os.environ["TESTING"] = "1"
+    # Disable rate limiting for tests by accessing limiter from main
+    from ..main import limiter
+    original_enabled = limiter.enabled
+    limiter.enabled = False
     
     with TestClient(app) as test_client:
         yield test_client
     
-    del os.environ["TESTING"]
+    # Re-enable rate limiting after tests
+    limiter.enabled = original_enabled
     app.dependency_overrides.clear()
 
 
