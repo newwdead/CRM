@@ -44,9 +44,14 @@ def client(test_db):
     
     app.dependency_overrides[get_db] = override_get_db
     
+    # Disable rate limiting for tests
+    import os
+    os.environ["TESTING"] = "1"
+    
     with TestClient(app) as test_client:
         yield test_client
     
+    del os.environ["TESTING"]
     app.dependency_overrides.clear()
 
 
@@ -112,9 +117,9 @@ def auth_token(client, test_db, test_user_data):
     return response.json()["access_token"]
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture
 def admin_auth_token(client, test_db):
-    """Create an admin user and return auth token (module-scoped to avoid rate limiting)"""
+    """Create an admin user and return auth token"""
     from ..models import User
     from passlib.context import CryptContext
     
