@@ -223,7 +223,7 @@ async def get_integrations_status(
     Get status of all integrations (admin only).
     Returns enabled/disabled status and health check for each integration.
     """
-    from .models import AppSetting
+    from ..models import AppSetting
     
     def get_integration_setting(key: str, default: str = "false"):
         setting = db.query(AppSetting).filter(AppSetting.key == key).first()

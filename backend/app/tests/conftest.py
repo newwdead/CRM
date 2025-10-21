@@ -112,26 +112,30 @@ def auth_token(client, test_db, test_user_data):
     return response.json()["access_token"]
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def admin_auth_token(client, test_db):
-    """Create an admin user and return auth token"""
+    """Create an admin user and return auth token (module-scoped to avoid rate limiting)"""
     from ..models import User
     from passlib.context import CryptContext
     
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     
-    # Create admin user directly in database
-    admin_user = User(
-        username="admin",
-        email="admin@example.com",
-        hashed_password=pwd_context.hash("adminpass123"),
-        full_name="Admin User",
-        is_active=True,
-        is_admin=True
-    )
-    test_db.add(admin_user)
-    test_db.commit()
-    test_db.refresh(admin_user)
+    # Check if admin user already exists
+    admin_user = test_db.query(User).filter(User.username == "admin").first()
+    
+    if not admin_user:
+        # Create admin user directly in database
+        admin_user = User(
+            username="admin",
+            email="admin@example.com",
+            hashed_password=pwd_context.hash("adminpass123"),
+            full_name="Admin User",
+            is_active=True,
+            is_admin=True
+        )
+        test_db.add(admin_user)
+        test_db.commit()
+        test_db.refresh(admin_user)
     
     # Login and get token (OAuth2PasswordRequestForm expects form data)
     login_data = {
