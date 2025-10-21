@@ -1,0 +1,148 @@
+# FastAPI Business Card CRM - Cursor AI Rules
+
+## Архитектура проекта
+- FastAPI backend с SQLAlchemy ORM
+- React frontend (JavaScript, не TypeScript)
+- PostgreSQL/SQLite база данных
+- Celery для асинхронных задач
+- OCR обработка визиток (Tesseract, Google Vision, PaddleOCR)
+- Интеграция с Telegram и WhatsApp
+
+## Правила разработки
+
+### Backend (FastAPI)
+- Использовать существующие модели из `backend/app/models/`
+- Использовать существующие схемы из `backend/app/schemas/`
+- Всегда использовать async/await для database операций
+- Следовать паттерну: router → service → repository
+- Использовать Depends() для dependency injection
+- Логирование через встроенный logger
+- Prometheus метрики для мониторинга
+
+### Frontend (React)
+- Использовать функциональные компоненты с хуками
+- Tailwind CSS для стилей
+- Axios для API запросов
+- React Router для навигации
+- Переводы через translations.js
+- Избегать создания новых больших компонентов (>300 строк)
+
+### База данных
+- SQLAlchemy модели в `backend/app/models/`
+- Alembic для миграций
+- Всегда использовать Session через get_db()
+- Избегать raw SQL запросов
+
+### OCR и обработка изображений
+- OCRManager для выбора провайдера
+- Поддержка: Tesseract, Google Vision, PaddleOCR
+- image_processing.py для preprocessing
+- qr_utils.py для QR кодов
+
+## Директории для игнорирования
+
+### Не читать и не анализировать:
+- node_modules/ - зависимости frontend (331MB)
+- uploads/ - загруженные файлы (46MB)
+- backups/ - бэкапы
+- data/ - database файлы
+- __pycache__/ - Python cache
+- .git/ - Git история
+- monitoring/prometheus-data/ - Prometheus данные
+- monitoring/grafana-data/ - Grafana данные
+
+### Документация в корне (не сканировать при поиске кода):
+- RELEASE_NOTES_*.md (52 файла)
+- *_SETUP.md
+- *_GUIDE.md
+- README*.md
+
+## Приоритеты при работе
+
+### Всегда проверять в первую очередь:
+1. `backend/app/main.py` - главный файл FastAPI
+2. `backend/app/models/` - модели базы данных
+3. `backend/app/schemas/` - Pydantic схемы
+4. `frontend/src/components/` - React компоненты
+5. `backend/app/tasks.py` - Celery задачи
+
+### Избегать редактирования:
+- Конфигурационные файлы без явного запроса
+- Docker файлы без необходимости
+- Nginx конфигурации
+- Systemd service файлы
+
+## Кодстайл
+
+### Python
+- Black style formatting
+- Type hints где возможно
+- Docstrings для публичных функций
+- FastAPI схемы валидации
+- Обработка ошибок через HTTPException
+
+### JavaScript
+- ES6+ синтаксис
+- Деструктуризация
+- Arrow functions
+- async/await для асинхронности
+- JSDoc комментарии для сложных функций
+
+## Производительность
+
+### Backend
+- Использовать bulk operations для множественных записей
+- Кэширование OCR результатов
+- Асинхронная обработка через Celery для тяжелых задач
+- Rate limiting через slowapi
+- Pagination для списков
+
+### Frontend
+- Lazy loading компонентов
+- Memo для тяжелых компонентов
+- Debounce для поисковых запросов
+- Виртуализация длинных списков
+
+## Безопасность
+- JWT токены для аутентификации (auth_utils.py)
+- OAuth2 схема
+- CORS настроен в main.py
+- Rate limiting на критичных endpoint'ах
+- Валидация всех входных данных через Pydantic
+
+## Интеграции
+- Telegram Bot: telegram_polling.py
+- WhatsApp: whatsapp_utils.py
+- OCR провайдеры: ocr_providers.py
+- Мониторинг: Prometheus + Grafana
+
+## Текущие проблемы производительности
+- main.py слишком большой (4072 строки) - требует рефакторинга
+- AdminPanel.js (1372 строки) - требует разбиения
+- ContactList.js (1008 строк) - требует разбиения
+
+## При создании нового функционала
+1. Проверить существующие утилиты и сервисы
+2. Не дублировать логику
+3. Добавлять тесты
+4. Обновлять документацию
+5. Добавлять Prometheus метрики для мониторинга
+6. Логировать важные операции
+
+## Поиск по проекту
+- Для backend кода: искать в `backend/app/`
+- Для frontend кода: искать в `frontend/src/`
+- Для конфигурации: корень проекта
+- Для документации: `docs/` или корень
+- Использовать grep для точного поиска символов
+- Избегать широких поисков по корню
+
+## Не делать без явного запроса
+- Создавать новые .md файлы в корне
+- Изменять Docker конфигурацию
+- Менять структуру базы данных без миграций
+- Удалять существующие endpoint'ы
+- Изменять систему аутентификации
+- Трогать production конфигурации
+
+

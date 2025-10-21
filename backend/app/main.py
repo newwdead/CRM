@@ -276,6 +276,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ============================================================================
+# Include API Routers (New Modular Structure)
+# ============================================================================
+from .api import api_router
+
+app.include_router(api_router)
+
 # Version endpoint (frontend calls /api/version; nginx strips /api/ and forwards to /version)
 @app.get('/version')
 def get_version():

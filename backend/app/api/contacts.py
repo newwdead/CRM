@@ -1,0 +1,405 @@
+"""
+Contacts API endpoints
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import uuid
+import logging
+
+from ..database import get_db
+from ..models import Contact, User, DuplicateContact, Tag, Group
+from .. import schemas
+from .. import auth_utils
+from .. import duplicate_utils
+from ..phone_utils import format_phone_number
+from ..core.utils import create_audit_log, get_system_setting
+
+# Logger
+logger = logging.getLogger(__name__)
+
+# Router
+router = APIRouter()
+
+# Prometheus metrics are defined in main.py to avoid duplication
+# TODO: Create centralized metrics module
+
+
+@router.get('/', response_model=schemas.PaginatedContactsResponse)
+def list_contacts(
+    q: str = Query(None, description="Search query (full-text search across all fields)"),
+    company: str = Query(None, description="Filter by company"),
+    position: str = Query(None, description="Filter by position"),
+    tags: str = Query(None, description="Filter by tag names (comma-separated)"),
+    groups: str = Query(None, description="Filter by group names (comma-separated)"),
+    sort_by: str = Query('id', description="Sort field: id, full_name, company, position"),
+    sort_order: str = Query('desc', description="Sort order: asc, desc"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page (1-100)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Get paginated list of contacts with advanced search and filtering.
+    
+    Parameters:
+    - q: Full-text search across all fields (name, company, position, email, phone)
+    - company: Filter by company (case-insensitive partial match)
+    - position: Filter by position (case-insensitive partial match)
+    - tags: Filter by tag names (comma-separated, e.g., "vip,client")
+    - groups: Filter by group names (comma-separated, e.g., "partners,customers")
+    - sort_by: Field to sort by (id, full_name, company, position)
+    - sort_order: Sort direction (asc, desc)
+    - page: Page number (starts from 1)
+    - limit: Items per page (1-100, default 20)
+    """
+    query = db.query(Contact)
+    
+    # Full-text search
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (Contact.full_name.ilike(search_term)) |
+            (Contact.company.ilike(search_term)) |
+            (Contact.position.ilike(search_term)) |
+            (Contact.email.ilike(search_term)) |
+            (Contact.phone.ilike(search_term)) |
+            (Contact.website.ilike(search_term)) |
+            (Contact.address.ilike(search_term))
+        )
+    
+    # Filter by company
+    if company:
+        query = query.filter(Contact.company.ilike(f"%{company}%"))
+    
+    # Filter by position
+    if position:
+        query = query.filter(Contact.position.ilike(f"%{position}%"))
+    
+    # Filter by tags
+    if tags:
+        tag_names = [name.strip() for name in tags.split(',') if name.strip()]
+        if tag_names:
+            # Get tag IDs for the given names
+            tag_records = db.query(Tag).filter(Tag.name.in_(tag_names)).all()
+            tag_ids = [tag.id for tag in tag_records]
+            
+            if tag_ids:
+                # Filter contacts that have ANY of the specified tags
+                query = query.filter(Contact.tags.any(Tag.id.in_(tag_ids)))
+    
+    # Filter by groups
+    if groups:
+        group_names = [name.strip() for name in groups.split(',') if name.strip()]
+        if group_names:
+            # Get group IDs for the given names
+            group_records = db.query(Group).filter(Group.name.in_(group_names)).all()
+            group_ids = [group.id for group in group_records]
+            
+            if group_ids:
+                # Filter contacts that have ANY of the specified groups
+                query = query.filter(Contact.groups.any(Group.id.in_(group_ids)))
+    
+    # Sorting
+    sort_field = getattr(Contact, sort_by, Contact.id)
+    if sort_order.lower() == 'asc':
+        query = query.order_by(sort_field.asc())
+    else:
+        query = query.order_by(sort_field.desc())
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Calculate pagination
+    pages = (total + limit - 1) // limit  # Ceiling division
+    offset = (page - 1) * limit
+    
+    # Apply pagination
+    items = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages
+    }
+
+
+@router.get('/search/')
+def search_contacts(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(10, ge=1, le=50, description="Max results (1-50)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Fast global search for SearchOverlay (Ctrl+K).
+    Searches across names, company, position, email, phone.
+    Returns minimal data for quick results.
+    """
+    search_term = f"%{q}%"
+    
+    # Search with relevance ranking
+    contacts = db.query(Contact).filter(
+        (Contact.full_name.ilike(search_term)) |
+        (Contact.company.ilike(search_term)) |
+        (Contact.position.ilike(search_term)) |
+        (Contact.email.ilike(search_term)) |
+        (Contact.phone.ilike(search_term))
+    ).limit(limit).all()
+    
+    # Return simplified data
+    return [{
+        'id': c.id,
+        'full_name': c.full_name,
+        'company': c.company,
+        'position': c.position,
+        'email': c.email,
+        'phone': c.phone
+    } for c in contacts]
+
+
+@router.get('/{contact_id}')
+def get_contact_by_id(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Get a single contact by ID.
+    Requires valid JWT token.
+    """
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    return contact
+
+
+@router.get('/uid/{uid}')
+def get_contact_by_uid(
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Get a single contact by UID.
+    Requires valid JWT token.
+    """
+    contact = db.query(Contact).filter(Contact.uid == uid).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    return contact
+
+
+@router.post('/')
+def create_contact(
+    data: schemas.ContactCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Create a new contact.
+    Automatically formats phone numbers and detects duplicates if enabled.
+    """
+    payload = data.dict()
+    if not payload.get('uid'):
+        payload['uid'] = uuid.uuid4().hex
+    
+    # Format phone numbers
+    if payload.get('phone'):
+        payload['phone'] = format_phone_number(payload['phone'])
+    if payload.get('phone_mobile'):
+        payload['phone_mobile'] = format_phone_number(payload['phone_mobile'])
+    if payload.get('phone_work'):
+        payload['phone_work'] = format_phone_number(payload['phone_work'])
+    if payload.get('phone_additional'):
+        payload['phone_additional'] = format_phone_number(payload['phone_additional'])
+    
+    contact = Contact(**payload)
+    db.add(contact)
+    db.flush()  # Get ID without committing
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='created',
+        entity_type='contact',
+        changes=payload
+    )
+    
+    db.commit()
+    db.refresh(contact)
+    
+    # Update contact metrics
+    # TODO: Re-enable metrics after refactoring
+    # contacts_created_counter.inc()
+    # contacts_total.set(db.query(Contact).count())
+    
+    # Auto-detect duplicates if enabled
+    try:
+        duplicate_enabled = get_system_setting(db, 'duplicate_detection_enabled', 'true')
+        if duplicate_enabled.lower() == 'true':
+            threshold = float(get_system_setting(db, 'duplicate_similarity_threshold', '0.75'))
+            
+            # Get existing contacts for comparison
+            existing_contacts = db.query(Contact).filter(Contact.id != contact.id).all()
+            
+            # Convert to dict for comparison
+            contact_dict = {
+                'id': contact.id,
+                'full_name': contact.full_name,
+                'first_name': contact.first_name,
+                'last_name': contact.last_name,
+                'middle_name': contact.middle_name,
+                'email': contact.email,
+                'phone': contact.phone,
+                'phone_mobile': contact.phone_mobile,
+                'phone_work': contact.phone_work,
+                'company': contact.company,
+                'position': contact.position,
+            }
+            
+            existing_dicts = [{
+                'id': c.id,
+                'full_name': c.full_name,
+                'first_name': c.first_name,
+                'last_name': c.last_name,
+                'middle_name': c.middle_name,
+                'email': c.email,
+                'phone': c.phone,
+                'phone_mobile': c.phone_mobile,
+                'phone_work': c.phone_work,
+                'company': c.company,
+                'position': c.position,
+            } for c in existing_contacts]
+            
+            # Find duplicates
+            duplicates = duplicate_utils.find_duplicates_for_new_contact(contact_dict, existing_dicts, threshold)
+            
+            # Save duplicates to database
+            for existing_contact_dict, score, field_scores in duplicates:
+                existing_id = existing_contact_dict['id']
+                id1, id2 = sorted([contact.id, existing_id])
+                
+                # Check if already exists
+                existing_dup = db.query(DuplicateContact).filter(
+                    (DuplicateContact.contact_id_1 == id1) & (DuplicateContact.contact_id_2 == id2)
+                ).first()
+                
+                if not existing_dup:
+                    new_dup = DuplicateContact(
+                        contact_id_1=id1,
+                        contact_id_2=id2,
+                        similarity_score=score,
+                        match_fields=field_scores,
+                        status='pending',
+                        auto_detected=True
+                    )
+                    db.add(new_dup)
+            
+            db.commit()
+    except Exception as e:
+        # Don't fail contact creation if duplicate detection fails
+        logger.error(f"Duplicate detection error: {e}")
+    
+    return contact
+
+
+@router.put('/{contact_id}')
+def update_contact(
+    contact_id: int,
+    data: schemas.ContactUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Update an existing contact.
+    Automatically formats phone numbers.
+    """
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    update_data = data.dict(exclude_unset=True)
+    
+    # Format phone numbers
+    if 'phone' in update_data and update_data['phone']:
+        update_data['phone'] = format_phone_number(update_data['phone'])
+    if 'phone_mobile' in update_data and update_data['phone_mobile']:
+        update_data['phone_mobile'] = format_phone_number(update_data['phone_mobile'])
+    if 'phone_work' in update_data and update_data['phone_work']:
+        update_data['phone_work'] = format_phone_number(update_data['phone_work'])
+    if 'phone_additional' in update_data and update_data['phone_additional']:
+        update_data['phone_additional'] = format_phone_number(update_data['phone_additional'])
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='updated',
+        entity_type='contact',
+        changes=update_data
+    )
+    
+    for k, v in update_data.items():
+        if hasattr(contact, k):
+            setattr(contact, k, v)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@router.delete('/{contact_id}')
+def delete_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Delete a contact.
+    """
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    # Audit log (before deletion)
+    create_audit_log(
+        db=db,
+        contact_id=contact.id,
+        user=current_user,
+        action='deleted',
+        entity_type='contact',
+        changes={'full_name': contact.full_name, 'company': contact.company}
+    )
+    
+    db.delete(contact)
+    db.commit()
+    return {'deleted': contact_id}
+
+
+@router.get('/{contact_id}/history', response_model=List[schemas.AuditLogResponse])
+def get_contact_history(
+    contact_id: int,
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of records to return"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """Get audit history for a specific contact."""
+    from ..models import AuditLog
+    
+    # Check if contact exists
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    # Get audit logs for this contact
+    logs = db.query(AuditLog).filter(
+        AuditLog.contact_id == contact_id
+    ).order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    
+    return logs
+

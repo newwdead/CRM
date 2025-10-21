@@ -1,0 +1,64 @@
+# Dependencies and build artifacts
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Data and uploads
+uploads/
+backups/
+data/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Test coverage
+.coverage
+htmlcov/
+coverage/
+.pytest_cache/
+
+# Build outputs
+*.tar.gz
+*.zip
+release-*.zip
+
+# Git
+.git/
+
+# Large monitoring data
+monitoring/prometheus-data/
+monitoring/grafana-data/
+
+
+
