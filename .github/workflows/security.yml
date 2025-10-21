@@ -76,19 +76,9 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
 
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
-          warn-only: true
+  # Note: Dependency Review job removed as it requires GitHub Advanced Security
+  # for private repositories (paid feature). We use Trivy, Safety, and NPM Audit
+  # for comprehensive security scanning instead.
 
   python-safety:
     name: Python Safety Check
