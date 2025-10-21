@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Rate limiter
-limiter = Limiter(key_func=get_remote_address)
+import os
+limiter = Limiter(key_func=get_remote_address, enabled=os.getenv("TESTING") != "true")
 
 # Prometheus metrics
 from prometheus_client import REGISTRY
