@@ -82,10 +82,19 @@ def get_statistics_overview(
     ).group_by(Contact.position).order_by(func.count(Contact.id).desc()).limit(10).all()
     
     # Contacts by month (last 12 months)
-    contacts_by_month = db.query(
-        func.to_char(Contact.created_at, 'YYYY-MM').label('month'),
-        func.count(Contact.id).label('count')
-    ).group_by('month').order_by('month').limit(12).all()
+    # Use database-agnostic approach
+    if 'sqlite' in str(db.bind.url):
+        # SQLite: use strftime
+        contacts_by_month = db.query(
+            func.strftime('%Y-%m', Contact.created_at).label('month'),
+            func.count(Contact.id).label('count')
+        ).group_by('month').order_by('month').limit(12).all()
+    else:
+        # PostgreSQL: use to_char
+        contacts_by_month = db.query(
+            func.to_char(Contact.created_at, 'YYYY-MM').label('month'),
+            func.count(Contact.id).label('count')
+        ).group_by('month').order_by('month').limit(12).all()
     
     return {
         "totals": {
