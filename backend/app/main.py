@@ -3326,27 +3326,21 @@ async def get_documentation(
 ):
     """
     Get documentation content (admin only).
-    Supports markdown files from project root.
+    Supports all markdown files from project root.
     """
     # Security: ensure doc_name doesn't contain path traversal
     if ".." in doc_name or "/" in doc_name or "\\" in doc_name:
         raise HTTPException(status_code=400, detail="Invalid document name")
     
-    # Allow only specific documentation files
-    allowed_docs = [
-        "PRODUCTION_DEPLOYMENT.md",
-        "README.md",
-        "TELEGRAM_SETUP.md",
-        "WHATSAPP_SETUP.md",
-        "MONITORING_SETUP.md"
-    ]
+    # Only allow .md files
+    if not doc_name.endswith('.md'):
+        raise HTTPException(status_code=400, detail="Only markdown files are allowed")
     
-    if doc_name not in allowed_docs:
-        raise HTTPException(status_code=404, detail="Documentation not found")
+    docs_root = Path("/home/ubuntu/fastapi-bizcard-crm-ready")
+    doc_path = docs_root / doc_name
     
-    doc_path = Path("/home/ubuntu/fastapi-bizcard-crm-ready") / doc_name
-    
-    if not doc_path.exists():
+    # Verify the file exists and is actually in the project root (not in subdirectories)
+    if not doc_path.exists() or doc_path.parent != docs_root:
         raise HTTPException(status_code=404, detail="Documentation file not found")
     
     try:
