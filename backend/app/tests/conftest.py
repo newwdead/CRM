@@ -1,6 +1,10 @@
 """
 Pytest configuration and fixtures
 """
+import os
+# Set TESTING env var BEFORE importing app modules
+os.environ["TESTING"] = "true"
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -44,16 +48,9 @@ def client(test_db):
     
     app.dependency_overrides[get_db] = override_get_db
     
-    # Disable rate limiting for tests using environment variable
-    import os
-    os.environ["TESTING"] = "true"
-    
     with TestClient(app) as test_client:
         yield test_client
     
-    # Re-enable rate limiting after tests
-    if "TESTING" in os.environ:
-        del os.environ["TESTING"]
     app.dependency_overrides.clear()
 
 

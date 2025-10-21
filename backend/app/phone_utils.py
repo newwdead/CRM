@@ -19,15 +19,20 @@ def format_phone_number(phone: str) -> str:
         9991234567 -> +7 (999) 123-45-67
         +1234567890 -> +1 (234) 567-890
     """
-    if not phone:
-        return phone
+    if phone is None:
+        return ""
+    
+    if not phone or not str(phone).strip():
+        return ""
+    
+    phone = str(phone)
     
     # Remove all non-digit characters except '+'
     clean = re.sub(r'[^\d+]', '', phone)
     
-    # If empty after cleaning, return original
+    # If empty after cleaning, return empty string
     if not clean or clean == '+':
-        return phone
+        return ""
     
     # Remove leading '+' for processing
     has_plus = clean.startswith('+')
