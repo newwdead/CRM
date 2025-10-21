@@ -153,20 +153,20 @@ def update_duplicate_status(
     """
     Update duplicate status: pending, reviewed, ignored
     """
-    if status not in ['pending', 'reviewed', 'ignored']:
-        raise HTTPException(status_code=400, detail='Invalid status')
-    
+    if status not in ["pending", "reviewed", "ignored"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
     dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
     if not dup:
-        raise HTTPException(status_code=404, detail='Duplicate not found')
-    
+        raise HTTPException(status_code=404, detail="Duplicate not found")
+
     dup.status = status
     dup.reviewed_at = func.now()
     dup.reviewed_by = current_user.id
-    
+
     db.commit()
-    
-    return {'message': 'Status updated', 'duplicate_id': duplicate_id, 'status': status}
+
+    return {"message": "Status updated", "duplicate_id": duplicate_id, "status": status}
 
 
 @router.post('/{duplicate_id}/ignore')
@@ -180,15 +180,15 @@ def ignore_duplicate(
     """
     dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
     if not dup:
-        raise HTTPException(status_code=404, detail='Duplicate not found')
-    
-    dup.status = 'ignored'
+        raise HTTPException(status_code=404, detail="Duplicate not found")
+
+    dup.status = "ignored"
     dup.reviewed_at = func.now()
     dup.reviewed_by = current_user.id
-    
+
     db.commit()
-    
-    return {'message': 'Duplicate marked as ignored', 'duplicate_id': duplicate_id}
+
+    return {"message": "Duplicate marked as ignored", "duplicate_id": duplicate_id}
 
 
 @router.post('/merge/{contact_id_1}/{contact_id_2}')

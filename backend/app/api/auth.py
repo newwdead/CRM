@@ -25,6 +25,7 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 # Prometheus metrics
+from prometheus_client import REGISTRY
 from ..core.metrics import (
     auth_attempts_counter,
     users_total,

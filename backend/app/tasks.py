@@ -420,7 +420,7 @@ def cleanup_old_results():
         keys = redis_client.keys('celery-task-meta-*')
         
         cleaned = 0
-        cutoff_time = datetime.now() - timedelta(hours=24)
+        # cutoff_time = datetime.now() - timedelta(hours=24)  # Reserved for future use
         
         for key in keys:
             try:
