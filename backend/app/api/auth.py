@@ -24,9 +24,14 @@ router = APIRouter()
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Prometheus metrics (imported from main.py to avoid duplication)
-# These are defined in main.py and accessed via the app instance
-from prometheus_client import REGISTRY
+# Prometheus metrics
+from ..core.metrics import (
+    auth_attempts_counter,
+    users_total,
+    user_logins_counter,
+    user_registrations_counter,
+    record_auth_attempt
+)
 
 def get_metric(name):
     """Helper to get existing metrics from registry"""
@@ -85,8 +90,7 @@ async def login(
     """
     user = auth_utils.authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        # TODO: Re-enable metrics after refactoring
-        # auth_attempts_counter.labels(status='failed').inc()
+        auth_attempts_counter.labels(status='failed').inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -94,8 +98,7 @@ async def login(
         )
     
     if not user.is_active:
-        # TODO: Re-enable metrics after refactoring
-        # auth_attempts_counter.labels(status='pending_approval').inc()
+        auth_attempts_counter.labels(status='pending_approval').inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account is awaiting administrator approval. Please contact the system administrator."
@@ -109,9 +112,9 @@ async def login(
     )
     
     # Update auth metrics
-    # TODO: Re-enable metrics after refactoring
-    # auth_attempts_counter.labels(status='success').inc()
-    # users_total.set(db.query(User).count())
+    auth_attempts_counter.labels(status='success').inc()
+    user_logins_counter.inc()
+    users_total.set(db.query(User).count())
     
     logger.info(f"User logged in: {user.username}")
     

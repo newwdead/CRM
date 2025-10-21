@@ -38,15 +38,17 @@ ocr_manager = OCRManager()
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Prometheus metrics
-ocr_processing_counter = Counter('ocr_processing_total', 'Total OCR processing requests', ['provider', 'status'])
-ocr_processing_time = Histogram('ocr_processing_seconds', 'OCR processing time', ['provider'])
-qr_scan_counter = Counter('qr_scan_total', 'QR code scans', ['status'])
-contacts_total = Gauge('contacts_total', 'Total number of contacts')
-contacts_created_counter = Counter('contacts_created_total', 'Total contacts created')
-users_total = Gauge('users_total', 'Total number of users')
-auth_attempts_counter = Counter('auth_attempts_total', 'Authentication attempts', ['status'])
-telegram_messages_counter = Counter('telegram_messages_total', 'Telegram messages processed', ['status'])
+# Prometheus metrics (imported from core.metrics)
+from .core.metrics import (
+    ocr_processing_counter,
+    ocr_processing_time,
+    qr_scan_counter,
+    contacts_total,
+    contacts_created_counter,
+    users_total,
+    auth_attempts_counter,
+    telegram_messages_counter
+)
 
 def init_db_with_retry(max_retries: int = 30, delay: float = 1.0):
     last_err = None

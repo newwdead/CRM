@@ -21,8 +21,13 @@ logger = logging.getLogger(__name__)
 # Router
 router = APIRouter()
 
-# Prometheus metrics are defined in main.py to avoid duplication
-# TODO: Create centralized metrics module
+# Prometheus metrics
+from ..core.metrics import (
+    contacts_created_counter,
+    contacts_updated_counter,
+    contacts_deleted_counter,
+    contacts_total
+)
 
 
 @router.get('/', response_model=schemas.PaginatedContactsResponse)
@@ -234,9 +239,8 @@ def create_contact(
     db.refresh(contact)
     
     # Update contact metrics
-    # TODO: Re-enable metrics after refactoring
-    # contacts_created_counter.inc()
-    # contacts_total.set(db.query(Contact).count())
+    contacts_created_counter.inc()
+    contacts_total.set(db.query(Contact).count())
     
     # Auto-detect duplicates if enabled
     try:
@@ -350,6 +354,10 @@ def update_contact(
             setattr(contact, k, v)
     db.commit()
     db.refresh(contact)
+    
+    # Update metrics
+    contacts_updated_counter.inc()
+    
     return contact
 
 
@@ -378,6 +386,11 @@ def delete_contact(
     
     db.delete(contact)
     db.commit()
+    
+    # Update metrics
+    contacts_deleted_counter.inc()
+    contacts_total.set(db.query(Contact).count())
+    
     return {'deleted': contact_id}
 
 

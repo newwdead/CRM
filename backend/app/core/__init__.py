@@ -18,6 +18,7 @@ from .utils import (
     get_system_setting,
     set_system_setting
 )
+from . import metrics
 
 __all__ = [
     'verify_password',
@@ -35,5 +36,6 @@ __all__ = [
     'get_setting',
     'set_setting',
     'get_system_setting',
-    'set_system_setting'
+    'set_system_setting',
+    'metrics'
 ]
