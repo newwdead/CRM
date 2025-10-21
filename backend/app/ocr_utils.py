@@ -204,7 +204,7 @@ def parse_phone_numbers(text: str) -> Dict[str, Optional[str]]:
         Dict with keys: phone, phone_mobile, phone_work, phone_additional
     """
     if not text:
-    return {
+        return {
             "phone": None,
             "phone_mobile": None,
             "phone_work": None,
