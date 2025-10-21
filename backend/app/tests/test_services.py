@@ -8,9 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from unittest.mock import Mock, patch
 
-from app.database import Base
-from app.models import Contact, User, Tag, Group, AppSetting
-from app.services import ContactService, DuplicateService, SettingsService
+from ..database import Base
+from ..models import Contact, User, Tag, Group, AppSetting
+from ..services import ContactService, DuplicateService, SettingsService
 
 
 # Test database setup
