@@ -13,7 +13,10 @@ import logging
 from ..database import get_db
 from ..models import Contact, User
 from .. import auth_utils
-from ..ocr_manager import ocr_manager
+from ..ocr_providers import OCRManager
+
+# Initialize OCR Manager
+ocr_manager = OCRManager()
 from .. import ocr_utils
 from .. import qr_utils
 from .. import image_processing
