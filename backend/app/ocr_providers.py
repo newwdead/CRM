@@ -16,6 +16,9 @@ import pytesseract
 import requests
 from urllib.parse import urlparse
 
+# Import caching utilities
+from .cache import get_cache_key, get_from_cache, set_to_cache
+
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
@@ -496,6 +499,13 @@ class OCRManager:
         if not self.providers:
             raise RuntimeError("No OCR providers available")
         
+        # Check cache first
+        cache_key = get_cache_key("ocr", image_data, preferred_provider or "auto")
+        cached_result = get_from_cache(cache_key)
+        if cached_result:
+            logger.info("OCR result retrieved from cache")
+            return cached_result
+        
         # Если указан предпочитаемый провайдер, пробуем его первым
         providers_to_try = list(self.providers)
         if preferred_provider:
@@ -515,6 +525,8 @@ class OCRManager:
                 # Проверяем что есть хоть какие-то данные
                 if result.get("data") and any(result["data"].values()):
                     logger.info(f"Successfully recognized with {provider.name}")
+                    # Cache the result for 24 hours
+                    set_to_cache(cache_key, result, ttl=86400)
                     return result
                 else:
                     logger.warning(f"{provider.name} returned empty data")

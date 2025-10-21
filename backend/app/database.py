@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
 import os
 
 # Prefer DATABASE_URL from environment (Postgres in prod), fallback to local SQLite
@@ -13,10 +14,15 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
         pool_pre_ping=True,
     )
 else:
-    # Postgres or other DBs
+    # PostgreSQL with optimized connection pooling
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
-        pool_pre_ping=True,
+        poolclass=QueuePool,
+        pool_size=20,           # Number of connections to keep open
+        max_overflow=40,        # Additional connections when pool is full
+        pool_pre_ping=True,     # Test connections before using them
+        pool_recycle=3600,      # Recycle connections every hour
+        echo=False,             # Set to True for SQL query logging
     )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
