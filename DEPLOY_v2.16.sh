@@ -3,6 +3,16 @@
 
 set -e  # Exit on error
 
+# Docker Compose command (support both v1 and v2)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Neither 'docker-compose' nor 'docker compose' found!"
+    exit 1
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🚀 FastAPI Business Card CRM - Deploy v2.16"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -77,8 +87,8 @@ mkdir -p "$BACKUP_DIR"
 
 # Backup database
 print_warning "Backing up PostgreSQL database..."
-if docker-compose ps postgres | grep -q "Up"; then
-    docker-compose exec -T postgres pg_dump -U postgres contacts > "$BACKUP_DIR/db_backup_${BACKUP_DATE}.sql"
+if eval "$DOCKER_COMPOSE ps postgres" | grep -q "Up"; then
+    eval "$DOCKER_COMPOSE exec -T postgres pg_dump -U postgres contacts" > "$BACKUP_DIR/db_backup_${BACKUP_DATE}.sql"
     print_success "Database backup created: db_backup_${BACKUP_DATE}.sql"
 else
     print_warning "PostgreSQL not running, skipping DB backup"
@@ -93,7 +103,7 @@ fi
 # 3. Stop services
 print_step "Step 3: Stopping services"
 
-docker-compose down
+eval "$DOCKER_COMPOSE down"
 print_success "Services stopped"
 
 # 4. Update code
@@ -125,7 +135,7 @@ print_step "Step 5: Updating dependencies"
 # Check if requirements changed
 if git diff HEAD@{1} --name-only | grep -q "requirements.txt"; then
     print_warning "Backend requirements changed, rebuilding..."
-    docker-compose build backend
+    eval "$DOCKER_COMPOSE build backend"
     print_success "Backend rebuilt"
 else
     print_success "Backend requirements unchanged"
@@ -134,7 +144,7 @@ fi
 # Check if package.json changed
 if git diff HEAD@{1} --name-only | grep -q "package.json"; then
     print_warning "Frontend dependencies changed, rebuilding..."
-    docker-compose build frontend
+    eval "$DOCKER_COMPOSE build frontend"
     print_success "Frontend rebuilt"
 else
     print_success "Frontend dependencies unchanged"
@@ -143,7 +153,7 @@ fi
 # 6. Start services
 print_step "Step 6: Starting services"
 
-docker-compose up -d
+eval "$DOCKER_COMPOSE up -d"
 print_success "Services started"
 
 # Wait for backend to be ready
@@ -163,12 +173,12 @@ echo ""
 print_step "Step 7: Database migrations"
 
 # Check if migrations exist
-if docker-compose exec -T backend alembic current > /dev/null 2>&1; then
-    CURRENT_MIGRATION=$(docker-compose exec -T backend alembic current | head -1)
+if eval "$DOCKER_COMPOSE exec -T backend alembic current" > /dev/null 2>&1; then
+    CURRENT_MIGRATION=$(eval "$DOCKER_COMPOSE exec -T backend alembic current" | head -1)
     echo "Current migration: $CURRENT_MIGRATION"
     
     # Run pending migrations
-    docker-compose exec -T backend alembic upgrade head
+    eval "$DOCKER_COMPOSE exec -T backend alembic upgrade head"
     print_success "Migrations applied"
 else
     print_warning "Alembic not configured or error checking migrations"
@@ -203,11 +213,11 @@ else
 fi
 
 # Check Redis
-if docker-compose ps redis | grep -q "Up"; then
+if eval "$DOCKER_COMPOSE ps redis" | grep -q "Up"; then
     print_success "Redis running: OK"
     
     # Check Redis connectivity
-    if docker-compose exec -T redis redis-cli ping | grep -q "PONG"; then
+    if eval "$DOCKER_COMPOSE exec -T redis redis-cli ping" | grep -q "PONG"; then
         print_success "Redis connectivity: OK"
     else
         print_warning "Redis not responding"
@@ -217,7 +227,7 @@ else
 fi
 
 # Check PostgreSQL
-if docker-compose ps postgres | grep -q "Up"; then
+if eval "$DOCKER_COMPOSE ps postgres" | grep -q "Up"; then
     print_success "PostgreSQL running: OK"
 else
     print_error "PostgreSQL not running"
@@ -228,8 +238,8 @@ print_step "Step 9: Performance verification"
 
 # Test OCR cache
 echo "Testing Redis OCR cache..."
-if docker-compose exec -T redis redis-cli KEYS "ocr:*" > /dev/null 2>&1; then
-    OCR_CACHE_COUNT=$(docker-compose exec -T redis redis-cli KEYS "ocr:*" | wc -l)
+if eval "$DOCKER_COMPOSE exec -T redis redis-cli KEYS 'ocr:*'" > /dev/null 2>&1; then
+    OCR_CACHE_COUNT=$(eval "$DOCKER_COMPOSE exec -T redis redis-cli KEYS 'ocr:*'" | wc -l)
     print_success "Redis OCR cache working (keys: $OCR_CACHE_COUNT)"
 else
     print_warning "Could not check OCR cache"
@@ -237,7 +247,7 @@ fi
 
 # Test database pool
 echo "Testing database pool..."
-if docker-compose logs backend | tail -50 | grep -q "pool"; then
+if eval "$DOCKER_COMPOSE logs backend" | tail -50 | grep -q "pool"; then
     print_success "Database pooling active"
 else
     print_success "Database connection established"
@@ -246,7 +256,7 @@ fi
 # 10. Display service status
 print_step "Step 10: Service status"
 
-docker-compose ps
+eval "$DOCKER_COMPOSE ps"
 
 # 11. Summary
 echo ""
@@ -261,9 +271,9 @@ echo "📚 API Docs: http://localhost:8000/docs"
 echo "💾 Backup: $BACKUP_DIR/db_backup_${BACKUP_DATE}.sql"
 echo ""
 echo "🔍 Next steps:"
-echo "  - Check logs: docker-compose logs -f"
+echo "  - Check logs: $DOCKER_COMPOSE logs -f"
 echo "  - Monitor Redis: docker exec -it redis redis-cli INFO"
-echo "  - Check DB pool: docker-compose logs backend | grep pool"
+echo "  - Check DB pool: $DOCKER_COMPOSE logs backend | grep pool"
 echo "  - Test API: curl http://localhost:8000/health"
 echo ""
 echo "📈 Performance improvements:"
@@ -279,7 +289,7 @@ echo ""
 read -p "Show recent logs? (y/N) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    docker-compose logs --tail=50
+    eval "$DOCKER_COMPOSE logs --tail=50"
 fi
 
 exit 0
