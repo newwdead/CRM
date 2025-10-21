@@ -24,14 +24,14 @@ api_router = APIRouter()
 api_router.include_router(health_router, tags=["Health"])  # No prefix - /health, /version
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(contacts_router, prefix="/contacts", tags=["Contacts"])
-api_router.include_router(exports_router, prefix="/contacts/export", tags=["Export/Import"])  # Must be before /contacts prefix
+api_router.include_router(exports_router, prefix="", tags=["Export/Import"])  # Absolute paths preserved
 api_router.include_router(duplicates_router, prefix="/api/duplicates", tags=["Duplicates"])
 api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
 api_router.include_router(admin_router, prefix="", tags=["Admin"])  # No prefix for backward compatibility
 api_router.include_router(ocr_router, prefix="/ocr", tags=["OCR"])
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])
-api_router.include_router(telegram_router, prefix="/telegram", tags=["Telegram"])
+api_router.include_router(telegram_router, prefix="", tags=["Telegram"])  # Absolute paths preserved
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 
 __all__ = [

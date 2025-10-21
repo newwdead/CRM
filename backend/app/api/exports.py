@@ -21,7 +21,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get('/csv')
+@router.get('/contacts/export')
 def export_csv(
     ids: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -65,7 +65,7 @@ def export_csv(
     )
 
 
-@router.get('/xlsx')
+@router.get('/contacts/export/xlsx')
 def export_xlsx(
     ids: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -108,7 +108,7 @@ def export_xlsx(
     )
 
 
-@router.get('/{contact_id}/pdf')
+@router.get('/contacts/{contact_id}/pdf')
 def export_contact_pdf(
     contact_id: int,
     db: Session = Depends(get_db),
@@ -202,7 +202,7 @@ def export_contact_pdf(
     return StreamingResponse(buffer, media_type='application/pdf', headers=headers)
 
 
-@router.post('/import')
+@router.post('/contacts/import')
 def import_contacts(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -234,7 +234,7 @@ def import_contacts(
     return {'imported': added}
 
 
-@router.post('/bulk-delete')
+@router.post('/contacts/delete_bulk')
 def delete_bulk(
     ids: list[int] = Body(...),
     db: Session = Depends(get_db),
@@ -246,7 +246,7 @@ def delete_bulk(
     return {'deleted': len(ids)}
 
 
-@router.put('/bulk-update')
+@router.put('/contacts/update_bulk')
 def update_bulk(
     payload: dict,
     db: Session = Depends(get_db),

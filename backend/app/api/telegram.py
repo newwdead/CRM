@@ -42,7 +42,7 @@ def set_setting(db: Session, key: str, value: str | None):
     db.commit()
 
 
-@router.get('/settings')
+@router.get('/settings/telegram')
 def get_telegram_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -56,7 +56,7 @@ def get_telegram_settings(
     }
 
 
-@router.put('/settings')
+@router.put('/settings/telegram')
 def update_telegram_settings(
     data: TelegramSettings,
     db: Session = Depends(get_db),
@@ -70,7 +70,7 @@ def update_telegram_settings(
     return {'ok': True}
 
 
-@router.post('/webhook')
+@router.post('/telegram/webhook')
 def telegram_webhook(
     update: dict = Body(...),
     db: Session = Depends(get_db)

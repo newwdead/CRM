@@ -2,7 +2,7 @@
 Contacts API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
 import logging
@@ -58,7 +58,11 @@ def list_contacts(
     - page: Page number (starts from 1)
     - limit: Items per page (1-100, default 20)
     """
-    query = db.query(Contact)
+    # Optimize N+1 queries with eager loading
+    query = db.query(Contact).options(
+        joinedload(Contact.tags),
+        joinedload(Contact.groups)
+    )
     
     # Full-text search
     if q:
