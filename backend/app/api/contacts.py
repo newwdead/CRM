@@ -1,14 +1,16 @@
 """
 Contacts API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
 import logging
+import os
 
 from ..database import get_db
 from ..models import Contact, User, DuplicateContact, Tag, Group
+from ..core.utils import get_setting
 from .. import schemas
 from .. import auth_utils
 from .. import duplicate_utils
@@ -419,4 +421,100 @@ def get_contact_history(
     ).order_by(AuditLog.timestamp.desc()).limit(limit).all()
     
     return logs
+
+
+@router.get('/{contact_id}/ocr-blocks')
+def get_contact_ocr_blocks(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Get OCR bounding boxes and text blocks for a contact's image.
+    Returns coordinates and text for visual editing.
+    """
+    from .. import tesseract_boxes
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.photo_path:
+        raise HTTPException(status_code=400, detail='Contact has no image')
+    
+    # Read image file
+    image_path = os.path.join('uploads', contact.photo_path)
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail='Image file not found')
+    
+    try:
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+        
+        # Get Tesseract language from settings
+        tesseract_langs = get_setting(db, 'TESSERACT_LANGS', 'rus+eng')
+        
+        # Extract blocks
+        result = tesseract_boxes.get_text_blocks(image_bytes, lang=tesseract_langs)
+        
+        # Group into lines for easier visualization
+        lines = tesseract_boxes.group_blocks_by_line(result['blocks'])
+        
+        return {
+            'contact_id': contact_id,
+            'image_width': result['image_width'],
+            'image_height': result['image_height'],
+            'blocks': result['blocks'],  # Word-level blocks
+            'lines': lines,  # Line-level grouped blocks
+            'current_data': {
+                'first_name': contact.first_name,
+                'last_name': contact.last_name,
+                'middle_name': contact.middle_name,
+                'company': contact.company,
+                'position': contact.position,
+                'email': contact.email,
+                'phone': contact.phone,
+                'phone_mobile': contact.phone_mobile,
+                'phone_work': contact.phone_work,
+                'phone_additional': contact.phone_additional,
+                'address': contact.address,
+                'address_additional': contact.address_additional,
+                'website': contact.website
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error extracting OCR blocks: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to extract OCR blocks: {str(e)}")
+
+
+@router.post('/{contact_id}/ocr-corrections')
+def save_ocr_correction(
+    contact_id: int,
+    correction_data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Save OCR correction for training purposes.
+    Stores original OCR text, corrected text, and field assignment.
+    """
+    from ..models import OCRCorrection
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    correction = OCRCorrection(
+        contact_id=contact_id,
+        original_text=correction_data.get('original_text'),
+        corrected_text=correction_data.get('corrected_text'),
+        field_name=correction_data.get('field_name'),
+        user_id=current_user.id
+    )
+    
+    db.add(correction)
+    db.commit()
+    
+    return {'status': 'success', 'message': 'Correction saved for training'}
 
