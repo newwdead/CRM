@@ -18,7 +18,7 @@ from .models import Contact, AppSetting, User
 from .ocr_providers import OCRManager
 from . import ocr_utils  # Enhanced OCR parsing
 from . import qr_utils  # QR code scanning
-from . import duplicate_utils  # Duplicate detection
+# from . import duplicate_utils  # Duplicate detection (will be used in v2.12)
 from . import auth_utils
 from . import image_processing  # Image preprocessing and multi-card detection
 from .auth_utils import get_current_active_user, get_current_admin_user

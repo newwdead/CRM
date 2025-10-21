@@ -22,3 +22,5 @@ opencv-python-headless
 vobject
 celery==5.3.4
 redis==5.0.1
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.25.0
