@@ -82,11 +82,25 @@ def db_session(test_db):
 
 
 @pytest.fixture
-def auth_token(client, test_user_data):
+def auth_token(client, test_db, test_user_data):
     """Create a regular user and return auth token"""
-    # Register user
-    register_response = client.post("/auth/register", json=test_user_data)
-    assert register_response.status_code in [200, 201], f"Registration failed: {register_response.text}"
+    from ..models import User
+    from passlib.context import CryptContext
+    
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
+    # Create regular user directly in database (to bypass approval requirement)
+    user = User(
+        username=test_user_data["username"],
+        email=test_user_data["email"],
+        hashed_password=pwd_context.hash(test_user_data["password"]),
+        full_name=test_user_data.get("full_name", "Test User"),
+        is_active=True,  # Set active to bypass admin approval
+        is_admin=False
+    )
+    test_db.add(user)
+    test_db.commit()
+    test_db.refresh(user)
     
     # Login and get token (OAuth2PasswordRequestForm expects form data)
     login_data = {
