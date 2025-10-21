@@ -918,9 +918,22 @@ def create_contact(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    from .phone_utils import format_phone_number
+    
     payload = data.dict()
     if not payload.get('uid'):
         payload['uid'] = uuid.uuid4().hex
+    
+    # Format phone numbers
+    if payload.get('phone'):
+        payload['phone'] = format_phone_number(payload['phone'])
+    if payload.get('phone_mobile'):
+        payload['phone_mobile'] = format_phone_number(payload['phone_mobile'])
+    if payload.get('phone_work'):
+        payload['phone_work'] = format_phone_number(payload['phone_work'])
+    if payload.get('phone_additional'):
+        payload['phone_additional'] = format_phone_number(payload['phone_additional'])
+    
     contact = Contact(**payload)
     db.add(contact)
     db.flush()  # Get ID without committing
@@ -951,11 +964,23 @@ def update_contact(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    from .phone_utils import format_phone_number
+    
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail='Not found')
     
     update_data = data.dict(exclude_unset=True)
+    
+    # Format phone numbers
+    if 'phone' in update_data and update_data['phone']:
+        update_data['phone'] = format_phone_number(update_data['phone'])
+    if 'phone_mobile' in update_data and update_data['phone_mobile']:
+        update_data['phone_mobile'] = format_phone_number(update_data['phone_mobile'])
+    if 'phone_work' in update_data and update_data['phone_work']:
+        update_data['phone_work'] = format_phone_number(update_data['phone_work'])
+    if 'phone_additional' in update_data and update_data['phone_additional']:
+        update_data['phone_additional'] = format_phone_number(update_data['phone_additional'])
     
     # Audit log
     create_audit_log(

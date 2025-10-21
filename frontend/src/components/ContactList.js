@@ -381,7 +381,10 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           style={{ flex: 1, minWidth: '200px' }}
         />
         <button 
-          onClick={() => setShowTableSettings(true)}
+          onClick={() => {
+            console.log('Table Settings button clicked!', showTableSettings);
+            setShowTableSettings(true);
+          }}
           className="secondary"
           title={lang === 'ru' ? 'Настройка таблицы' : 'Table Settings'}
         >
@@ -595,6 +598,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                 />
               </th>
               <th style={{ width: '50px' }}>№</th>
+              <th style={{ width: '100px' }}>{lang === 'ru' ? 'Дата' : 'Date'}</th>
               <th style={{ width: '80px' }}>{t.uid}</th>
               <th style={{ width: '150px' }}>{t.name}</th>
               <th style={{ width: '140px' }}>{t.company}</th>
@@ -611,7 +615,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
         <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan="14" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                <td colSpan="15" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   {search || companyFilter || positionFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
                 </td>
               </tr>
@@ -631,8 +635,11 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                       onChange={() => toggle(c.id)}
                     />
                   </td>
-                  <td style={{ textAlign: 'center', color: '#999' }}>
-                    {(page - 1) * limit + index + 1}
+                  <td style={{ textAlign: 'center', color: '#999', fontWeight: '500' }}>
+                    {c.sequence_number || (page - 1) * limit + index + 1}
+                  </td>
+                  <td style={{ fontSize: '11px', color: '#666' }} title={c.created_at ? new Date(c.created_at).toLocaleString() : ''}>
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
                   </td>
                   <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.uid}>
                     {c.uid ? (

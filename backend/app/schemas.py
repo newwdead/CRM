@@ -130,6 +130,7 @@ class ContactUpdate(ContactBase):
 class ContactResponse(ContactBase):
     """Schema for contact in responses."""
     id: int
+    sequence_number: Optional[int] = None
     tags: List['TagResponse'] = []
     groups: List['GroupResponse'] = []
     thumbnail_path: Optional[str] = None

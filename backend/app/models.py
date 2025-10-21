@@ -56,6 +56,7 @@ class Contact(Base):
     __tablename__ = "contacts"
     id = Column(Integer, primary_key=True, index=True)
     uid = Column(String, unique=True, index=True, nullable=True)
+    sequence_number = Column(Integer, unique=True, index=True, nullable=True)  # Порядковый номер по мере добавления
     
     # Name fields (ФИО)
     full_name = Column(String, nullable=True)  # Полное имя (для обратной совместимости)
