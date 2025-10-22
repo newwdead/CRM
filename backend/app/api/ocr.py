@@ -138,10 +138,11 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         if user_id:
             data['user_id'] = user_id
         
-        # Save to database
-        contact = Contact(**data)
-        db.add(contact)
-        db.commit()
+        # Save to database using ContactRepository
+        from ..repositories import ContactRepository
+        contact_repo = ContactRepository(db)
+        contact = contact_repo.create(data)
+        contact_repo.commit()
         db.refresh(contact)
         
         # Convert to dict for response
@@ -249,7 +250,9 @@ async def upload_card(
             
             # Update metrics
             contacts_created_counter.inc(len(created_contacts))
-            contacts_total.set(db.query(Contact).count())
+            from ..repositories import ContactRepository
+            contact_repo = ContactRepository(db)
+            contacts_total.set(contact_repo.count())
             
             return {
                 "message": f"{len(created_contacts)} business cards detected and processed",
@@ -285,7 +288,9 @@ async def upload_card(
         
         # Update metrics
         contacts_created_counter.inc()
-        contacts_total.set(db.query(Contact).count())
+        from ..repositories import ContactRepository
+        contact_repo = ContactRepository(db)
+        contacts_total.set(contact_repo.count())
         
         return contact_dict
         
