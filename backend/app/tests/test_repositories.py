@@ -241,8 +241,9 @@ class TestOCRRepository:
         correction_data = {
             'contact_id': test_contact.id,
             'original_text': 'John Doe',
+            'original_box': '{"x": 10, "y": 20, "width": 100, "height": 30}',
             'corrected_text': 'John Doe',
-            'field_name': 'full_name'
+            'corrected_field': 'full_name'
         }
         
         ocr_data = repo.create_ocr_correction(correction_data)
@@ -259,8 +260,9 @@ class TestOCRRepository:
         repo.create_ocr_correction({
             'contact_id': test_contact.id,
             'original_text': 'Test',
+            'original_box': '{"x": 0, "y": 0, "width": 50, "height": 20}',
             'corrected_text': 'Test',
-            'field_name': 'name'
+            'corrected_field': 'first_name'
         })
         repo.commit()
         
@@ -275,8 +277,9 @@ class TestOCRRepository:
         correction = repo.create_ocr_correction({
             'contact_id': test_contact.id,
             'original_text': 'Test',
+            'original_box': '{"x": 5, "y": 5, "width": 80, "height": 25}',
             'corrected_text': 'Test Corrected',
-            'field_name': 'name'
+            'corrected_field': 'first_name'
         })
         repo.commit()
         
@@ -331,7 +334,7 @@ class TestSettingsRepository:
 class TestAuditRepository:
     """Tests for AuditRepository"""
     
-    def test_create_audit_log(self, db: Session):
+    def test_create_audit_log(self, db: Session, test_contact: Contact):
         """Test creating an audit log"""
         repo = AuditRepository(db)
         
@@ -347,19 +350,20 @@ class TestAuditRepository:
         
         audit_data = {
             'user_id': user.id,
-            'action': 'create',
+            'username': 'audit_user',
+            'action': 'created',
             'entity_type': 'contact',
-            'entity_id': 1,
-            'details': 'Test audit log'
+            'contact_id': test_contact.id,
+            'changes': '{"field": "name", "old": "", "new": "Test"}'
         }
         
         audit = repo.create_audit_log(audit_data)
         repo.commit()
         
         assert audit.id is not None
-        assert audit.action == 'create'
+        assert audit.action == 'created'
     
-    def test_get_audit_logs_by_user(self, db: Session):
+    def test_get_audit_logs_by_user(self, db: Session, test_contact: Contact):
         """Test getting audit logs by user"""
         repo = AuditRepository(db)
         
@@ -375,9 +379,10 @@ class TestAuditRepository:
         
         repo.create_audit_log({
             'user_id': user.id,
-            'action': 'update',
+            'username': 'log_user',
+            'action': 'updated',
             'entity_type': 'contact',
-            'entity_id': 1
+            'contact_id': test_contact.id
         })
         repo.commit()
         
