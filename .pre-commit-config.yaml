@@ -1,19 +1,126 @@
+# Pre-commit hooks configuration
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: check-ast
-      - id: check-json
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
+  # Python Code Formatting
   - repo: https://github.com/psf/black
-    rev: 24.8.0
+    rev: 23.12.1
     hooks:
       - id: black
-        language_version: python3
+        name: Black (Python formatter)
+        language_version: python3.10
+        files: ^backend/
+        exclude: ^backend/app/tests/
+
+  # Python Import Sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (Python import sorter)
+        args: ["--profile", "black"]
+        files: ^backend/
+        exclude: ^backend/app/tests/
+
+  # Python Linting
   - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+    rev: 7.0.0
     hooks:
       - id: flake8
-        additional_dependencies: [flake8-bugbear]
+        name: Flake8 (Python linter)
+        args: [
+          "--max-line-length=120",
+          "--extend-ignore=E203,W503,E501",
+          "--exclude=migrations,__pycache__,node_modules"
+        ]
+        files: ^backend/
+        exclude: ^backend/app/tests/
+
+  # JavaScript/React Formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        name: Prettier (JS/React formatter)
+        files: \.(js|jsx|json|css|md)$
+        exclude: (node_modules|build|coverage)
+        args: [
+          "--write",
+          "--single-quote",
+          "--trailing-comma=es5",
+          "--print-width=100"
+        ]
+
+  # General Fixes
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+        exclude: (\.md|\.txt)$
+      
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+        name: Fix end of files
+        exclude: (node_modules|\.min\.|\.map$)
+      
+      # Check YAML syntax
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']
+      
+      # Check JSON syntax
+      - id: check-json
+        name: Check JSON syntax
+        exclude: (tsconfig\.json)
+      
+      # Check for merge conflicts
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      
+      # Check for large files (>500KB)
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=500']
+        exclude: (package-lock\.json|\.whl$)
+      
+      # Prevent commits to main/master
+      - id: no-commit-to-branch
+        name: Prevent commits to main
+        args: ['--branch', 'main', '--branch', 'master']
+
+  # Python Security Check
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        name: Bandit (Python security)
+        args: ["-ll", "-q", "-r", "backend/"]
+        exclude: ^backend/app/tests/
+
+  # Dockerfile Linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Hadolint (Dockerfile linter)
+        files: Dockerfile
+
+  # Markdown Linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        name: Markdownlint
+        args: ["--fix"]
+        exclude: (node_modules|CHANGELOG)
+
+# CI-specific settings
+ci:
+  autofix_commit_msg: "chore: auto-fix pre-commit hooks"
+  autofix_prs: true
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: weekly

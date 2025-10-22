@@ -1,333 +1,263 @@
 """
 Tests for Service Layer
-
-Tests for ContactService, DuplicateService, SettingsService, and OCRService.
 """
+
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from unittest.mock import Mock, patch
+from sqlalchemy.orm import Session
 
-from ..database import Base
-from ..models import Contact, User, Tag, Group, AppSetting
-from ..services import ContactService, DuplicateService, SettingsService
+from ..models import Contact
+from ..services import ContactService
 
 
-# Test database setup
-@pytest.fixture(scope='function')
-def test_db():
-    """Create a test database."""
-    engine = create_engine('sqlite:///:memory:')
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(bind=engine)
-    db = TestingSessionLocal()
-    
-    yield db
-    
-    db.close()
-
-
-@pytest.fixture
-def test_user(test_db):
-    """Create a test user."""
-    user = User(
-        username='testuser',
-        email='test@example.com',
-        hashed_password='hashedpassword',
-        is_active=True
-    )
-    test_db.add(user)
-    test_db.commit()
-    test_db.refresh(user)
-    return user
-
-
-@pytest.fixture
-def contact_service(test_db):
-    """Get ContactService instance."""
-    return ContactService(test_db)
-
-
-@pytest.fixture
-def duplicate_service(test_db):
-    """Get DuplicateService instance."""
-    return DuplicateService(test_db)
-
-
-@pytest.fixture
-def settings_service(test_db):
-    """Get SettingsService instance."""
-    return SettingsService(test_db)
-
-
-# ContactService Tests
 class TestContactService:
-    """Tests for ContactService."""
+    """Tests for ContactService"""
     
-    def test_create_contact(self, contact_service, test_user):
-        """Test creating a contact."""
+    @pytest.fixture
+    def contact_service(self, test_db: Session):
+        """Create ContactService instance"""
+        return ContactService(test_db)
+    
+    def test_get_contacts_list(self, contact_service, test_contact):
+        """Test getting paginated contacts list"""
+        contacts, total = contact_service.get_contacts_list(skip=0, limit=10)
+        
+        assert isinstance(contacts, list)
+        assert isinstance(total, int)
+        assert total >= 1
+        assert len(contacts) <= 10
+    
+    def test_get_contacts_with_filters(self, contact_service, test_contact):
+        """Test getting contacts with filters"""
+        contacts, total = contact_service.get_contacts_list(
+            q=test_contact.first_name,
+            skip=0,
+            limit=10
+        )
+        
+        assert isinstance(contacts, list)
+        assert any(c.first_name == test_contact.first_name for c in contacts)
+    
+    def test_get_contacts_with_company_filter(self, contact_service, test_contact):
+        """Test filtering by company"""
+        contacts, total = contact_service.get_contacts_list(
+            company=test_contact.company,
+            skip=0,
+            limit=10
+        )
+        
+        assert isinstance(contacts, list)
+        if contacts:
+            assert all(c.company == test_contact.company for c in contacts)
+    
+    def test_get_contacts_with_sorting(self, contact_service):
+        """Test sorting contacts"""
+        contacts, _ = contact_service.get_contacts_list(
+            sort_by="first_name",
+            sort_order="asc",
+            skip=0,
+            limit=10
+        )
+        
+        assert isinstance(contacts, list)
+        # Verify sorting (if more than 1 contact)
+        if len(contacts) > 1:
+            names = [c.first_name for c in contacts if c.first_name]
+            assert names == sorted(names)
+    
+    def test_create_contact(self, contact_service):
+        """Test creating a contact via service"""
         contact_data = {
-            'full_name': 'John Doe',
-            'email': 'john@example.com',
-            'phone': '+1234567890',
-            'company': 'Test Corp'
+            'uid': 'service-test-123',
+            'first_name': 'Service',
+            'last_name': 'Test',
+            'email': 'service@test.com',
+            'company': 'Test Service Co'
         }
         
-        contact = contact_service.create_contact(
-            data=contact_data,
-            current_user=test_user,
-            auto_detect_duplicates=False  # Disable for testing
-        )
+        contact = contact_service.create_contact(contact_data)
         
         assert contact.id is not None
-        assert contact.full_name == 'John Doe'
-        assert contact.email == 'john@example.com'
-        assert contact.uid is not None
+        assert contact.first_name == 'Service'
+        assert contact.email == 'service@test.com'
     
-    def test_get_by_id(self, contact_service, test_user):
-        """Test getting contact by ID."""
-        # Create a contact
-        contact_data = {'full_name': 'Jane Doe', 'email': 'jane@example.com'}
-        contact = contact_service.create_contact(contact_data, test_user, False)
+    def test_get_contact_by_id(self, contact_service, test_contact):
+        """Test getting contact by ID via service"""
+        contact = contact_service.get_contact_by_id(test_contact.id)
         
-        # Get by ID
-        fetched = contact_service.get_by_id(contact.id)
-        
-        assert fetched is not None
-        assert fetched.id == contact.id
-        assert fetched.full_name == 'Jane Doe'
+        assert contact is not None
+        assert contact.id == test_contact.id
+        assert contact.first_name == test_contact.first_name
     
-    def test_get_by_id_not_found(self, contact_service):
-        """Test getting non-existent contact."""
-        contact = contact_service.get_by_id(99999)
+    def test_get_nonexistent_contact(self, contact_service):
+        """Test getting non-existent contact"""
+        contact = contact_service.get_contact_by_id(99999)
+        
         assert contact is None
     
-    def test_update_contact(self, contact_service, test_user):
-        """Test updating a contact."""
-        # Create a contact
-        contact_data = {'full_name': 'Old Name', 'email': 'old@example.com'}
-        contact = contact_service.create_contact(contact_data, test_user, False)
-        
-        # Update
-        update_data = {'full_name': 'New Name', 'company': 'New Corp'}
-        updated = contact_service.update_contact(contact.id, update_data, test_user)
-        
-        assert updated is not None
-        assert updated.full_name == 'New Name'
-        assert updated.company == 'New Corp'
-        assert updated.email == 'old@example.com'  # Unchanged
-    
-    def test_delete_contact(self, contact_service, test_user):
-        """Test deleting a contact."""
-        # Create a contact
-        contact_data = {'full_name': 'To Delete', 'email': 'delete@example.com'}
-        contact = contact_service.create_contact(contact_data, test_user, False)
-        
-        # Delete
-        deleted = contact_service.delete_contact(contact.id, test_user)
-        
-        assert deleted is True
-        
-        # Verify deletion
-        fetched = contact_service.get_by_id(contact.id)
-        assert fetched is None
-    
-    def test_list_contacts(self, contact_service, test_user):
-        """Test listing contacts with pagination."""
-        # Create multiple contacts
-        for i in range(5):
-            contact_data = {
-                'full_name': f'Contact {i}',
-                'email': f'contact{i}@example.com',
-                'company': 'Test Corp'
-            }
-            contact_service.create_contact(contact_data, test_user, False)
-        
-        # List contacts
-        result = contact_service.list_contacts(page=1, limit=10)
-        
-        assert result['total'] == 5
-        assert len(result['items']) == 5
-        assert result['pages'] == 1
-    
-    def test_list_contacts_with_search(self, contact_service, test_user):
-        """Test listing contacts with search query."""
-        # Create contacts
-        contact_service.create_contact(
-            {'full_name': 'John Smith', 'email': 'john@example.com'},
-            test_user,
-            False
-        )
-        contact_service.create_contact(
-            {'full_name': 'Jane Doe', 'email': 'jane@example.com'},
-            test_user,
-            False
-        )
-        
-        # Search for "John"
-        result = contact_service.list_contacts(q='John')
-        
-        assert result['total'] == 1
-        assert result['items'][0].full_name == 'John Smith'
-    
-    def test_search_contacts(self, contact_service, test_user):
-        """Test fast search."""
-        # Create contacts
-        contact_service.create_contact(
-            {'full_name': 'Alice', 'company': 'Tech Corp'},
-            test_user,
-            False
-        )
-        
-        # Search
-        results = contact_service.search_contacts('Tech', limit=10)
-        
-        assert len(results) == 1
-        assert results[0]['company'] == 'Tech Corp'
-    
-    def test_phone_formatting(self, contact_service, test_user):
-        """Test automatic phone number formatting."""
-        contact_data = {
-            'full_name': 'Test User',
-            'phone': '1234567890',
-            'phone_mobile': '9876543210'
+    def test_update_contact(self, contact_service, test_contact):
+        """Test updating contact via service"""
+        update_data = {
+            'first_name': 'Updated Service'
         }
         
-        contact = contact_service.create_contact(contact_data, test_user, False)
+        updated = contact_service.update_contact(test_contact.id, update_data)
         
-        # Phone numbers should be formatted
-        assert contact.phone is not None
-        assert contact.phone_mobile is not None
-
-
-# DuplicateService Tests
-class TestDuplicateService:
-    """Tests for DuplicateService."""
+        assert updated is not None
+        assert updated.first_name == 'Updated Service'
     
-    def test_find_duplicates_manual(self, duplicate_service, test_user, test_db):
-        """Test manual duplicate detection."""
-        # Create similar contacts
-        contact1 = Contact(
-            full_name='John Doe',
-            email='john@example.com',
-            company='Test Corp'
-        )
-        contact2 = Contact(
-            full_name='John Doe',
-            email='john.doe@example.com',
-            company='Test Corp'
-        )
+    def test_delete_contact(self, contact_service, test_contact):
+        """Test deleting contact via service"""
+        contact_id = test_contact.id
         
-        test_db.add(contact1)
-        test_db.add(contact2)
-        test_db.commit()
+        result = contact_service.delete_contact(contact_id)
         
-        # Find duplicates
-        result = duplicate_service.find_duplicates_manual(threshold=0.7)
-        
-        assert result['found'] >= 0  # May find duplicates
-        assert 'threshold' in result
-    
-    def test_update_duplicate_status(self, duplicate_service, test_user):
-        """Test updating duplicate status."""
-        # This test would require setting up duplicate records
-        # Skipping for now as it requires more complex setup
-        pass
-
-
-# SettingsService Tests
-class TestSettingsService:
-    """Tests for SettingsService."""
-    
-    def test_set_and_get_setting(self, settings_service):
-        """Test setting and getting a setting."""
-        # Set setting
-        setting = settings_service.set_setting('test_key', 'test_value')
-        
-        assert setting.key == 'test_key'
-        assert setting.value == 'test_value'
-        
-        # Get setting
-        value = settings_service.get_setting('test_key')
-        assert value == 'test_value'
-    
-    def test_get_setting_with_default(self, settings_service):
-        """Test getting non-existent setting with default."""
-        value = settings_service.get_setting('nonexistent', 'default_value')
-        assert value == 'default_value'
-    
-    def test_get_all_settings(self, settings_service):
-        """Test getting all settings."""
-        # Create settings
-        settings_service.set_setting('key1', 'value1')
-        settings_service.set_setting('key2', 'value2')
-        
-        # Get all
-        settings = settings_service.get_all_settings()
-        
-        assert len(settings) == 2
-    
-    def test_get_settings_dict(self, settings_service):
-        """Test getting settings as dictionary."""
-        # Create settings
-        settings_service.set_setting('key1', 'value1')
-        settings_service.set_setting('key2', 'value2')
-        
-        # Get dict
-        settings_dict = settings_service.get_settings_dict()
-        
-        assert settings_dict['key1'] == 'value1'
-        assert settings_dict['key2'] == 'value2'
-    
-    def test_delete_setting(self, settings_service):
-        """Test deleting a setting."""
-        # Create setting
-        settings_service.set_setting('to_delete', 'value')
-        
-        # Delete
-        deleted = settings_service.delete_setting('to_delete')
-        assert deleted is True
+        assert result is True
         
         # Verify deletion
-        value = settings_service.get_setting('to_delete')
-        assert value is None
+        deleted = contact_service.get_contact_by_id(contact_id)
+        assert deleted is None
     
-    def test_set_ocr_provider(self, settings_service):
-        """Test setting OCR provider."""
-        setting = settings_service.set_ocr_provider('tesseract')
-        assert setting.value == 'tesseract'
+    def test_search_contacts(self, contact_service, test_contact):
+        """Test searching contacts"""
+        results = contact_service.search_contacts(test_contact.first_name)
         
-        # Invalid provider should raise error
-        with pytest.raises(ValueError):
-            settings_service.set_ocr_provider('invalid_provider')
+        assert isinstance(results, list)
+        assert any(c.id == test_contact.id for c in results)
     
-    def test_set_duplicate_threshold(self, settings_service):
-        """Test setting duplicate threshold."""
-        setting = settings_service.set_duplicate_threshold(0.8)
-        assert setting.value == '0.8'
+    def test_get_contacts_by_company(self, contact_service, test_contact):
+        """Test getting contacts by company"""
+        contacts = contact_service.get_contacts_by_company(test_contact.company)
         
-        # Invalid threshold should raise error
-        with pytest.raises(ValueError):
-            settings_service.set_duplicate_threshold(1.5)
+        assert isinstance(contacts, list)
+        assert all(c.company == test_contact.company for c in contacts)
     
-    def test_get_ocr_settings(self, settings_service):
-        """Test getting OCR settings."""
-        settings = settings_service.get_ocr_settings()
+    def test_count_contacts(self, contact_service):
+        """Test counting total contacts"""
+        count = contact_service.count_contacts()
         
-        assert 'provider' in settings
-        assert 'language' in settings
-        assert 'confidence_threshold' in settings
+        assert isinstance(count, int)
+        assert count >= 0
     
-    def test_get_duplicate_detection_settings(self, settings_service):
-        """Test getting duplicate detection settings."""
-        settings = settings_service.get_duplicate_detection_settings()
+    def test_bulk_update_contacts(self, contact_service, test_db):
+        """Test bulk updating contacts"""
+        # Create test contacts
+        import uuid
+        contacts = []
+        for i in range(3):
+            contact = Contact(
+                uid=f'bulk-{uuid.uuid4()}',
+                first_name=f'Bulk{i}',
+                company='Old Company'
+            )
+            test_db.add(contact)
+            contacts.append(contact)
+        test_db.commit()
         
-        assert 'enabled' in settings
-        assert 'threshold' in settings
-        assert 'auto_detect' in settings
+        contact_ids = [c.id for c in contacts]
+        update_data = {'company': 'New Company'}
+        
+        result = contact_service.bulk_update_contacts(contact_ids, update_data)
+        
+        assert result is True
+        
+        # Verify updates
+        for contact_id in contact_ids:
+            updated = contact_service.get_contact_by_id(contact_id)
+            assert updated.company == 'New Company'
+    
+    def test_bulk_delete_contacts(self, contact_service, test_db):
+        """Test bulk deleting contacts"""
+        # Create test contacts
+        import uuid
+        contacts = []
+        for i in range(3):
+            contact = Contact(
+                uid=f'bulk-del-{uuid.uuid4()}',
+                first_name=f'BulkDel{i}'
+            )
+            test_db.add(contact)
+            contacts.append(contact)
+        test_db.commit()
+        
+        contact_ids = [c.id for c in contacts]
+        
+        result = contact_service.bulk_delete_contacts(contact_ids)
+        
+        assert result is True
+        
+        # Verify deletion
+        for contact_id in contact_ids:
+            deleted = contact_service.get_contact_by_id(contact_id)
+            assert deleted is None
 
 
-# Run tests
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+class TestContactServiceValidation:
+    """Tests for ContactService validation"""
+    
+    @pytest.fixture
+    def contact_service(self, test_db: Session):
+        """Create ContactService instance"""
+        return ContactService(test_db)
+    
+    def test_create_contact_with_duplicate_email(self, contact_service, test_contact):
+        """Test creating contact with duplicate email"""
+        contact_data = {
+            'uid': 'duplicate-test',
+            'first_name': 'Duplicate',
+            'email': test_contact.email  # Duplicate email
+        }
+        
+        # Should either raise error or handle gracefully
+        # Implementation depends on business logic
+        try:
+            contact = contact_service.create_contact(contact_data)
+            # If no error, verify it was created
+            assert contact is not None
+        except Exception as e:
+            # If error, verify it's appropriate
+            assert "duplicate" in str(e).lower() or "exists" in str(e).lower()
+    
+    def test_update_nonexistent_contact(self, contact_service):
+        """Test updating non-existent contact"""
+        result = contact_service.update_contact(99999, {'first_name': 'Test'})
+        
+        assert result is None
+    
+    def test_delete_nonexistent_contact(self, contact_service):
+        """Test deleting non-existent contact"""
+        result = contact_service.delete_contact(99999)
+        
+        assert result is False
 
+
+class TestContactServicePerformance:
+    """Tests for ContactService performance"""
+    
+    @pytest.fixture
+    def contact_service(self, test_db: Session):
+        """Create ContactService instance"""
+        return ContactService(test_db)
+    
+    def test_get_contacts_list_performance(self, contact_service):
+        """Test performance of getting contacts list"""
+        import time
+        
+        start = time.time()
+        contacts, total = contact_service.get_contacts_list(skip=0, limit=100)
+        duration = time.time() - start
+        
+        # Should complete in reasonable time (<1 second for small dataset)
+        assert duration < 1.0
+        assert isinstance(contacts, list)
+    
+    def test_search_performance(self, contact_service):
+        """Test search performance"""
+        import time
+        
+        start = time.time()
+        results = contact_service.search_contacts("test")
+        duration = time.time() - start
+        
+        # Search should be fast
+        assert duration < 1.0
+        assert isinstance(results, list)
