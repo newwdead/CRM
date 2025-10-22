@@ -7,6 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import MainLayout from './components/routing/MainLayout';
 import NotFound from './components/routing/NotFound';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import LoginPage from './components/LoginPage';
@@ -132,8 +133,9 @@ function App() {
   }
 
   return (
-    <HelmetProvider>
-      <BrowserRouter>
+    <ErrorBoundary>
+      <HelmetProvider>
+        <BrowserRouter>
         <ScrollToTop />
         <Toaster position="top-right" />
         
@@ -203,8 +205,9 @@ function App() {
             }
           />
         </Routes>
-      </BrowserRouter>
-    </HelmetProvider>
+        </BrowserRouter>
+      </HelmetProvider>
+    </ErrorBoundary>
   );
 }
 
