@@ -523,3 +523,71 @@ def save_ocr_correction(
     
     return {'status': 'success', 'message': 'Correction saved for training'}
 
+
+@router.post('/{contact_id}/reprocess-ocr')
+def reprocess_contact_ocr(
+    contact_id: int,
+    blocks_data: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Reprocess OCR for a contact with updated block information.
+    Takes modified block positions/sizes and re-extracts contact fields.
+    """
+    from ..ocr_manager import OCRManager
+    import json
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.photo_path:
+        raise HTTPException(status_code=400, detail='Contact has no image')
+    
+    # Get blocks from request
+    blocks = blocks_data.get('blocks', [])
+    
+    # Combine all block texts
+    all_text = '\n'.join([block.get('text', '') for block in blocks])
+    
+    # Use OCR Manager to re-extract fields from combined text
+    ocr_manager = OCRManager()
+    
+    try:
+        # Extract structured data from the combined OCR text
+        extracted_data = ocr_manager.extract_contact_fields(all_text)
+        
+        # Update contact with new data (only non-empty fields)
+        for field, value in extracted_data.items():
+            if value and hasattr(contact, field):
+                setattr(contact, field, value)
+        
+        # Update OCR raw text
+        contact.ocr_raw = all_text
+        
+        db.commit()
+        db.refresh(contact)
+        
+        # Return updated contact data
+        return {
+            'id': contact.id,
+            'first_name': contact.first_name,
+            'last_name': contact.last_name,
+            'middle_name': contact.middle_name,
+            'company': contact.company,
+            'position': contact.position,
+            'email': contact.email,
+            'phone': contact.phone,
+            'phone_mobile': contact.phone_mobile,
+            'phone_work': contact.phone_work,
+            'phone_additional': contact.phone_additional,
+            'address': contact.address,
+            'address_additional': contact.address_additional,
+            'website': contact.website
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reprocessing OCR for contact {contact_id}: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to reprocess OCR: {str(e)}')
+

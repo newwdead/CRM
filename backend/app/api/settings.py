@@ -229,35 +229,177 @@ async def get_integrations_status(
         setting = db.query(AppSetting).filter(AppSetting.key == key).first()
         return setting.value if setting else default
     
+    # Check Redis connection
+    redis_configured = False
+    redis_connection_ok = None
+    try:
+        import redis
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        r = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=1)
+        r.ping()
+        redis_configured = True
+        redis_connection_ok = True
+    except:
+        redis_configured = bool(os.getenv("REDIS_HOST"))
+        redis_connection_ok = False if redis_configured else None
+    
+    # Check Celery
+    celery_configured = bool(os.getenv("CELERY_BROKER_URL"))
+    
+    # Check Auth settings
+    auth_configured = bool(os.getenv("SECRET_KEY") and os.getenv("ALGORITHM"))
+    
+    # Check Backup settings
+    backup_configured = bool(get_integration_setting("backup.path") or os.getenv("BACKUP_PATH"))
+    
+    # Check Monitoring
+    prometheus_configured = bool(os.getenv("PROMETHEUS_ENABLED", "true") == "true")
+    
     return {
         "integrations": [
             {
+                "id": "ocr",
+                "name": "OCR Recognition",
+                "description": "Business card text recognition using multiple providers",
+                "enabled": True,
+                "configured": bool(os.getenv("GOOGLE_VISION_API_KEY") or os.getenv("PARSIO_API_KEY")),
+                "status": "active",
+                "connection_ok": True,
+                "config": {
+                    "default_provider": get_integration_setting("ocr.default_provider", "auto"),
+                    "google_vision_key": "***" if os.getenv("GOOGLE_VISION_API_KEY") else "",
+                    "parsio_key": "***" if os.getenv("PARSIO_API_KEY") else "",
+                    "tesseract_enabled": "true"
+                },
+                "config_summary": {
+                    "Provider": get_integration_setting("ocr.default_provider", "auto"),
+                    "Tesseract": "✅",
+                    "Google Vision": "✅" if os.getenv("GOOGLE_VISION_API_KEY") else "❌",
+                    "Parsio": "✅" if os.getenv("PARSIO_API_KEY") else "❌"
+                }
+            },
+            {
                 "id": "telegram",
                 "name": "Telegram Bot",
+                "description": "Receive business cards via Telegram bot",
                 "enabled": get_integration_setting("telegram.enabled", "false") == "true",
                 "configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
                 "status": "active" if get_integration_setting("telegram.enabled") == "true" else "inactive",
+                "connection_ok": bool(os.getenv("TELEGRAM_BOT_TOKEN")) if get_integration_setting("telegram.enabled") == "true" else None,
+                "config": {
+                    "bot_token": "***" if os.getenv("TELEGRAM_BOT_TOKEN") else "",
+                    "webhook_url": get_integration_setting("telegram.webhook_url", "")
+                },
+                "config_summary": {
+                    "Bot": "Configured" if os.getenv("TELEGRAM_BOT_TOKEN") else "Not configured"
+                }
             },
             {
                 "id": "whatsapp",
                 "name": "WhatsApp Business",
+                "description": "Receive business cards via WhatsApp Business",
                 "enabled": get_integration_setting("whatsapp.enabled", "false") == "true",
                 "configured": bool(get_integration_setting("WHATSAPP_API_TOKEN")),
                 "status": "active" if get_integration_setting("whatsapp.enabled") == "true" else "inactive",
+                "connection_ok": bool(get_integration_setting("WHATSAPP_API_TOKEN")) if get_integration_setting("whatsapp.enabled") == "true" else None,
+                "config": {
+                    "api_token": "***" if get_integration_setting("WHATSAPP_API_TOKEN") else "",
+                    "phone_number": get_integration_setting("whatsapp.phone_number", "")
+                },
+                "config_summary": {
+                    "API": "Configured" if get_integration_setting("WHATSAPP_API_TOKEN") else "Not configured"
+                }
             },
             {
-                "id": "google_vision",
-                "name": "Google Vision OCR",
+                "id": "auth",
+                "name": "Authentication",
+                "description": "User authentication and authorization settings",
                 "enabled": True,
-                "configured": bool(get_integration_setting("GOOGLE_VISION_API_KEY")),
-                "status": "available",
+                "configured": auth_configured,
+                "status": "active",
+                "connection_ok": auth_configured,
+                "config": {
+                    "secret_key": "***" if os.getenv("SECRET_KEY") else "",
+                    "algorithm": os.getenv("ALGORITHM", "HS256"),
+                    "access_token_expire": os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080")
+                },
+                "config_summary": {
+                    "Algorithm": os.getenv("ALGORITHM", "HS256"),
+                    "Token Expire": f"{os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '10080')} min"
+                }
             },
             {
-                "id": "parsio",
-                "name": "Parsio OCR",
-                "enabled": True,
-                "configured": bool(get_integration_setting("PARSIO_API_KEY")),
-                "status": "available",
+                "id": "backup",
+                "name": "Backup & Recovery",
+                "description": "Automatic database backup configuration",
+                "enabled": get_integration_setting("backup.enabled", "true") == "true",
+                "configured": backup_configured,
+                "status": "active" if get_integration_setting("backup.enabled") == "true" else "inactive",
+                "connection_ok": backup_configured if get_integration_setting("backup.enabled") == "true" else None,
+                "config": {
+                    "backup_path": get_integration_setting("backup.path", os.getenv("BACKUP_PATH", "/backups")),
+                    "schedule": get_integration_setting("backup.schedule", "daily"),
+                    "retention_days": get_integration_setting("backup.retention", "30")
+                },
+                "config_summary": {
+                    "Schedule": get_integration_setting("backup.schedule", "daily"),
+                    "Retention": f"{get_integration_setting('backup.retention', '30')} days"
+                }
+            },
+            {
+                "id": "monitoring",
+                "name": "Monitoring",
+                "description": "Prometheus and Grafana monitoring",
+                "enabled": prometheus_configured,
+                "configured": True,
+                "status": "active" if prometheus_configured else "inactive",
+                "connection_ok": True,
+                "config": {
+                    "prometheus_enabled": str(prometheus_configured),
+                    "prometheus_port": os.getenv("PROMETHEUS_PORT", "9090"),
+                    "grafana_port": os.getenv("GRAFANA_PORT", "3001")
+                },
+                "config_summary": {
+                    "Prometheus": f"Port {os.getenv('PROMETHEUS_PORT', '9090')}",
+                    "Grafana": f"Port {os.getenv('GRAFANA_PORT', '3001')}"
+                }
+            },
+            {
+                "id": "celery",
+                "name": "Background Tasks",
+                "description": "Asynchronous task processing (OCR, exports, etc)",
+                "enabled": celery_configured,
+                "configured": celery_configured,
+                "status": "active" if celery_configured else "inactive",
+                "connection_ok": celery_configured,
+                "config": {
+                    "broker_url": "***" if os.getenv("CELERY_BROKER_URL") else "",
+                    "result_backend": "***" if os.getenv("CELERY_RESULT_BACKEND") else "",
+                    "workers": get_integration_setting("celery.workers", "2")
+                },
+                "config_summary": {
+                    "Broker": "Redis" if "redis" in os.getenv("CELERY_BROKER_URL", "") else "Not configured",
+                    "Workers": get_integration_setting("celery.workers", "2")
+                }
+            },
+            {
+                "id": "redis",
+                "name": "Redis Cache",
+                "description": "In-memory cache for OCR results and sessions",
+                "enabled": redis_configured,
+                "configured": redis_configured,
+                "status": "active" if redis_configured else "inactive",
+                "connection_ok": redis_connection_ok,
+                "config": {
+                    "host": os.getenv("REDIS_HOST", "localhost"),
+                    "port": os.getenv("REDIS_PORT", "6379"),
+                    "db": os.getenv("REDIS_DB", "0")
+                },
+                "config_summary": {
+                    "Host": os.getenv("REDIS_HOST", "localhost"),
+                    "Port": os.getenv("REDIS_PORT", "6379")
+                }
             }
         ]
     }
@@ -273,7 +415,7 @@ async def toggle_integration(
     """
     Enable or disable an integration (admin only).
     """
-    valid_integrations = ["telegram", "whatsapp", "google_vision", "parsio"]
+    valid_integrations = ["telegram", "whatsapp", "ocr", "auth", "backup", "monitoring", "celery", "redis"]
     
     if integration_id not in valid_integrations:
         raise HTTPException(
@@ -310,7 +452,7 @@ async def test_integration(
     """
     Test an integration connection (admin only).
     """
-    valid_integrations = ["telegram", "whatsapp", "google_vision", "parsio"]
+    valid_integrations = ["telegram", "whatsapp", "ocr", "auth", "backup", "monitoring", "celery", "redis"]
     
     if integration_id not in valid_integrations:
         raise HTTPException(

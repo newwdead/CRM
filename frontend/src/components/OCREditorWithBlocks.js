@@ -15,6 +15,10 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const [assigningToField, setAssigningToField] = useState(null);
   const [language, setLanguage] = useState(localStorage.getItem('language') || 'ru');
   const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [editBlockMode, setEditBlockMode] = useState(false);
+  const [draggingBlock, setDraggingBlock] = useState(null);
+  const [resizingBlock, setResizingBlock] = useState(null);
+  const [reprocessing, setReprocessing] = useState(false);
   
   const imageRef = useRef(null);
   const [imageScale, setImageScale] = useState(1);
@@ -34,6 +38,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
       multiSelectMode: 'Multi-select mode',
       multiSelectHint: 'Hold Ctrl to select multiple blocks',
       noBlocks: 'No text blocks detected',
+      editBlocks: 'Edit Blocks',
+      reprocessOCR: 'Re-run OCR',
+      reprocessing: 'Re-processing...',
+      reprocessSuccess: 'OCR re-processed successfully',
+      reprocessError: 'Failed to re-process OCR',
+      editModeHint: 'Drag blocks to move, drag corners to resize',
       fields: {
         first_name: 'First Name',
         last_name: 'Last Name',
@@ -74,6 +84,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
       multiSelectMode: 'Режим мультивыбора',
       multiSelectHint: 'Удерживайте Ctrl для выбора нескольких блоков',
       noBlocks: 'Текстовые блоки не обнаружены',
+      editBlocks: 'Редактировать блоки',
+      reprocessOCR: 'Повторить OCR',
+      reprocessing: 'Обработка...',
+      reprocessSuccess: 'OCR успешно перезапущен',
+      reprocessError: 'Ошибка при повторной обработке',
+      editModeHint: 'Перетаскивайте блоки для перемещения, углы для изменения размера',
       fields: {
         first_name: 'Имя',
         last_name: 'Фамилия',
@@ -254,6 +270,83 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     }));
   };
 
+  const handleReprocessOCR = async () => {
+    setReprocessing(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Send updated blocks to backend
+      const response = await fetch(`/api/contacts/${contact.id}/reprocess-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          blocks: ocrBlocks.lines.map(line => ({
+            text: line.text,
+            box: line.box,
+            confidence: line.confidence
+          }))
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to reprocess OCR');
+
+      const data = await response.json();
+      
+      // Update contact data with new OCR results
+      Object.keys(data).forEach(key => {
+        if (editableFields.includes(key)) {
+          setEditedData(prev => ({
+            ...prev,
+            [key]: data[key] || prev[key]
+          }));
+        }
+      });
+      
+      toast.success(t.reprocessSuccess);
+      
+      // Reload OCR blocks
+      await loadOCRBlocks();
+      
+    } catch (error) {
+      console.error('Error reprocessing OCR:', error);
+      toast.error(t.reprocessError);
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  const handleBlockDragStart = (block, event) => {
+    if (!editBlockMode) return;
+    event.stopPropagation();
+    setDraggingBlock(block);
+  };
+
+  const handleBlockDrag = (event) => {
+    if (!draggingBlock || !editBlockMode) return;
+    
+    const container = imageRef.current.parentElement;
+    const rect = container.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / imageScale;
+    const y = (event.clientY - rect.top) / imageScale;
+    
+    // Update block position
+    setOcrBlocks(prev => ({
+      ...prev,
+      lines: prev.lines.map(line => 
+        line === draggingBlock
+          ? { ...line, box: { ...line.box, x, y } }
+          : line
+      )
+    }));
+  };
+
+  const handleBlockDragEnd = () => {
+    setDraggingBlock(null);
+  };
+
   const handleSave = async () => {
     // Check if there are any changes
     const hasChanges = editableFields.some(
@@ -377,7 +470,7 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
             {t.subtitle}
           </p>
           <div style={{
-            margin: '0 0 15px 0',
+            margin: '0 0 10px 0',
             padding: '8px 12px',
             fontSize: '12px',
             color: '#fbbf24',
@@ -385,7 +478,51 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
             border: '1px solid rgba(251, 191, 36, 0.3)',
             borderRadius: '6px'
           }}>
-            💡 {t.multiSelectHint}
+            💡 {editBlockMode ? t.editModeHint : t.multiSelectHint}
+          </div>
+          
+          {/* Block editing controls */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '15px'
+          }}>
+            <button
+              onClick={() => setEditBlockMode(!editBlockMode)}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                backgroundColor: editBlockMode ? '#10b981' : '#3b82f6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {editBlockMode ? '✅ ' : '✏️ '}{t.editBlocks}
+            </button>
+            <button
+              onClick={handleReprocessOCR}
+              disabled={reprocessing}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                backgroundColor: reprocessing ? '#9ca3af' : '#f59e0b',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: reprocessing ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                opacity: reprocessing ? 0.6 : 1
+              }}
+            >
+              {reprocessing ? '⏳ ' + t.reprocessing : '🔄 ' + t.reprocessOCR}
+            </button>
           </div>
           
           {imageUrl && ocrBlocks && (
@@ -439,14 +576,15 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                           y={box.y * imageScale}
                           width={box.width * imageScale}
                           height={box.height * imageScale}
-                          fill={isSelected ? 'rgba(251, 191, 36, 0.3)' : 'rgba(59, 130, 246, 0.2)'}
-                          stroke={isSelected ? '#fbbf24' : '#3b82f6'}
-                          strokeWidth={isSelected ? 3 : 1}
+                          fill={isSelected ? 'rgba(251, 191, 36, 0.3)' : editBlockMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
+                          stroke={isSelected ? '#fbbf24' : editBlockMode ? '#10b981' : '#3b82f6'}
+                          strokeWidth={isSelected ? 3 : editBlockMode ? 2 : 1}
                           style={{
                             pointerEvents: 'auto',
-                            cursor: 'pointer'
+                            cursor: editBlockMode ? 'move' : 'pointer'
                           }}
-                          onClick={(e) => handleBlockClick(line, e)}
+                          onClick={(e) => !editBlockMode && handleBlockClick(line, e)}
+                          onMouseDown={(e) => editBlockMode && handleBlockDragStart(line, e)}
                         />
                         <text
                           x={box.x * imageScale + 5}

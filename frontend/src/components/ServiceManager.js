@@ -94,7 +94,7 @@ const ServiceManager = () => {
   const fetchServicesStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/services/status', {
+      const response = await fetch('/services/status', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -117,7 +117,7 @@ const ServiceManager = () => {
     const toastId = toast.loading(t.messages.restarting);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/services/${serviceName}/restart`, {
+      const response = await fetch(`/services/${serviceName}/restart`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -145,7 +145,7 @@ const ServiceManager = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/services/logs/${serviceName}?lines=200`, {
+      const response = await fetch(`/services/${serviceName}/logs?lines=200`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
