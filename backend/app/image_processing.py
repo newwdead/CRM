@@ -298,16 +298,21 @@ def process_business_card_image(image_bytes: bytes,
         
         # Step 2: Process each card
         processed_cards = []
-        for card_bytes in cards:
-            # Auto-crop if enabled
+        for idx, card_bytes in enumerate(cards):
+            # Auto-crop if enabled (skip for multi-cards as they're already cropped)
             if auto_crop and len(cards) == 1:  # Only crop if single card
                 card_bytes = auto_crop_card(card_bytes)
+                logger.info(f"Applied auto-crop to single card")
+            elif len(cards) > 1:
+                logger.info(f"Card {idx+1}/{len(cards)}: Already cropped during detection")
             
             # Enhance if enabled
             if enhance:
                 card_bytes = enhance_image_for_ocr(card_bytes)
             
             processed_cards.append(card_bytes)
+        
+        logger.info(f"Processed {len(processed_cards)} card(s) for OCR")
         
         return processed_cards
         

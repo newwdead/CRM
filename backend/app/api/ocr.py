@@ -55,7 +55,7 @@ def get_ocr_providers():
 
 
 def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str, 
-                       provider: str, filename: str, db: Session) -> Optional[dict]:
+                       provider: str, filename: str, db: Session, user_id: int = None) -> Optional[dict]:
     """
     Process a single business card image (QR + OCR).
     Returns contact data dict or None on failure.
@@ -135,6 +135,8 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         data['thumbnail_path'] = thumbnail_name
         data['ocr_raw'] = raw_json
         data['recognition_method'] = recognition_method
+        if user_id:
+            data['user_id'] = user_id
         
         # Save to database
         contact = Contact(**data)
@@ -224,17 +226,26 @@ async def upload_card(
                 card_thumbnail_name = os.path.basename(card_thumbnail_path)
                 
                 # Process card (QR + OCR)
-                card_data = process_single_card(
-                    card_bytes, 
-                    card_safe_name, 
-                    card_thumbnail_name,
-                    provider, 
-                    file.filename,
-                    db
-                )
-                
-                if card_data:
-                    created_contacts.append(card_data)
+                try:
+                    card_data = process_single_card(
+                        card_bytes, 
+                        card_safe_name, 
+                        card_thumbnail_name,
+                        provider, 
+                        file.filename,
+                        db,
+                        user_id=current_user.id
+                    )
+                    
+                    if card_data:
+                        created_contacts.append(card_data)
+                        logger.info(f"Successfully processed card {idx + 1}: Contact ID {card_data.get('id')}")
+                    else:
+                        logger.warning(f"Card {idx + 1} processing returned no data")
+                except Exception as card_error:
+                    logger.error(f"Error processing card {idx + 1}: {card_error}")
+                    # Continue with other cards even if one fails
+                    continue
             
             # Update metrics
             contacts_created_counter.inc(len(created_contacts))
@@ -265,7 +276,8 @@ async def upload_card(
             thumbnail_name,
             provider,
             file.filename,
-            db
+            db,
+            user_id=current_user.id
         )
         
         if not contact_dict:

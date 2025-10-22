@@ -137,8 +137,17 @@ async def get_services_status(
                     else:
                         exited_count += 1
         
+        # Categorize services for frontend
+        categorized = {}
+        for service in services:
+            cat = service['category']
+            if cat not in categorized:
+                categorized[cat] = []
+            categorized[cat].append(service)
+        
         return {
             'services': services,
+            'categorized': categorized,
             'stats': {
                 'total': len(services),
                 'running': running_count,
