@@ -123,6 +123,28 @@ class AuditRepository:
             desc(AuditLog.timestamp)
         ).all()
     
+    def get_recent_logs(
+        self,
+        limit: int = 100,
+        entity_type: Optional[str] = None
+    ) -> List[AuditLog]:
+        """
+        Get recent audit logs with optional entity type filter.
+        
+        Args:
+            limit: Maximum number of records to return
+            entity_type: Optional filter by entity type
+        
+        Returns:
+            List of AuditLog instances
+        """
+        query = self.db.query(AuditLog)
+        
+        if entity_type:
+            query = query.filter(AuditLog.entity_type == entity_type)
+        
+        return query.order_by(desc(AuditLog.timestamp)).limit(limit).all()
+    
     def get_audit_logs_by_date_range(
         self, 
         start_date: datetime, 

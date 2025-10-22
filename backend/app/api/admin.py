@@ -31,13 +31,14 @@ def get_recent_audit_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_utils.get_current_admin_user)
 ):
-    """Get recent audit logs (admin only)."""
-    query = db.query(AuditLog)
+    """
+    Get recent audit logs (admin only).
+    Uses AuditRepository
+    """
+    from ..repositories import AuditRepository
+    audit_repo = AuditRepository(db)
     
-    if entity_type:
-        query = query.filter(AuditLog.entity_type == entity_type)
-    
-    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    logs = audit_repo.get_recent_logs(limit=limit, entity_type=entity_type)
     
     return logs
 
@@ -51,14 +52,23 @@ def get_statistics_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_utils.get_current_active_user)
 ):
-    """Get overall statistics and analytics."""
-    # Total counts
-    total_contacts = db.query(Contact).count()
+    """
+    Get overall statistics and analytics.
+    Uses ContactRepository and UserRepository for counts
+    """
+    from ..repositories import ContactRepository, UserRepository
+    contact_repo = ContactRepository(db)
+    user_repo = UserRepository(db)
+    
+    # Total counts - using repositories
+    total_contacts = contact_repo.count()
+    total_users = user_repo.count()
+    
+    # Tags and Groups - keeping direct queries for now (no repositories yet)
     total_tags = db.query(Tag).count()
     total_groups = db.query(Group).count()
-    total_users = db.query(User).count()
     
-    # Contacts with contact info
+    # Contacts with contact info - keeping direct queries for complex filters
     with_email = db.query(Contact).filter(Contact.email.isnot(None), Contact.email != '').count()
     with_phone = db.query(Contact).filter(Contact.phone.isnot(None), Contact.phone != '').count()
     with_photo = db.query(Contact).filter(Contact.photo_path.isnot(None), Contact.photo_path != '').count()
