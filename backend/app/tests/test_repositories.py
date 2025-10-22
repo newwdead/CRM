@@ -34,7 +34,7 @@ class TestContactRepository:
             'company': 'Test Company'
         }
         
-        contact = repo.create_contact(contact_data)
+        contact = repo.create(contact_data)
         repo.commit()
         
         assert contact.id is not None
@@ -45,7 +45,7 @@ class TestContactRepository:
         """Test getting contact by ID"""
         repo = ContactRepository(db)
         
-        found = repo.get_contact_by_id(test_contact.id)
+        found = repo.find_by_id(test_contact.id)
         
         assert found is not None
         assert found.id == test_contact.id
@@ -55,7 +55,7 @@ class TestContactRepository:
         """Test getting contact by UID"""
         repo = ContactRepository(db)
         
-        found = repo.get_contact_by_uid(test_contact.uid)
+        found = repo.find_by_uid(test_contact.uid)
         
         assert found is not None
         assert found.uid == test_contact.uid
@@ -64,7 +64,7 @@ class TestContactRepository:
         """Test updating a contact"""
         repo = ContactRepository(db)
         
-        updated = repo.update_contact(test_contact, {'first_name': 'Jane'})
+        updated = repo.update(test_contact, {'first_name': 'Jane'})
         repo.commit()
         
         assert updated.first_name == 'Jane'
@@ -74,17 +74,17 @@ class TestContactRepository:
         repo = ContactRepository(db)
         
         contact_id = test_contact.id
-        repo.delete_contact(test_contact)
+        repo.delete(test_contact)
         repo.commit()
         
-        found = repo.get_contact_by_id(contact_id)
+        found = repo.find_by_id(contact_id)
         assert found is None
     
     def test_count_contacts(self, db: Session, test_contact: Contact):
         """Test counting contacts"""
         repo = ContactRepository(db)
         
-        count = repo.count_contacts()
+        count = repo.count()
         assert count >= 1
     
     def test_search_and_filter_contacts(self, db: Session, test_contact: Contact):
@@ -92,12 +92,12 @@ class TestContactRepository:
         repo = ContactRepository(db)
         
         # Search by name
-        results = repo.search_and_filter_contacts(q=test_contact.first_name)
+        results = repo.search(query=test_contact.first_name)
         assert len(results) >= 1
         assert any(c.id == test_contact.id for c in results)
         
         # Filter by company
-        results = repo.search_and_filter_contacts(company=test_contact.company)
+        results = repo.filter_by(company=test_contact.company)
         assert len(results) >= 1
 
 
