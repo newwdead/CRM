@@ -80,11 +80,21 @@ async def get_services_status(
                 elif service_name in ['prometheus', 'grafana']:
                     category = 'monitoring'
                 
+                # Format ports properly
+                publishers = service_data.get('Publishers', [])
+                ports_str = ''
+                if publishers and isinstance(publishers, list):
+                    try:
+                        ports_str = ', '.join([f"{p.get('PublishedPort', '')}:{p.get('TargetPort', '')}" for p in publishers if isinstance(p, dict)])
+                    except:
+                        ports_str = str(publishers)
+                
                 services.append({
                     'name': service_name,
+                    'state': state.lower(),  # Changed from 'status' to 'state' for consistency
                     'status': state.lower(),
                     'category': category,
-                    'ports': service_data.get('Publishers', []),
+                    'ports': ports_str,
                     'image': service_data.get('Image', ''),
                     'created': service_data.get('CreatedAt', ''),
                     'running_for': service_data.get('RunningFor', '')

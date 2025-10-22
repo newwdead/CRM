@@ -365,17 +365,28 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const handleBlockDrag = (event) => {
     if (!draggingBlock || !editBlockMode) return;
     
-    const container = imageRef.current.parentElement;
+    const container = imageRef.current;
+    if (!container) return;
+    
     const rect = container.getBoundingClientRect();
+    
+    // Calculate new position relative to image
     const x = (event.clientX - rect.left) / imageScale;
     const y = (event.clientY - rect.top) / imageScale;
     
-    // Update block position
+    // Update block position (keeping width and height)
     setOcrBlocks(prev => ({
       ...prev,
       lines: prev.lines.map(line => 
         line === draggingBlock
-          ? { ...line, box: { ...line.box, x, y } }
+          ? { 
+              ...line, 
+              box: { 
+                ...line.box, 
+                x: Math.max(0, Math.min(x, prev.image_width - line.box.width)),
+                y: Math.max(0, Math.min(y, prev.image_height - line.box.height))
+              } 
+            }
           : line
       )
     }));
