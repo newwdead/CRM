@@ -5,7 +5,7 @@ Handles all database operations for OCR-related models.
 
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-from ..models.ocr import OCRTrainingData
+from ..models.ocr import OCRCorrection
 
 
 class OCRRepository:
@@ -20,7 +20,7 @@ class OCRRepository:
         """
         self.db = db
     
-    def get_training_data_by_id(self, training_id: int) -> Optional[OCRTrainingData]:
+    def get_training_data_by_id(self, training_id: int) -> Optional[OCRCorrection]:
         """
         Get OCR training data by ID.
         
@@ -28,11 +28,11 @@ class OCRRepository:
             training_id: Training data ID
         
         Returns:
-            OCRTrainingData instance or None
+            OCRCorrection instance or None
         """
-        return self.db.query(OCRTrainingData).filter(OCRTrainingData.id == training_id).first()
+        return self.db.query(OCRCorrection).filter(OCRCorrection.id == training_id).first()
     
-    def get_all_training_data(self, skip: int = 0, limit: int = 100) -> List[OCRTrainingData]:
+    def get_all_training_data(self, skip: int = 0, limit: int = 100) -> List[OCRCorrection]:
         """
         Get all training data with pagination.
         
@@ -41,11 +41,11 @@ class OCRRepository:
             limit: Maximum number of records to return
         
         Returns:
-            List of OCRTrainingData instances
+            List of OCRCorrection instances
         """
-        return self.db.query(OCRTrainingData).offset(skip).limit(limit).all()
+        return self.db.query(OCRCorrection).offset(skip).limit(limit).all()
     
-    def get_training_data_by_contact(self, contact_id: int) -> List[OCRTrainingData]:
+    def get_training_data_by_contact(self, contact_id: int) -> List[OCRCorrection]:
         """
         Get training data for a specific contact.
         
@@ -53,24 +53,24 @@ class OCRRepository:
             contact_id: Contact ID
         
         Returns:
-            List of OCRTrainingData instances
+            List of OCRCorrection instances
         """
-        return self.db.query(OCRTrainingData).filter(
-            OCRTrainingData.contact_id == contact_id
+        return self.db.query(OCRCorrection).filter(
+            OCRCorrection.contact_id == contact_id
         ).all()
     
-    def get_validated_training_data(self) -> List[OCRTrainingData]:
+    def get_validated_training_data(self) -> List[OCRCorrection]:
         """
         Get all validated training data.
         
         Returns:
-            List of validated OCRTrainingData instances
+            List of validated OCRCorrection instances
         """
-        return self.db.query(OCRTrainingData).filter(
-            OCRTrainingData.validated == True
+        return self.db.query(OCRCorrection).filter(
+            OCRCorrection.validated == True
         ).all()
     
-    def create_training_data(self, training_data: Dict[str, Any]) -> OCRTrainingData:
+    def create_training_data(self, training_data: Dict[str, Any]) -> OCRCorrection:
         """
         Create new OCR training data.
         
@@ -78,27 +78,27 @@ class OCRRepository:
             training_data: Dictionary with training data
         
         Returns:
-            Created OCRTrainingData instance
+            Created OCRCorrection instance
         """
-        ocr_data = OCRTrainingData(**training_data)
+        ocr_data = OCRCorrection(**training_data)
         self.db.add(ocr_data)
         self.db.flush()
         return ocr_data
     
     def update_training_data(
         self, 
-        training_data: OCRTrainingData, 
+        training_data: OCRCorrection, 
         update_data: Dict[str, Any]
-    ) -> OCRTrainingData:
+    ) -> OCRCorrection:
         """
         Update OCR training data.
         
         Args:
-            training_data: OCRTrainingData instance to update
+            training_data: OCRCorrection instance to update
             update_data: Dictionary with fields to update
         
         Returns:
-            Updated OCRTrainingData instance
+            Updated OCRCorrection instance
         """
         for key, value in update_data.items():
             if hasattr(training_data, key):
@@ -106,7 +106,7 @@ class OCRRepository:
         self.db.add(training_data)
         return training_data
     
-    def mark_as_validated(self, training_id: int) -> OCRTrainingData:
+    def mark_as_validated(self, training_id: int) -> OCRCorrection:
         """
         Mark training data as validated.
         
@@ -114,7 +114,7 @@ class OCRRepository:
             training_id: Training data ID
         
         Returns:
-            Updated OCRTrainingData instance
+            Updated OCRCorrection instance
         """
         training_data = self.get_training_data_by_id(training_id)
         if training_data:
@@ -122,12 +122,12 @@ class OCRRepository:
             self.db.add(training_data)
         return training_data
     
-    def delete_training_data(self, training_data: OCRTrainingData) -> None:
+    def delete_training_data(self, training_data: OCRCorrection) -> None:
         """
         Delete OCR training data.
         
         Args:
-            training_data: OCRTrainingData instance to delete
+            training_data: OCRCorrection instance to delete
         """
         self.db.delete(training_data)
     
@@ -141,8 +141,8 @@ class OCRRepository:
         Returns:
             Number of deleted records
         """
-        count = self.db.query(OCRTrainingData).filter(
-            OCRTrainingData.contact_id == contact_id
+        count = self.db.query(OCRCorrection).filter(
+            OCRCorrection.contact_id == contact_id
         ).delete()
         return count
     
@@ -153,7 +153,7 @@ class OCRRepository:
         Returns:
             Total count
         """
-        return self.db.query(OCRTrainingData).count()
+        return self.db.query(OCRCorrection).count()
     
     def count_validated_training_data(self) -> int:
         """
@@ -162,8 +162,8 @@ class OCRRepository:
         Returns:
             Count of validated training data
         """
-        return self.db.query(OCRTrainingData).filter(
-            OCRTrainingData.validated == True
+        return self.db.query(OCRCorrection).filter(
+            OCRCorrection.validated == True
         ).count()
     
     def commit(self) -> None:
