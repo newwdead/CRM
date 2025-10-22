@@ -3,7 +3,7 @@ Contacts API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 import logging
 import os
