@@ -121,15 +121,15 @@ class TestDuplicateRepository:
         duplicate_data = {
             'contact_id_1': test_contact.id,
             'contact_id_2': contact2.id,
-            'similarity': 0.85,
-            'match_type': 'name'
+            'similarity_score': 0.85,
+            'status': 'pending'
         }
         
         duplicate = repo.create_duplicate(duplicate_data)
         repo.commit()
         
         assert duplicate.id is not None
-        assert duplicate.similarity == 0.85
+        assert duplicate.similarity_score == 0.85
     
     def test_get_duplicates_for_contact(self, db: Session, test_contact: Contact):
         """Test getting duplicates for a contact"""
@@ -157,15 +157,16 @@ class TestDuplicateRepository:
         dup = repo.create_duplicate({
             'contact_id_1': test_contact.id,
             'contact_id_2': contact2.id,
-            'similarity': 0.9
+            'similarity_score': 0.9,
+            'status': 'pending'
         })
         repo.commit()
         
-        # Mark as resolved
-        resolved = repo.mark_as_resolved(dup.id)
+        # Mark as resolved using update method
+        resolved = repo.update_duplicate(dup, {'status': 'reviewed'})
         repo.commit()
         
-        assert resolved.resolved is True
+        assert resolved.status == 'reviewed'
 
 
 class TestUserRepository:
@@ -234,93 +235,81 @@ class TestOCRRepository:
     """Tests for OCRRepository"""
     
     def test_create_training_data(self, db: Session, test_contact: Contact):
-        """Test creating OCR training data"""
+        """Test creating OCR correction data"""
         repo = OCRRepository(db)
         
-        training_data = {
+        correction_data = {
             'contact_id': test_contact.id,
             'original_text': 'John Doe',
             'corrected_text': 'John Doe',
-            'field_name': 'full_name',
-            'validated': False
+            'field_name': 'full_name'
         }
         
-        ocr_data = repo.create_training_data(training_data)
+        ocr_data = repo.create_ocr_correction(correction_data)
         repo.commit()
         
         assert ocr_data.id is not None
         assert ocr_data.original_text == 'John Doe'
     
     def test_get_training_data_by_contact(self, db: Session, test_contact: Contact):
-        """Test getting training data by contact"""
+        """Test getting OCR corrections by contact"""
         repo = OCRRepository(db)
         
-        # Create training data
-        repo.create_training_data({
+        # Create correction data
+        repo.create_ocr_correction({
             'contact_id': test_contact.id,
             'original_text': 'Test',
             'corrected_text': 'Test',
-            'field_name': 'name',
-            'validated': False
+            'field_name': 'name'
         })
         repo.commit()
         
-        data = repo.get_training_data_by_contact(test_contact.id)
+        data = repo.get_corrections_for_contact(test_contact.id)
         assert isinstance(data, list)
         assert len(data) >= 1
     
     def test_mark_as_validated(self, db: Session, test_contact: Contact):
-        """Test marking training data as validated"""
+        """Test updating OCR correction"""
         repo = OCRRepository(db)
         
-        training = repo.create_training_data({
+        correction = repo.create_ocr_correction({
             'contact_id': test_contact.id,
             'original_text': 'Test',
-            'corrected_text': 'Test',
-            'field_name': 'name',
-            'validated': False
+            'corrected_text': 'Test Corrected',
+            'field_name': 'name'
         })
         repo.commit()
         
-        validated = repo.mark_as_validated(training.id)
+        # Update correction
+        updated = repo.update_ocr_correction(correction, {'corrected_text': 'Final Text'})
         repo.commit()
         
-        assert validated.validated is True
+        assert updated.corrected_text == 'Final Text'
 
 
 class TestSettingsRepository:
     """Tests for SettingsRepository"""
     
     def test_create_setting(self, db: Session):
-        """Test creating a setting"""
+        """Test creating an app setting"""
         repo = SettingsRepository(db)
         
-        setting_data = {
-            'key': 'test_setting',
-            'value': 'test_value',
-            'category': 'general'
-        }
-        
-        setting = repo.create_setting(setting_data)
+        setting = repo.create_app_setting('test_setting', 'test_value')
         repo.commit()
         
-        assert setting.id is not None
         assert setting.key == 'test_setting'
+        assert setting.value == 'test_value'
     
     def test_get_setting_by_key(self, db: Session):
         """Test getting setting by key"""
         repo = SettingsRepository(db)
         
         # Create setting
-        repo.create_setting({
-            'key': 'find_me_key',
-            'value': 'find_me_value',
-            'category': 'test'
-        })
+        repo.create_app_setting('find_me_key', 'find_me_value')
         repo.commit()
         
         # Find setting
-        found = repo.get_setting_by_key('find_me_key')
+        found = repo.get_app_setting('find_me_key')
         assert found is not None
         assert found.value == 'find_me_value'
     
@@ -328,14 +317,12 @@ class TestSettingsRepository:
         """Test updating setting value"""
         repo = SettingsRepository(db)
         
-        setting = repo.create_setting({
-            'key': 'update_me',
-            'value': 'old_value',
-            'category': 'test'
-        })
+        # Create setting
+        repo.create_app_setting('update_me', 'old_value')
         repo.commit()
         
-        updated = repo.update_setting_value('update_me', 'new_value')
+        # Update setting
+        updated = repo.update_app_setting('update_me', 'new_value')
         repo.commit()
         
         assert updated.value == 'new_value'
