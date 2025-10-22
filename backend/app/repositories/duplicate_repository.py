@@ -22,7 +22,7 @@ class DuplicateRepository:
         """
         self.db = db
     
-    def get_duplicate_by_id(self, duplicate_id: int) -> Optional[DuplicateContactContact]:
+    def get_duplicate_by_id(self, duplicate_id: int) -> Optional[DuplicateContact]:
         """
         Get duplicate by ID.
         
@@ -30,11 +30,11 @@ class DuplicateRepository:
             duplicate_id: DuplicateContact ID
         
         Returns:
-            DuplicateContactContact instance or None
+            DuplicateContact instance or None
         """
-        return self.db.query(DuplicateContactContact).filter(DuplicateContactContact.id == duplicate_id).first()
+        return self.db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
     
-    def get_all_duplicates(self, skip: int = 0, limit: int = 100) -> List[DuplicateContactContact]:
+    def get_all_duplicates(self, skip: int = 0, limit: int = 100) -> List[DuplicateContact]:
         """
         Get all duplicates with pagination.
         
@@ -43,9 +43,9 @@ class DuplicateRepository:
             limit: Maximum number of records to return
         
         Returns:
-            List of DuplicateContactContact instances
+            List of DuplicateContact instances
         """
-        return self.db.query(DuplicateContactContact).offset(skip).limit(limit).all()
+        return self.db.query(DuplicateContact).offset(skip).limit(limit).all()
     
     def get_duplicates_for_contact(self, contact_id: int) -> List[DuplicateContact]:
         """
