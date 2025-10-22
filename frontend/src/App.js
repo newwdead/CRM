@@ -9,21 +9,21 @@ import MainLayout from './components/routing/MainLayout';
 import NotFound from './components/routing/NotFound';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Pages
-import LoginPage from './components/LoginPage';
-import HomePage from './components/pages/HomePage';
-import ContactsPage from './components/pages/ContactsPage';
-import ContactPage from './components/pages/ContactPage';
-import OCREditorPage from './components/pages/OCREditorPage';
+// Pages - Lazy loaded for code splitting
+const LoginPage = React.lazy(() => import('./components/LoginPage'));
+const HomePage = React.lazy(() => import('./components/pages/HomePage'));
+const ContactsPage = React.lazy(() => import('./components/pages/ContactsPage'));
+const ContactPage = React.lazy(() => import('./components/pages/ContactPage'));
+const OCREditorPage = React.lazy(() => import('./components/pages/OCREditorPage'));
 
-// Other components
-import UploadCard from './components/UploadCard';
-import BatchUpload from './components/BatchUpload';
-import Companies from './components/Companies';
-import DuplicateFinder from './components/DuplicateFinder';
-import ImportExport from './components/ImportExport';
-import Settings from './components/Settings';
-import AdminPanel from './components/AdminPanel';
+// Other components - Lazy loaded for code splitting
+const UploadCard = React.lazy(() => import('./components/UploadCard'));
+const BatchUpload = React.lazy(() => import('./components/BatchUpload'));
+const Companies = React.lazy(() => import('./components/Companies'));
+const DuplicateFinder = React.lazy(() => import('./components/DuplicateFinder'));
+const ImportExport = React.lazy(() => import('./components/ImportExport'));
+const Settings = React.lazy(() => import('./components/Settings'));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 
 /**
  * Scroll Restoration Component
@@ -147,7 +147,9 @@ function App() {
               isAuthenticated ? (
                 <Navigate to="/" replace />
               ) : (
-                <LoginPage onLoginSuccess={handleLoginSuccess} lang={lang} t={{}} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <LoginPage onLoginSuccess={handleLoginSuccess} lang={lang} t={{}} />
+                </Suspense>
               )
             } 
           />
