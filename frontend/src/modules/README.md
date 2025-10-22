@@ -1,6 +1,6 @@
 # 📦 Модульная архитектура Frontend
 
-**Версия:** 2.21.7  
+**Версия:** 2.26.0  
 **Дата:** 2025-10-22  
 **Статус:** ✅ Production Ready
 
@@ -33,6 +33,11 @@ frontend/src/modules/
 │   ├── api/
 │   ├── hooks/
 │   ├── components/
+│   └── index.js
+│
+├── duplicates/                 # 🔄 Управление дубликатами ⭐ NEW
+│   ├── api/
+│   ├── hooks/
 │   └── index.js
 │
 └── admin/                      # 👔 Административные модули
@@ -207,6 +212,91 @@ const { integrations, loading, toggleIntegration, testIntegration } = useIntegra
 
 ---
 
+### 5️⃣ Duplicates Module (`modules/duplicates/`) ⭐ NEW
+
+**Назначение:** Обнаружение и объединение дубликатов контактов
+
+**Структура:**
+```
+duplicates/
+├── api/
+│   └── duplicatesApi.js       # fetchDuplicates, mergeDuplicates, markAsReviewed, dismissDuplicate
+├── hooks/
+│   └── useDuplicates.js       # Управление дубликатами
+└── index.js
+```
+
+**Использование:**
+```javascript
+import { useDuplicates, duplicatesApi } from '../modules/duplicates';
+
+function DuplicatesManager() {
+  const { 
+    duplicates, 
+    groupedDuplicates, 
+    loading, 
+    mergeDuplicates,
+    dismissDuplicate,
+    getDuplicateCount,
+    hasDuplicates
+  } = useDuplicates();
+
+  return (
+    <div>
+      {duplicates.map(dup => (
+        <DuplicateCard 
+          key={dup.id}
+          duplicate={dup}
+          onMerge={() => mergeDuplicates(dup.contact_id_1, [dup.contact_id_2])}
+          onDismiss={() => dismissDuplicate(dup.id)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+**API Methods:**
+```javascript
+// Получить все дубликаты
+const duplicates = await duplicatesApi.fetchDuplicates();
+
+// Получить дубликаты для контакта
+const contactDups = await duplicatesApi.fetchContactDuplicates(contactId);
+
+// Объединить контакты
+await duplicatesApi.mergeDuplicates(primaryId, [duplicateId1, duplicateId2]);
+
+// Отметить как просмотренное
+await duplicatesApi.markAsReviewed(duplicateId);
+
+// Отклонить совпадение
+await duplicatesApi.dismissDuplicate(duplicateId);
+```
+
+**Хуки:**
+```javascript
+import { useDuplicates } from '../modules/duplicates/hooks/useDuplicates';
+
+const {
+  duplicates,              // Массив всех дубликатов
+  groupedDuplicates,       // Дубликаты, сгруппированные по contact_id
+  loading,                 // Состояние загрузки
+  error,                   // Ошибка
+  loadDuplicates,          // Перезагрузить
+  loadContactDuplicates,   // Загрузить для контакта
+  mergeDuplicates,         // Объединить
+  markAsReviewed,          // Отметить как просмотренное
+  dismissDuplicate,        // Отклонить
+  getDuplicateCount,       // Получить количество для контакта
+  hasDuplicates            // Проверить наличие дубликатов
+} = useDuplicates();
+```
+
+**Статистика:** 3 файла, 290 строк
+
+---
+
 ## 🎯 Руководство по добавлению нового модуля
 
 ### Шаг 1: Создать структуру
@@ -359,7 +449,8 @@ test('renders data', async () => {
 | **Services** | 5 | 652 | 2×786 | **-134** |
 | **Contacts** | 8 | 1073 | 1×1079 | **-6** |
 | **Settings** | 5 | 233 | 1×603 | **-370** |
-| **ИТОГО** | **28** | **3287** | **3618** | **-510** |
+| **Duplicates** ⭐ | 3 | 290 | новый | новый |
+| **ИТОГО** | **31** | **3577** | **3618** | **-510** |
 
 ---
 
@@ -383,12 +474,23 @@ test('renders data', async () => {
 ## 🔗 Ссылки
 
 - [Release Notes v2.21.7](../../../RELEASE_NOTES_v2.21.7.md)
-- [Migration Logs](../../../MIGRATION_LOG_*.md)
+- [Release Notes v2.21.8](../../../RELEASE_NOTES_v2.21.8.md)
+- [Pages Documentation](../../components/pages/README.md)
+- [Utils Documentation](../../utils/README.md)
+- [Mobile Components](../../components/mobile/README.md)
 - [Optimization Plan](../../../PROJECT_OPTIMIZATION_PLAN_v2.21.3.md)
 
 ---
 
 **Дата создания:** 2025-10-22  
-**Версия:** 2.21.7  
+**Последнее обновление:** 2025-10-22  
+**Версия:** 2.26.0  
 **Статус:** ✅ Production
+
+**Новое в v2.26.0:**
+- ✨ Добавлен Duplicates модуль
+- 📱 Документация для mobile компонентов
+- 📄 Документация для pages
+- 🛠️ Документация для utils
+- 📊 Обновлена статистика
 
