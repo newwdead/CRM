@@ -90,7 +90,7 @@ class DuplicateRepository:
             List of pending DuplicateContact instances
         """
         return self.db.query(DuplicateContact).filter(
-            DuplicateContact.resolved == False
+            DuplicateContact.status == 'pending'
         ).all()
     
     def create_duplicate(self, duplicate_data: Dict[str, Any]) -> DuplicateContact:

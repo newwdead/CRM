@@ -92,13 +92,14 @@ class TestContactRepository:
         repo = ContactRepository(db)
         
         # Search by name
-        results = repo.search(query=test_contact.first_name)
+        results = repo.search(search_term=test_contact.first_name)
         assert len(results) >= 1
         assert any(c.id == test_contact.id for c in results)
         
         # Filter by company
-        results = repo.filter_by(company=test_contact.company)
-        assert len(results) >= 1
+        contacts_list, total_count = repo.filter_by(filters={'company': test_contact.company})
+        assert len(contacts_list) >= 1
+        assert total_count >= 1
 
 
 class TestDuplicateRepository:
@@ -246,7 +247,7 @@ class TestOCRRepository:
             'corrected_field': 'full_name'
         }
         
-        ocr_data = repo.create_ocr_correction(correction_data)
+        ocr_data = repo.create_training_data(correction_data)
         repo.commit()
         
         assert ocr_data.id is not None
@@ -257,7 +258,7 @@ class TestOCRRepository:
         repo = OCRRepository(db)
         
         # Create correction data
-        repo.create_ocr_correction({
+        repo.create_training_data({
             'contact_id': test_contact.id,
             'original_text': 'Test',
             'original_box': '{"x": 0, "y": 0, "width": 50, "height": 20}',
@@ -266,7 +267,7 @@ class TestOCRRepository:
         })
         repo.commit()
         
-        data = repo.get_corrections_for_contact(test_contact.id)
+        data = repo.get_training_data_by_contact(test_contact.id)
         assert isinstance(data, list)
         assert len(data) >= 1
     
@@ -274,7 +275,7 @@ class TestOCRRepository:
         """Test updating OCR correction"""
         repo = OCRRepository(db)
         
-        correction = repo.create_ocr_correction({
+        correction = repo.create_training_data({
             'contact_id': test_contact.id,
             'original_text': 'Test',
             'original_box': '{"x": 5, "y": 5, "width": 80, "height": 25}',
@@ -283,8 +284,8 @@ class TestOCRRepository:
         })
         repo.commit()
         
-        # Update correction
-        updated = repo.update_ocr_correction(correction, {'corrected_text': 'Final Text'})
+        # Update using update_training_data method
+        updated = repo.update_training_data(correction, {'corrected_text': 'Final Text'})
         repo.commit()
         
         assert updated.corrected_text == 'Final Text'
@@ -297,7 +298,11 @@ class TestSettingsRepository:
         """Test creating an app setting"""
         repo = SettingsRepository(db)
         
-        setting = repo.create_app_setting('test_setting', 'test_value')
+        setting_data = {
+            'key': 'test_setting',
+            'value': 'test_value'
+        }
+        setting = repo.create_setting(setting_data)
         repo.commit()
         
         assert setting.key == 'test_setting'
@@ -308,11 +313,11 @@ class TestSettingsRepository:
         repo = SettingsRepository(db)
         
         # Create setting
-        repo.create_app_setting('find_me_key', 'find_me_value')
+        repo.create_setting({'key': 'find_me_key', 'value': 'find_me_value'})
         repo.commit()
         
         # Find setting
-        found = repo.get_app_setting('find_me_key')
+        found = repo.get_setting_by_key('find_me_key')
         assert found is not None
         assert found.value == 'find_me_value'
     
@@ -321,13 +326,14 @@ class TestSettingsRepository:
         repo = SettingsRepository(db)
         
         # Create setting
-        repo.create_app_setting('update_me', 'old_value')
+        repo.create_setting({'key': 'update_me', 'value': 'old_value'})
         repo.commit()
         
         # Update setting
-        updated = repo.update_app_setting('update_me', 'new_value')
+        updated = repo.update_setting_value('update_me', 'new_value')
         repo.commit()
         
+        assert updated is not None
         assert updated.value == 'new_value'
 
 
