@@ -136,111 +136,16 @@ def create_contact(
 ):
     """
     Create a new contact.
-    Automatically formats phone numbers and detects duplicates if enabled.
+    
+    All business logic is delegated to ContactService.
+    Роутер только валидирует данные и вызывает сервис.
     """
-    payload = data.dict()
-    if not payload.get('uid'):
-        payload['uid'] = uuid.uuid4().hex
-    
-    # Format phone numbers
-    if payload.get('phone'):
-        payload['phone'] = format_phone_number(payload['phone'])
-    if payload.get('phone_mobile'):
-        payload['phone_mobile'] = format_phone_number(payload['phone_mobile'])
-    if payload.get('phone_work'):
-        payload['phone_work'] = format_phone_number(payload['phone_work'])
-    if payload.get('phone_additional'):
-        payload['phone_additional'] = format_phone_number(payload['phone_additional'])
-    
-    contact = Contact(**payload)
-    db.add(contact)
-    db.flush()  # Get ID without committing
-    
-    # Audit log
-    create_audit_log(
-        db=db,
-        contact_id=contact.id,
-        user=current_user,
-        action='created',
-        entity_type='contact',
-        changes=payload
+    service = ContactService(db)
+    return service.create_contact(
+        data=data.dict(),
+        current_user=current_user,
+        auto_detect_duplicates=True
     )
-    
-    db.commit()
-    db.refresh(contact)
-    
-    # Update contact metrics
-    contacts_created_counter.inc()
-    contacts_total.set(db.query(Contact).count())
-    
-    # Auto-detect duplicates if enabled
-    try:
-        duplicate_enabled = get_system_setting(db, 'duplicate_detection_enabled', 'true')
-        if duplicate_enabled.lower() == 'true':
-            threshold = float(get_system_setting(db, 'duplicate_similarity_threshold', '0.75'))
-            
-            # Get existing contacts for comparison
-            existing_contacts = db.query(Contact).filter(Contact.id != contact.id).all()
-            
-            # Convert to dict for comparison
-            contact_dict = {
-                'id': contact.id,
-                'full_name': contact.full_name,
-                'first_name': contact.first_name,
-                'last_name': contact.last_name,
-                'middle_name': contact.middle_name,
-                'email': contact.email,
-                'phone': contact.phone,
-                'phone_mobile': contact.phone_mobile,
-                'phone_work': contact.phone_work,
-                'company': contact.company,
-                'position': contact.position,
-            }
-            
-            existing_dicts = [{
-                'id': c.id,
-                'full_name': c.full_name,
-                'first_name': c.first_name,
-                'last_name': c.last_name,
-                'middle_name': c.middle_name,
-                'email': c.email,
-                'phone': c.phone,
-                'phone_mobile': c.phone_mobile,
-                'phone_work': c.phone_work,
-                'company': c.company,
-                'position': c.position,
-            } for c in existing_contacts]
-            
-            # Find duplicates
-            duplicates = duplicate_utils.find_duplicates_for_new_contact(contact_dict, existing_dicts, threshold)
-            
-            # Save duplicates to database
-            for existing_contact_dict, score, field_scores in duplicates:
-                existing_id = existing_contact_dict['id']
-                id1, id2 = sorted([contact.id, existing_id])
-                
-                # Check if already exists
-                existing_dup = db.query(DuplicateContact).filter(
-                    (DuplicateContact.contact_id_1 == id1) & (DuplicateContact.contact_id_2 == id2)
-                ).first()
-                
-                if not existing_dup:
-                    new_dup = DuplicateContact(
-                        contact_id_1=id1,
-                        contact_id_2=id2,
-                        similarity_score=score,
-                        match_fields=field_scores,
-                        status='pending',
-                        auto_detected=True
-                    )
-                    db.add(new_dup)
-            
-            db.commit()
-    except Exception as e:
-        # Don't fail contact creation if duplicate detection fails
-        logger.error(f"Duplicate detection error: {e}")
-    
-    return contact
 
 
 @router.put('/{contact_id}')
@@ -252,44 +157,15 @@ def update_contact(
 ):
     """
     Update an existing contact.
-    Automatically formats phone numbers.
+    
+    All business logic is delegated to ContactService.
     """
-    contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact:
-        raise HTTPException(status_code=404, detail='Contact not found')
-    
-    update_data = data.dict(exclude_unset=True)
-    
-    # Format phone numbers
-    if 'phone' in update_data and update_data['phone']:
-        update_data['phone'] = format_phone_number(update_data['phone'])
-    if 'phone_mobile' in update_data and update_data['phone_mobile']:
-        update_data['phone_mobile'] = format_phone_number(update_data['phone_mobile'])
-    if 'phone_work' in update_data and update_data['phone_work']:
-        update_data['phone_work'] = format_phone_number(update_data['phone_work'])
-    if 'phone_additional' in update_data and update_data['phone_additional']:
-        update_data['phone_additional'] = format_phone_number(update_data['phone_additional'])
-    
-    # Audit log
-    create_audit_log(
-        db=db,
-        contact_id=contact.id,
-        user=current_user,
-        action='updated',
-        entity_type='contact',
-        changes=update_data
+    service = ContactService(db)
+    return service.update_contact(
+        contact_id=contact_id,
+        data=data.dict(exclude_unset=True),
+        current_user=current_user
     )
-    
-    for k, v in update_data.items():
-        if hasattr(contact, k):
-            setattr(contact, k, v)
-    db.commit()
-    db.refresh(contact)
-    
-    # Update metrics
-    contacts_updated_counter.inc()
-    
-    return contact
 
 
 @router.delete('/{contact_id}')
@@ -300,28 +176,11 @@ def delete_contact(
 ):
     """
     Delete a contact.
+    
+    All business logic is delegated to ContactService.
     """
-    contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact:
-        raise HTTPException(status_code=404, detail='Contact not found')
-    
-    # Audit log (before deletion)
-    create_audit_log(
-        db=db,
-        contact_id=contact.id,
-        user=current_user,
-        action='deleted',
-        entity_type='contact',
-        changes={'full_name': contact.full_name, 'company': contact.company}
-    )
-    
-    db.delete(contact)
-    db.commit()
-    
-    # Update metrics
-    contacts_deleted_counter.inc()
-    contacts_total.set(db.query(Contact).count())
-    
+    service = ContactService(db)
+    service.delete_contact(contact_id=contact_id, current_user=current_user)
     return {'deleted': contact_id}
 
 
