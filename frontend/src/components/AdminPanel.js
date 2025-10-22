@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import Documentation from './Documentation';
-import ServiceManager from './ServiceManager';
+import ServiceManagerSimple from './ServiceManagerSimple';
 import SystemSettings from './SystemSettings';
-import DuplicatesPanel from './DuplicatesPanel';
+import DuplicateFinder from './DuplicateFinder';
 import UserManagement from './admin/UserManagement';
 import BackupManagement from './admin/BackupManagement';
 import SystemResources from './admin/SystemResources';
@@ -156,8 +156,8 @@ function AdminPanel({ t, lang }) {
         {activeTab === 'settings' && <SystemSettings lang={lang} />}
         {activeTab === 'backups' && <BackupManagement />}
         {activeTab === 'resources' && <SystemResources />}
-        {activeTab === 'services' && <ServiceManager />}
-        {activeTab === 'duplicates' && <DuplicatesPanel lang={lang} />}
+        {activeTab === 'services' && <ServiceManagerSimple />}
+        {activeTab === 'duplicates' && <DuplicateFinder lang={lang} />}
         {activeTab === 'documentation' && <Documentation lang={lang} />}
         </div>
     </div>
