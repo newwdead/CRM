@@ -6,6 +6,7 @@ const ServiceManager = () => {
   const [services, setServices] = useState([]);
   const [categorizedServices, setCategorizedServices] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [expandedCategory, setExpandedCategory] = useState('core');
   const [selectedService, setSelectedService] = useState(null);
   const [logs, setLogs] = useState('');
@@ -93,6 +94,7 @@ const ServiceManager = () => {
 
   const fetchServicesStatus = async () => {
     try {
+      setError(null);
       const token = localStorage.getItem('token');
       const response = await fetch('/services/status', {
         headers: {
@@ -100,14 +102,27 @@ const ServiceManager = () => {
         }
       });
 
-      if (!response.ok) throw new Error('Failed to fetch services');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || 'Failed to fetch services');
+      }
 
       const data = await response.json();
+      
+      // Handle error in response
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
       setServices(data.services || []);
       setCategorizedServices(data.categorized || {});
     } catch (error) {
       console.error('Error fetching services:', error);
-      toast.error('Failed to fetch services');
+      setError(error.message);
+      toast.error(`Failed to fetch services: ${error.message}`);
+      // Set empty arrays to prevent rendering issues
+      setServices([]);
+      setCategorizedServices({});
     } finally {
       setLoading(false);
     }
@@ -204,6 +219,62 @@ const ServiceManager = () => {
         color: '#666'
       }}>
         Loading...
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div style={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        padding: '20px'
+      }}>
+        <div style={{ 
+          fontSize: '48px',
+          marginBottom: '20px'
+        }}>
+          ⚠️
+        </div>
+        <div style={{ 
+          fontSize: '24px',
+          color: '#dc3545',
+          marginBottom: '10px',
+          fontWeight: '600'
+        }}>
+          {language === 'ru' ? 'Ошибка загрузки сервисов' : 'Error Loading Services'}
+        </div>
+        <div style={{ 
+          fontSize: '16px',
+          color: '#666',
+          marginBottom: '20px',
+          textAlign: 'center',
+          maxWidth: '600px'
+        }}>
+          {error}
+        </div>
+        <button
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            fetchServicesStatus();
+          }}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: '#0366d6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          🔄 {language === 'ru' ? 'Попробовать снова' : 'Try Again'}
+        </button>
       </div>
     );
   }

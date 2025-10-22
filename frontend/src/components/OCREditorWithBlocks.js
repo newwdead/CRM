@@ -19,6 +19,9 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const [draggingBlock, setDraggingBlock] = useState(null);
   const [resizingBlock, setResizingBlock] = useState(null);
   const [reprocessing, setReprocessing] = useState(false);
+  const [editingBlockText, setEditingBlockText] = useState(null);
+  const [isAddingBlock, setIsAddingBlock] = useState(false);
+  const [newBlockStart, setNewBlockStart] = useState(null);
   
   const imageRef = useRef(null);
   const [imageScale, setImageScale] = useState(1);
@@ -44,6 +47,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
       reprocessSuccess: 'OCR re-processed successfully',
       reprocessError: 'Failed to re-process OCR',
       editModeHint: 'Drag blocks to move, drag corners to resize',
+      deleteBlock: 'Delete Block',
+      addBlock: 'Add Block',
+      editText: 'Edit Text',
+      splitBlock: 'Split Block',
+      saveText: 'Save',
+      cancelEdit: 'Cancel',
       fields: {
         first_name: 'First Name',
         last_name: 'Last Name',
@@ -90,6 +99,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
       reprocessSuccess: 'OCR успешно перезапущен',
       reprocessError: 'Ошибка при повторной обработке',
       editModeHint: 'Перетаскивайте блоки для перемещения, углы для изменения размера',
+      deleteBlock: 'Удалить блок',
+      addBlock: 'Добавить блок',
+      editText: 'Редактировать текст',
+      splitBlock: 'Разбить блок',
+      saveText: 'Сохранить',
+      cancelEdit: 'Отмена',
       fields: {
         first_name: 'Имя',
         last_name: 'Фамилия',
@@ -347,6 +362,122 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     setDraggingBlock(null);
   };
 
+  const handleDeleteBlock = (block) => {
+    if (!window.confirm(language === 'ru' ? 'Удалить этот блок?' : 'Delete this block?')) {
+      return;
+    }
+    
+    setOcrBlocks(prev => ({
+      ...prev,
+      lines: prev.lines.filter(line => line !== block)
+    }));
+    
+    toast.success(language === 'ru' ? 'Блок удален' : 'Block deleted');
+  };
+
+  const handleAddBlock = () => {
+    setIsAddingBlock(true);
+    toast.info(language === 'ru' ? 'Выделите область для нового блока' : 'Draw area for new block');
+  };
+
+  const handleImageMouseDown = (event) => {
+    if (!isAddingBlock) return;
+    
+    const container = imageRef.current.parentElement;
+    const rect = container.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / imageScale;
+    const y = (event.clientY - rect.top) / imageScale;
+    
+    setNewBlockStart({ x, y });
+  };
+
+  const handleImageMouseUp = (event) => {
+    if (!isAddingBlock || !newBlockStart) return;
+    
+    const container = imageRef.current.parentElement;
+    const rect = container.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / imageScale;
+    const y = (event.clientY - rect.top) / imageScale;
+    
+    const width = Math.abs(x - newBlockStart.x);
+    const height = Math.abs(y - newBlockStart.y);
+    
+    if (width < 20 || height < 10) {
+      toast.error(language === 'ru' ? 'Блок слишком маленький' : 'Block too small');
+      setIsAddingBlock(false);
+      setNewBlockStart(null);
+      return;
+    }
+    
+    const newBlock = {
+      text: language === 'ru' ? 'Новый текст' : 'New text',
+      box: {
+        x: Math.min(newBlockStart.x, x),
+        y: Math.min(newBlockStart.y, y),
+        width: width,
+        height: height
+      },
+      confidence: 0
+    };
+    
+    setOcrBlocks(prev => ({
+      ...prev,
+      lines: [...prev.lines, newBlock]
+    }));
+    
+    setIsAddingBlock(false);
+    setNewBlockStart(null);
+    toast.success(language === 'ru' ? 'Блок добавлен' : 'Block added');
+  };
+
+  const handleEditBlockText = (block) => {
+    setEditingBlockText(block);
+  };
+
+  const handleSaveBlockText = (newText) => {
+    setOcrBlocks(prev => ({
+      ...prev,
+      lines: prev.lines.map(line => 
+        line === editingBlockText
+          ? { ...line, text: newText }
+          : line
+      )
+    }));
+    
+    setEditingBlockText(null);
+    toast.success(language === 'ru' ? 'Текст сохранен' : 'Text saved');
+  };
+
+  const handleSplitBlock = (block) => {
+    const midY = block.box.y + block.box.height / 2;
+    
+    const block1 = {
+      ...block,
+      box: {
+        ...block.box,
+        height: block.box.height / 2
+      },
+      text: block.text.substring(0, Math.floor(block.text.length / 2))
+    };
+    
+    const block2 = {
+      ...block,
+      box: {
+        ...block.box,
+        y: midY,
+        height: block.box.height / 2
+      },
+      text: block.text.substring(Math.floor(block.text.length / 2))
+    };
+    
+    setOcrBlocks(prev => ({
+      ...prev,
+      lines: prev.lines.map(line => line === block ? block1 : line).concat([block2])
+    }));
+    
+    toast.success(language === 'ru' ? 'Блок разбит на два' : 'Block split into two');
+  };
+
   const handleSave = async () => {
     // Check if there are any changes
     const hasChanges = editableFields.some(
@@ -483,14 +614,14 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
           
           {/* Block editing controls */}
           <div style={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
             gap: '8px',
             marginBottom: '15px'
           }}>
             <button
               onClick={() => setEditBlockMode(!editBlockMode)}
               style={{
-                flex: 1,
                 padding: '8px 12px',
                 backgroundColor: editBlockMode ? '#10b981' : '#3b82f6',
                 color: '#fff',
@@ -508,7 +639,6 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
               onClick={handleReprocessOCR}
               disabled={reprocessing}
               style={{
-                flex: 1,
                 padding: '8px 12px',
                 backgroundColor: reprocessing ? '#9ca3af' : '#f59e0b',
                 color: '#fff',
@@ -523,7 +653,150 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
             >
               {reprocessing ? '⏳ ' + t.reprocessing : '🔄 ' + t.reprocessOCR}
             </button>
+            <button
+              onClick={handleAddBlock}
+              disabled={!editBlockMode}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: isAddingBlock ? '#10b981' : '#8b5cf6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: !editBlockMode ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                opacity: !editBlockMode ? 0.5 : 1
+              }}
+            >
+              {isAddingBlock ? '✏️ ' : '➕ '}{t.addBlock}
+            </button>
+            {selectedBlocks.length === 1 && editBlockMode && (
+              <>
+                <button
+                  onClick={() => handleEditBlockText(selectedBlocks[0])}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#06b6d4',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  📝 {t.editText}
+                </button>
+                <button
+                  onClick={() => handleSplitBlock(selectedBlocks[0])}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#a855f7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ✂️ {t.splitBlock}
+                </button>
+                <button
+                  onClick={() => handleDeleteBlock(selectedBlocks[0])}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#ef4444',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🗑️ {t.deleteBlock}
+                </button>
+              </>
+            )}
           </div>
+          
+          {/* Text editing dialog */}
+          {editingBlockText && (
+            <div style={{
+              marginBottom: '15px',
+              padding: '15px',
+              backgroundColor: '#2563eb',
+              borderRadius: '8px',
+              border: '2px solid #3b82f6'
+            }}>
+              <label style={{
+                display: 'block',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '600',
+                marginBottom: '8px'
+              }}>
+                {t.editText}:
+              </label>
+              <textarea
+                defaultValue={editingBlockText.text}
+                id="block-text-input"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  fontSize: '14px',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  marginBottom: '10px',
+                  minHeight: '60px',
+                  fontFamily: 'monospace',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => {
+                    const newText = document.getElementById('block-text-input').value;
+                    handleSaveBlockText(newText);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    backgroundColor: '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✅ {t.saveText}
+                </button>
+                <button
+                  onClick={() => setEditingBlockText(null)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    backgroundColor: '#6b7280',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ❌ {t.cancelEdit}
+                </button>
+              </div>
+            </div>
+          )}
           
           {imageUrl && ocrBlocks && (
             <div style={{
@@ -555,13 +828,16 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                 
                 {/* Render bounding boxes */}
                 <svg
+                  onMouseDown={handleImageMouseDown}
+                  onMouseUp={handleImageMouseUp}
                   style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: `${ocrBlocks.image_width * imageScale}px`,
                     height: `${ocrBlocks.image_height * imageScale}px`,
-                    pointerEvents: 'none'
+                    pointerEvents: 'auto',
+                    cursor: isAddingBlock ? 'crosshair' : 'default'
                   }}
                 >
                   {ocrBlocks.lines.map((line, idx) => {

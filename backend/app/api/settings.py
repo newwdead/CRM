@@ -481,7 +481,7 @@ async def update_integration_config(
     """
     Update integration configuration (admin only).
     """
-    valid_integrations = ["telegram", "whatsapp", "google_vision", "parsio"]
+    valid_integrations = ["telegram", "whatsapp", "ocr", "auth", "backup", "monitoring", "celery", "redis"]
     
     if integration_id not in valid_integrations:
         raise HTTPException(

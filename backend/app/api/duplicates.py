@@ -23,55 +23,144 @@ router = APIRouter()
 @router.get('')
 def get_duplicates(
     status: str = None,
+    threshold: float = 0.6,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_utils.get_current_active_user)
 ):
     """
-    Get list of detected duplicate contacts.
-    Optional filter by status: pending, reviewed, merged, ignored
+    Find and return duplicate contacts grouped by similarity.
+    
+    This endpoint performs real-time duplicate detection and groups
+    similar contacts together for review.
+    
+    Args:
+        status: Optional filter by status (pending, reviewed, merged, ignored)
+        threshold: Minimum similarity score (0.0-1.0, default 0.6)
+        limit: Maximum number of contacts to check (default 50)
     """
-    query = db.query(DuplicateContact)
+    try:
+        # Get all contacts
+        contacts = db.query(Contact).limit(limit).all()
+        
+        if len(contacts) < 2:
+            return {
+                'duplicates': [],
+                'total_groups': 0,
+                'total_contacts': len(contacts),
+                'threshold': threshold
+            }
+        
+        # Convert to dicts for comparison
+        contact_dicts = []
+        for c in contacts:
+            contact_dicts.append({
+                'id': c.id,
+                'full_name': c.full_name,
+                'first_name': c.first_name,
+                'last_name': c.last_name,
+                'middle_name': c.middle_name,
+                'email': c.email,
+                'phone': c.phone,
+                'phone_mobile': c.phone_mobile,
+                'phone_work': c.phone_work,
+                'phone_additional': c.phone_additional,
+                'company': c.company,
+                'position': c.position,
+                'address': c.address,
+                'website': c.website,
+                'comment': c.comment
+            })
+        
+        # Find duplicates using utility function
+        duplicates = duplicate_utils.find_duplicate_contacts(contact_dicts, threshold)
+        
+        # Group duplicates by contact clusters
+        # Each group represents a set of similar contacts
+        groups = {}
+        group_counter = 0
+        
+        for contact1, contact2, score, field_scores in duplicates:
+            # Find if either contact is already in a group
+            found_group = None
+            for group_id, group_data in groups.items():
+                if contact1['id'] in [c['contact']['id'] for c in group_data['contacts']]:
+                    found_group = group_id
+                    break
+                if contact2['id'] in [c['contact']['id'] for c in group_data['contacts']]:
+                    found_group = group_id
+                    break
+            
+            # Determine reasons for match
+            reasons = []
+            for field, field_score in field_scores.items():
+                if field_score > 0.8:
+                    if field == 'phone':
+                        reasons.append('identical_phone')
+                    elif field == 'phone_mobile':
+                        reasons.append('identical_mobile')
+                    elif field == 'email':
+                        reasons.append('identical_email')
+                    elif field in ['first_name', 'last_name', 'full_name']:
+                        reasons.append('similar_name')
+                    elif field == 'company':
+                        reasons.append('same_company')
+            
+            # If found a group, add the new contact to it
+            if found_group is not None:
+                # Check if contact1 is already in the group
+                if contact1['id'] not in [c['contact']['id'] for c in groups[found_group]['contacts']]:
+                    groups[found_group]['contacts'].append({
+                        'contact': contact1,
+                        'score': score,
+                        'reasons': reasons
+                    })
+                    groups[found_group]['max_score'] = max(groups[found_group]['max_score'], score)
+                
+                # Check if contact2 is already in the group
+                if contact2['id'] not in [c['contact']['id'] for c in groups[found_group]['contacts']]:
+                    groups[found_group]['contacts'].append({
+                        'contact': contact2,
+                        'score': score,
+                        'reasons': reasons
+                    })
+                    groups[found_group]['max_score'] = max(groups[found_group]['max_score'], score)
+            else:
+                # Create new group
+                group_counter += 1
+                groups[group_counter] = {
+                    'group_id': group_counter,
+                    'contacts': [
+                        {
+                            'contact': contact1,
+                            'score': score,
+                            'reasons': reasons
+                        },
+                        {
+                            'contact': contact2,
+                            'score': score,
+                            'reasons': reasons
+                        }
+                    ],
+                    'max_score': score
+                }
+        
+        # Convert groups dict to list
+        result_groups = list(groups.values())
+        
+        return {
+            'duplicates': result_groups,
+            'total_groups': len(result_groups),
+            'total_contacts': len(contacts),
+            'threshold': threshold
+        }
     
-    if status:
-        query = query.filter(DuplicateContact.status == status)
-    
-    duplicates = query.order_by(
-        DuplicateContact.similarity_score.desc(),
-        DuplicateContact.detected_at.desc()
-    ).limit(limit).all()
-    
-    result = []
-    for dup in duplicates:
-        result.append({
-            'id': dup.id,
-            'contact_id_1': dup.contact_id_1,
-            'contact_id_2': dup.contact_id_2,
-            'contact_1': {
-                'id': dup.contact_1.id,
-                'full_name': dup.contact_1.full_name or f"{dup.contact_1.first_name or ''} {dup.contact_1.last_name or ''}".strip(),
-                'email': dup.contact_1.email,
-                'phone': dup.contact_1.phone,
-                'company': dup.contact_1.company,
-            },
-            'contact_2': {
-                'id': dup.contact_2.id,
-                'full_name': dup.contact_2.full_name or f"{dup.contact_2.first_name or ''} {dup.contact_2.last_name or ''}".strip(),
-                'email': dup.contact_2.email,
-                'phone': dup.contact_2.phone,
-                'company': dup.contact_2.company,
-            },
-            'similarity_score': dup.similarity_score,
-            'match_fields': dup.match_fields if dup.match_fields else {},
-            'status': dup.status,
-            'auto_detected': dup.auto_detected,
-            'detected_at': dup.detected_at.isoformat() if dup.detected_at else None,
-        })
-    
-    return {
-        'duplicates': result,
-        'total': len(result)
-    }
+    except Exception as e:
+        logger.error(f"Error finding duplicates: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to find duplicates: {str(e)}"
+        )
 
 
 @router.post('/find')
@@ -191,6 +280,77 @@ def ignore_duplicate(
     return {"message": "Duplicate marked as ignored", "duplicate_id": duplicate_id}
 
 
+@router.post('/merge')
+def merge_contacts_simple(
+    primary_id: int = Body(...),
+    secondary_id: int = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Merge two contacts (simple version).
+    The secondary contact's data is merged into the primary contact,
+    and the secondary contact is deleted.
+    """
+    # Get contacts
+    primary = db.query(Contact).filter(Contact.id == primary_id).first()
+    secondary = db.query(Contact).filter(Contact.id == secondary_id).first()
+    
+    if not primary or not secondary:
+        raise HTTPException(status_code=404, detail='One or both contacts not found')
+    
+    # Merge non-empty fields from secondary into primary
+    merge_fields = [
+        'full_name', 'first_name', 'last_name', 'middle_name',
+        'email', 'phone', 'phone_mobile', 'phone_work', 'phone_additional',
+        'company', 'position', 'department',
+        'address', 'address_additional', 'website',
+        'birthday', 'comment'
+    ]
+    
+    for field in merge_fields:
+        primary_value = getattr(primary, field, None)
+        secondary_value = getattr(secondary, field, None)
+        
+        # If primary is empty but secondary has a value, copy it
+        if not primary_value and secondary_value:
+            setattr(primary, field, secondary_value)
+    
+    # Update duplicate record if exists
+    dup = db.query(DuplicateContact).filter(
+        DuplicateContact.contact_id_1 == min(primary_id, secondary_id),
+        DuplicateContact.contact_id_2 == max(primary_id, secondary_id)
+    ).first()
+    
+    if dup:
+        dup.status = 'merged'
+        dup.reviewed_at = func.now()
+        dup.reviewed_by = current_user.id
+        dup.merged_into = primary_id
+    
+    # Audit log
+    create_audit_log(
+        db=db,
+        contact_id=primary_id,
+        user=current_user,
+        action='merged',
+        entity_type='contact',
+        changes={'merged_from': secondary_id}
+    )
+    
+    # Delete secondary contact
+    db.delete(secondary)
+    
+    db.commit()
+    db.refresh(primary)
+    
+    return {
+        'message': 'Contacts merged successfully',
+        'merged_contact_id': primary_id,
+        'deleted_contact_id': secondary_id
+    }
+
+
 @router.post('/merge/{contact_id_1}/{contact_id_2}')
 def merge_contacts_endpoint(
     contact_id_1: int,
@@ -200,7 +360,7 @@ def merge_contacts_endpoint(
     current_user: User = Depends(auth_utils.get_current_active_user)
 ):
     """
-    Merge two contacts.
+    Merge two contacts (advanced version with field selection).
     selected_fields: dict mapping field_name -> 'primary' or 'secondary'
     Example: {'email': 'primary', 'phone': 'secondary', 'company': 'keep_both'}
     """
