@@ -13,6 +13,7 @@ import LoginPage from './components/LoginPage';
 import HomePage from './components/pages/HomePage';
 import ContactsPage from './components/pages/ContactsPage';
 import ContactPage from './components/pages/ContactPage';
+import OCREditorPage from './components/pages/OCREditorPage';
 
 // Other components
 import UploadCard from './components/UploadCard';
@@ -163,6 +164,7 @@ function App() {
                       {/* Contacts */}
                       <Route path="/contacts" element={<ContactsPage lang={lang} />} />
                       <Route path="/contacts/:id" element={<ContactPage lang={lang} />} />
+                      <Route path="/contacts/:id/ocr-editor" element={<OCREditorPage lang={lang} />} />
 
                       {/* Organizations */}
                       <Route path="/companies" element={<Companies lang={lang} />} />

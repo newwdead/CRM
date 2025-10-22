@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ContactCard from './ContactCard';
 import { ContactListSkeleton } from './SkeletonLoader';
 import TableSettings from './TableSettings';
 import OCREditor from './OCREditor';
-import { OCREditorContainer } from '../modules/ocr';
 import DuplicateMergeModal from './DuplicateMergeModal';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
 export default function ContactList({ lang = 'ru', onEdit }) {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState([]);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
@@ -20,9 +21,6 @@ export default function ContactList({ lang = 'ru', onEdit }) {
   
   // Contact Card Modal State
   const [viewingContact, setViewingContact] = useState(null);
-  
-  // OCR Editor State
-  const [editingOCR, setEditingOCR] = useState(null);
   
   // Duplicates State
   const [duplicates, setDuplicates] = useState([]);
@@ -566,7 +564,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                setEditingOCR(c);
+                navigate(`/contacts/${c.id}/ocr-editor`);
               }} 
               className="primary" 
               style={{ 
@@ -1014,47 +1012,6 @@ export default function ContactList({ lang = 'ru', onEdit }) {
           onSave={handleSaveTableSettings}
           onClose={() => setShowTableSettings(false)}
           lang={lang}
-        />
-      )}
-
-      {/* OCR Editor Modal */}
-      {editingOCR && (
-        <OCREditorContainer
-          contact={editingOCR}
-          onSave={async (updatedData) => {
-            try {
-              const token = localStorage.getItem('token');
-              const response = await fetch(`/api/contacts/${editingOCR.id}`, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(updatedData)
-              });
-              
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to update contact');
-              }
-              
-              // Get updated contact data from server
-              const updatedContact = await response.json();
-              
-              // Reload the full contact list to ensure consistency
-              await load();
-              
-              // Close the editor after successful save
-              setEditingOCR(null);
-              
-              toast.success(lang === 'ru' ? 'Контакт обновлён' : 'Contact updated');
-            } catch (error) {
-              console.error('Error updating contact:', error);
-              toast.error(lang === 'ru' ? `Ошибка: ${error.message}` : `Error: ${error.message}`);
-              throw error; // Re-throw to let OCREditor handle it too
-            }
-          }}
-          onClose={() => setEditingOCR(null)}
         />
       )}
 
