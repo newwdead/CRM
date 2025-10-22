@@ -1,17 +1,17 @@
 """
-Duplicate Repository Layer
-Handles all database operations for Duplicate models.
+DuplicateContact Repository Layer
+Handles all database operations for DuplicateContact models.
 """
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import List, Optional, Dict, Any
-from ..models.duplicate import Duplicate
+from ..models.duplicate import DuplicateContactContact
 from ..models.contact import Contact
 
 
-class DuplicateRepository:
-    """Repository for Duplicate model database operations."""
+class DuplicateContactRepository:
+    """Repository for DuplicateContactContact model database operations."""
     
     def __init__(self, db: Session):
         """
@@ -22,19 +22,19 @@ class DuplicateRepository:
         """
         self.db = db
     
-    def get_duplicate_by_id(self, duplicate_id: int) -> Optional[Duplicate]:
+    def get_duplicate_by_id(self, duplicate_id: int) -> Optional[DuplicateContactContact]:
         """
         Get duplicate by ID.
         
         Args:
-            duplicate_id: Duplicate ID
+            duplicate_id: DuplicateContact ID
         
         Returns:
-            Duplicate instance or None
+            DuplicateContactContact instance or None
         """
-        return self.db.query(Duplicate).filter(Duplicate.id == duplicate_id).first()
+        return self.db.query(DuplicateContactContact).filter(DuplicateContactContact.id == duplicate_id).first()
     
-    def get_all_duplicates(self, skip: int = 0, limit: int = 100) -> List[Duplicate]:
+    def get_all_duplicates(self, skip: int = 0, limit: int = 100) -> List[DuplicateContactContact]:
         """
         Get all duplicates with pagination.
         
@@ -43,11 +43,11 @@ class DuplicateRepository:
             limit: Maximum number of records to return
         
         Returns:
-            List of Duplicate instances
+            List of DuplicateContactContact instances
         """
-        return self.db.query(Duplicate).offset(skip).limit(limit).all()
+        return self.db.query(DuplicateContactContact).offset(skip).limit(limit).all()
     
-    def get_duplicates_for_contact(self, contact_id: int) -> List[Duplicate]:
+    def get_duplicates_for_contact(self, contact_id: int) -> List[DuplicateContact]:
         """
         Get all duplicates for a specific contact.
         
@@ -55,27 +55,27 @@ class DuplicateRepository:
             contact_id: Contact ID
         
         Returns:
-            List of Duplicate instances
+            List of DuplicateContact instances
         """
-        return self.db.query(Duplicate).filter(
+        return self.db.query(DuplicateContact).filter(
             or_(
-                Duplicate.contact_id_1 == contact_id,
-                Duplicate.contact_id_2 == contact_id
+                DuplicateContact.contact_id_1 == contact_id,
+                DuplicateContact.contact_id_2 == contact_id
             )
         ).all()
     
-    def get_pending_duplicates(self) -> List[Duplicate]:
+    def get_pending_duplicates(self) -> List[DuplicateContact]:
         """
         Get all pending (unresolved) duplicates.
         
         Returns:
-            List of pending Duplicate instances
+            List of pending DuplicateContact instances
         """
-        return self.db.query(Duplicate).filter(
-            Duplicate.resolved == False
+        return self.db.query(DuplicateContact).filter(
+            DuplicateContact.resolved == False
         ).all()
     
-    def create_duplicate(self, duplicate_data: Dict[str, Any]) -> Duplicate:
+    def create_duplicate(self, duplicate_data: Dict[str, Any]) -> DuplicateContact:
         """
         Create a new duplicate record.
         
@@ -83,23 +83,23 @@ class DuplicateRepository:
             duplicate_data: Dictionary with duplicate data
         
         Returns:
-            Created Duplicate instance
+            Created DuplicateContact instance
         """
-        duplicate = Duplicate(**duplicate_data)
+        duplicate = DuplicateContact(**duplicate_data)
         self.db.add(duplicate)
         self.db.flush()
         return duplicate
     
-    def update_duplicate(self, duplicate: Duplicate, update_data: Dict[str, Any]) -> Duplicate:
+    def update_duplicate(self, duplicate: DuplicateContact, update_data: Dict[str, Any]) -> DuplicateContact:
         """
         Update duplicate record.
         
         Args:
-            duplicate: Duplicate instance to update
+            duplicate: DuplicateContact instance to update
             update_data: Dictionary with fields to update
         
         Returns:
-            Updated Duplicate instance
+            Updated DuplicateContact instance
         """
         for key, value in update_data.items():
             if hasattr(duplicate, key):
@@ -107,15 +107,15 @@ class DuplicateRepository:
         self.db.add(duplicate)
         return duplicate
     
-    def mark_as_resolved(self, duplicate_id: int) -> Duplicate:
+    def mark_as_resolved(self, duplicate_id: int) -> DuplicateContact:
         """
         Mark duplicate as resolved.
         
         Args:
-            duplicate_id: Duplicate ID
+            duplicate_id: DuplicateContact ID
         
         Returns:
-            Updated Duplicate instance
+            Updated DuplicateContact instance
         """
         duplicate = self.get_duplicate_by_id(duplicate_id)
         if duplicate:
@@ -123,12 +123,12 @@ class DuplicateRepository:
             self.db.add(duplicate)
         return duplicate
     
-    def delete_duplicate(self, duplicate: Duplicate) -> None:
+    def delete_duplicate(self, duplicate: DuplicateContact) -> None:
         """
         Delete duplicate record.
         
         Args:
-            duplicate: Duplicate instance to delete
+            duplicate: DuplicateContact instance to delete
         """
         self.db.delete(duplicate)
     
@@ -142,10 +142,10 @@ class DuplicateRepository:
         Returns:
             Number of deleted records
         """
-        count = self.db.query(Duplicate).filter(
+        count = self.db.query(DuplicateContact).filter(
             or_(
-                Duplicate.contact_id_1 == contact_id,
-                Duplicate.contact_id_2 == contact_id
+                DuplicateContact.contact_id_1 == contact_id,
+                DuplicateContact.contact_id_2 == contact_id
             )
         ).delete()
         return count
@@ -157,7 +157,7 @@ class DuplicateRepository:
         Returns:
             Total count
         """
-        return self.db.query(Duplicate).count()
+        return self.db.query(DuplicateContact).count()
     
     def count_pending_duplicates(self) -> int:
         """
@@ -166,7 +166,7 @@ class DuplicateRepository:
         Returns:
             Count of pending duplicates
         """
-        return self.db.query(Duplicate).filter(Duplicate.resolved == False).count()
+        return self.db.query(DuplicateContact).filter(DuplicateContact.resolved == False).count()
     
     def commit(self) -> None:
         """Commit database transaction."""
