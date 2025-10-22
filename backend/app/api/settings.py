@@ -28,12 +28,17 @@ async def get_system_settings(
     """
     Get system settings (admin only).
     Returns various system configuration parameters.
+    Uses ContactRepository and UserRepository
     """
+    from ..repositories import ContactRepository, UserRepository
+    contact_repo = ContactRepository(db)
+    user_repo = UserRepository(db)
+    
     return {
         "database": {
-            "total_contacts": db.query(Contact).count(),
-            "total_users": db.query(User).count(),
-            "pending_users": db.query(User).filter(User.is_active == False).count(),
+            "total_contacts": contact_repo.count(),
+            "total_users": user_repo.count(),
+            "pending_users": user_repo.count_by_is_active(False),
         },
         "ocr": {
             "default_provider": "auto",
@@ -63,8 +68,11 @@ async def get_pending_users(
     """
     Get list of users pending approval (admin only).
     Returns users with is_active=False.
+    Uses UserRepository
     """
-    pending_users = db.query(User).filter(User.is_active == False).all()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    pending_users = user_repo.get_users_by_is_active(False)
     return pending_users
 
 
@@ -76,9 +84,13 @@ async def get_editable_settings(
     """
     Get editable settings (admin only).
     Returns current environment variables and database settings.
+    Uses SettingsRepository
     """
+    from ..repositories import SettingsRepository
+    settings_repo = SettingsRepository(db)
+    
     def get_db_setting(key: str, default: str = ""):
-        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        setting = settings_repo.get_app_setting(key)
         return setting.value if setting else default
     
     return {
@@ -130,14 +142,17 @@ async def update_editable_settings(
     """
     Update editable settings (admin only).
     Saves settings to database.
+    Uses SettingsRepository
     """
+    from ..repositories import SettingsRepository
+    settings_repo = SettingsRepository(db)
+    
     def set_db_setting(key: str, value: str):
-        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
-        if setting:
-            setting.value = value
+        existing = settings_repo.get_app_setting(key)
+        if existing:
+            settings_repo.update_app_setting(key, value)
         else:
-            setting = AppSetting(key=key, value=value)
-            db.add(setting)
+            settings_repo.create_app_setting(key, value)
     
     # Update OCR settings
     if "ocr" in settings:
@@ -204,7 +219,7 @@ async def update_editable_settings(
         if "metrics_retention_days" in settings["monitoring"]:
             set_db_setting("METRICS_RETENTION_DAYS", str(settings["monitoring"]["metrics_retention_days"]))
     
-    db.commit()
+    settings_repo.commit()
     
     logger.info(f"Settings updated by admin: {current_user.username}")
     
@@ -222,11 +237,13 @@ async def get_integrations_status(
     """
     Get status of all integrations (admin only).
     Returns enabled/disabled status and health check for each integration.
+    Uses SettingsRepository
     """
-    from ..models import AppSetting
+    from ..repositories import SettingsRepository
+    settings_repo = SettingsRepository(db)
     
     def get_integration_setting(key: str, default: str = "false"):
-        setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+        setting = settings_repo.get_app_setting(key)
         return setting.value if setting else default
     
     # Check Redis connection
@@ -414,6 +431,7 @@ async def toggle_integration(
 ):
     """
     Enable or disable an integration (admin only).
+    Uses SettingsRepository
     """
     valid_integrations = ["telegram", "whatsapp", "ocr", "auth", "backup", "monitoring", "celery", "redis"]
     
@@ -423,16 +441,19 @@ async def toggle_integration(
             detail=f"Invalid integration ID: {integration_id}"
         )
     
-    # Save to database
+    # Save to database using SettingsRepository
+    from ..repositories import SettingsRepository
+    settings_repo = SettingsRepository(db)
     setting_key = f"{integration_id}.enabled"
-    setting = db.query(AppSetting).filter(AppSetting.key == setting_key).first()
-    if setting:
-        setting.value = "true" if enabled else "false"
-    else:
-        setting = AppSetting(key=setting_key, value="true" if enabled else "false")
-        db.add(setting)
+    value = "true" if enabled else "false"
     
-    db.commit()
+    existing = settings_repo.get_app_setting(setting_key)
+    if existing:
+        settings_repo.update_app_setting(setting_key, value)
+    else:
+        settings_repo.create_app_setting(setting_key, value)
+    
+    settings_repo.commit()
     
     logger.info(f"Integration {integration_id} {'enabled' if enabled else 'disabled'} by {current_user.username}")
     
@@ -480,6 +501,7 @@ async def update_integration_config(
 ):
     """
     Update integration configuration (admin only).
+    Uses SettingsRepository
     """
     valid_integrations = ["telegram", "whatsapp", "ocr", "auth", "backup", "monitoring", "celery", "redis"]
     
@@ -489,17 +511,19 @@ async def update_integration_config(
             detail=f"Invalid integration ID: {integration_id}"
         )
     
-    # Save configuration to database
+    # Save configuration to database using SettingsRepository
+    from ..repositories import SettingsRepository
+    settings_repo = SettingsRepository(db)
+    
     for key, value in config.items():
         setting_key = f"{integration_id}.{key}"
-        setting = db.query(AppSetting).filter(AppSetting.key == setting_key).first()
-        if setting:
-            setting.value = str(value)
+        existing = settings_repo.get_app_setting(setting_key)
+        if existing:
+            settings_repo.update_app_setting(setting_key, str(value))
         else:
-            setting = AppSetting(key=setting_key, value=str(value))
-            db.add(setting)
+            settings_repo.create_app_setting(setting_key, str(value))
     
-    db.commit()
+    settings_repo.commit()
     
     logger.info(f"Integration {integration_id} config updated by {current_user.username}")
     

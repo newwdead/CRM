@@ -128,6 +128,30 @@ class UserRepository:
         """
         return self.db.query(User).count()
     
+    def count_by_is_active(self, is_active: bool) -> int:
+        """
+        Count users by active status.
+        
+        Args:
+            is_active: Active status filter
+        
+        Returns:
+            Count of users with specified active status
+        """
+        return self.db.query(User).filter(User.is_active == is_active).count()
+    
+    def get_users_by_is_active(self, is_active: bool) -> List[User]:
+        """
+        Get users by active status.
+        
+        Args:
+            is_active: Active status filter
+        
+        Returns:
+            List of User instances with specified active status
+        """
+        return self.db.query(User).filter(User.is_active == is_active).all()
+    
     def count_active_users(self) -> int:
         """
         Count active users.
