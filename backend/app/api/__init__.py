@@ -16,6 +16,7 @@ from .health import router as health_router
 from .telegram import router as telegram_router
 from .whatsapp import router as whatsapp_router
 from .exports import router as exports_router
+from .services import router as services_router
 
 # Create main API router
 api_router = APIRouter()
@@ -33,6 +34,7 @@ api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])
 api_router.include_router(telegram_router, prefix="", tags=["Telegram"])  # Absolute paths preserved
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
+api_router.include_router(services_router, prefix="", tags=["Services"])  # No prefix - /services/*
 
 __all__ = [
     'api_router',
@@ -47,7 +49,8 @@ __all__ = [
     'health_router',
     'telegram_router',
     'whatsapp_router',
-    'exports_router'
+    'exports_router',
+    'services_router'
 ]
 
 

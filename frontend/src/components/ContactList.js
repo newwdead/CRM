@@ -67,17 +67,18 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     return [
       { key: 'select', label: '☑️', visible: true, order: 0, width: '40' },
       { key: 'number', label: '№', visible: true, order: 1, width: '50' },
-      { key: 'uid', label: lang === 'ru' ? 'UID' : 'UID', visible: true, order: 2, width: 'auto' },
-      { key: 'name', label: lang === 'ru' ? 'Имя' : 'Name', visible: true, order: 3, width: 'auto' },
-      { key: 'company', label: lang === 'ru' ? 'Компания' : 'Company', visible: true, order: 4, width: 'auto' },
-      { key: 'position', label: lang === 'ru' ? 'Должность' : 'Position', visible: true, order: 5, width: 'auto' },
-      { key: 'email', label: 'Email', visible: true, order: 6, width: 'auto' },
-      { key: 'phone', label: lang === 'ru' ? 'Телефон' : 'Phone', visible: true, order: 7, width: 'auto' },
-      { key: 'address', label: lang === 'ru' ? 'Адрес' : 'Address', visible: false, order: 8, width: 'auto' },
-      { key: 'website', label: lang === 'ru' ? 'Сайт' : 'Website', visible: false, order: 9, width: 'auto' },
-      { key: 'comment', label: lang === 'ru' ? 'Комментарий' : 'Comment', visible: false, order: 10, width: 'auto' },
-      { key: 'photo', label: lang === 'ru' ? 'Фото' : 'Photo', visible: true, order: 11, width: 'auto' },
-      { key: 'actions', label: lang === 'ru' ? 'Действия' : 'Actions', visible: true, order: 12, width: 'auto' },
+      { key: 'date', label: lang === 'ru' ? 'Дата' : 'Date', visible: true, order: 2, width: '100' },
+      { key: 'uid', label: 'UID', visible: false, order: 3, width: '80' },
+      { key: 'name', label: lang === 'ru' ? 'Имя' : 'Name', visible: true, order: 4, width: '150' },
+      { key: 'company', label: lang === 'ru' ? 'Компания' : 'Company', visible: true, order: 5, width: '140' },
+      { key: 'position', label: lang === 'ru' ? 'Должность' : 'Position', visible: true, order: 6, width: '120' },
+      { key: 'email', label: 'Email', visible: true, order: 7, width: '180' },
+      { key: 'phone', label: lang === 'ru' ? 'Телефон' : 'Phone', visible: true, order: 8, width: '130' },
+      { key: 'address', label: lang === 'ru' ? 'Адрес' : 'Address', visible: false, order: 9, width: '150' },
+      { key: 'website', label: lang === 'ru' ? 'Сайт' : 'Website', visible: false, order: 10, width: '60' },
+      { key: 'comment', label: lang === 'ru' ? 'Комментарий' : 'Comment', visible: false, order: 11, width: '120' },
+      { key: 'photo', label: lang === 'ru' ? 'Фото' : 'Photo', visible: true, order: 12, width: '60' },
+      { key: 'actions', label: lang === 'ru' ? 'Действия' : 'Actions', visible: true, order: 13, width: '100' },
     ];
   });
 
@@ -387,6 +388,204 @@ export default function ContactList({ lang = 'ru', onEdit }) {
     .filter(col => col.visible)
     .sort((a, b) => a.order - b.order);
 
+  // Helper function to render cell content based on column key
+  const renderCell = (col, contact, index) => {
+    const c = contact;
+    const cellStyle = { 
+      overflow: 'hidden', 
+      textOverflow: 'ellipsis', 
+      whiteSpace: 'nowrap' 
+    };
+
+    switch (col.key) {
+      case 'select':
+        return (
+          <td key={col.key} onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={selected.includes(c.id)}
+              onChange={() => toggle(c.id)}
+            />
+          </td>
+        );
+
+      case 'number':
+        return (
+          <td key={col.key} style={{ textAlign: 'center', color: '#999', fontWeight: '500' }}>
+            {c.sequence_number || (page - 1) * limit + index + 1}
+          </td>
+        );
+
+      case 'date':
+        return (
+          <td key={col.key} style={{ fontSize: '11px', color: '#666' }} title={c.created_at ? new Date(c.created_at).toLocaleString() : ''}>
+            {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+          </td>
+        );
+
+      case 'uid':
+        return (
+          <td key={col.key} style={cellStyle} title={c.uid}>
+            {c.uid ? (
+              <code style={{ fontSize: '10px', color: '#666' }}>{c.uid.slice(0, 8)}</code>
+            ) : '—'}
+          </td>
+        );
+
+      case 'name':
+        return (
+          <td key={col.key} style={{ ...cellStyle, fontWeight: '500' }} title={c.last_name || c.first_name ? `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim() : c.full_name}>
+            {c.last_name || c.first_name ? (
+              `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim()
+            ) : (
+              c.full_name || '—'
+            )}
+            {duplicateMap[c.id] && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMergingContact(c);
+                }}
+                style={{
+                  marginLeft: '8px',
+                  backgroundColor: '#ff9800',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+                title={lang === 'ru' ? `Найдено ${duplicateMap[c.id]} возможных дубликат(ов). Нажмите для объединения.` : `Found ${duplicateMap[c.id]} possible duplicate(s). Click to merge.`}
+              >
+                ⚠️ {duplicateMap[c.id]}
+              </span>
+            )}
+          </td>
+        );
+
+      case 'company':
+        return (
+          <td key={col.key} style={cellStyle} title={c.company}>
+            {c.company || '—'}
+          </td>
+        );
+
+      case 'position':
+        return (
+          <td key={col.key} style={cellStyle} title={c.position}>
+            {c.position || '—'}
+          </td>
+        );
+
+      case 'email':
+        return (
+          <td key={col.key} style={cellStyle} title={c.email}>
+            {c.email ? (
+              <a href={`mailto:${c.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
+                {c.email}
+              </a>
+            ) : '—'}
+          </td>
+        );
+
+      case 'phone':
+        return (
+          <td key={col.key} style={cellStyle} title={c.phone}>
+            {c.phone ? (
+              <a href={`tel:${c.phone}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
+                {c.phone}
+              </a>
+            ) : '—'}
+          </td>
+        );
+
+      case 'address':
+        return (
+          <td key={col.key} style={cellStyle} title={c.address}>
+            {c.address || '—'}
+          </td>
+        );
+
+      case 'website':
+        return (
+          <td key={col.key} style={{ textAlign: 'center' }}>
+            {c.website ? (
+              <a
+                href={c.website}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--primary-color)', fontSize: '18px', textDecoration: 'none' }}
+                title={c.website}
+                onClick={(e) => e.stopPropagation()}
+              >
+                🔗
+              </a>
+            ) : '—'}
+          </td>
+        );
+
+      case 'comment':
+        return (
+          <td key={col.key} style={cellStyle} title={c.comment}>
+            {c.comment || '—'}
+          </td>
+        );
+
+      case 'photo':
+        return (
+          <td key={col.key} style={{ textAlign: 'center' }}>
+            {c.photo_path ? (
+              <img
+                src={`/files/${c.thumbnail_path || c.photo_path}`}
+                alt="Thumbnail"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewingImage(c.photo_path);
+                }}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  objectFit: 'cover',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  border: '1px solid #ddd'
+                }}
+                title={t.photo}
+              />
+            ) : '—'}
+          </td>
+        );
+
+      case 'actions':
+        return (
+          <td key={col.key} style={{ whiteSpace: 'nowrap' }}>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingOCR(c);
+              }} 
+              className="primary" 
+              style={{ 
+                padding: '6px 12px', 
+                fontSize: '13px',
+                backgroundColor: '#4CAF50'
+              }}
+              title={lang === 'ru' ? 'Редактирование OCR' : 'OCR Editor'}
+            >
+              📝 {t.ocrEdit}
+            </button>
+          </td>
+        );
+
+      default:
+        return <td key={col.key}>—</td>;
+    }
+  };
+
   // Show skeleton while loading
   if (loading) {
     return <ContactListSkeleton rows={limit} />;
@@ -620,35 +819,40 @@ export default function ContactList({ lang = 'ru', onEdit }) {
 
       {/* Contacts Table */}
       <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
-        <table style={{ tableLayout: 'fixed', width: '100%' }}>
+        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: '800px' }}>
         <thead>
             <tr>
-              <th style={{ width: '40px' }}>
-                <input
-                  type="checkbox"
-                  checked={selected.length === contacts.length && contacts.length > 0}
-                  onChange={toggleAll}
-                />
-              </th>
-              <th style={{ width: '50px' }}>№</th>
-              <th style={{ width: '100px' }}>{lang === 'ru' ? 'Дата' : 'Date'}</th>
-              <th style={{ width: '80px' }}>{t.uid}</th>
-              <th style={{ width: '150px' }}>{t.name}</th>
-              <th style={{ width: '140px' }}>{t.company}</th>
-              <th style={{ width: '120px' }}>{t.position}</th>
-              <th style={{ width: '180px' }}>{t.email}</th>
-              <th style={{ width: '130px' }}>{t.phone}</th>
-              <th style={{ width: '150px' }}>{t.address}</th>
-              <th style={{ width: '60px' }}>{t.website}</th>
-              <th style={{ width: '120px' }}>{t.comment}</th>
-              <th style={{ width: '60px', textAlign: 'center' }}>{t.photo}</th>
-              <th style={{ width: '100px' }}>{t.actions}</th>
+              {visibleColumns.map(col => {
+                if (col.key === 'select') {
+                  return (
+                    <th key={col.key} style={{ width: col.width !== 'auto' ? `${col.width}px` : 'auto' }}>
+                      <input
+                        type="checkbox"
+                        checked={selected.length === contacts.length && contacts.length > 0}
+                        onChange={toggleAll}
+                      />
+                    </th>
+                  );
+                }
+                
+                return (
+                  <th 
+                    key={col.key} 
+                    style={{ 
+                      width: col.width !== 'auto' ? `${col.width}px` : 'auto',
+                      textAlign: col.key === 'photo' ? 'center' : 'left'
+                    }}
+                  >
+                    {col.label}
+                  </th>
+                );
+              })}
             </tr>
         </thead>
         <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan="15" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                <td colSpan={visibleColumns.length} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   {search || companyFilter || positionFilter ? '🔍 ' + (lang === 'ru' ? 'Ничего не найдено' : 'Nothing found') : '📭 ' + (lang === 'ru' ? 'Нет контактов' : 'No contacts')}
                 </td>
               </tr>
@@ -661,141 +865,8 @@ export default function ContactList({ lang = 'ru', onEdit }) {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(c.id)}
-                      onChange={() => toggle(c.id)}
-                    />
-                  </td>
-                  <td style={{ textAlign: 'center', color: '#999', fontWeight: '500' }}>
-                    {c.sequence_number || (page - 1) * limit + index + 1}
-                  </td>
-                  <td style={{ fontSize: '11px', color: '#666' }} title={c.created_at ? new Date(c.created_at).toLocaleString() : ''}>
-                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.uid}>
-                    {c.uid ? (
-                      <code style={{ fontSize: '10px', color: '#666' }}>{c.uid.slice(0, 8)}</code>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }} title={c.last_name || c.first_name ? `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim() : c.full_name}>
-                    {c.last_name || c.first_name ? (
-                      `${c.last_name || ''} ${c.first_name || ''} ${c.middle_name || ''}`.trim()
-                    ) : (
-                      c.full_name || '—'
-                    )}
-                    {duplicateMap[c.id] && (
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMergingContact(c);
-                        }}
-                        style={{
-                          marginLeft: '8px',
-                          backgroundColor: '#ff9800',
-                          color: 'white',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
-                        title={lang === 'ru' ? `Найдено ${duplicateMap[c.id]} возможных дубликат(ов). Нажмите для объединения.` : `Found ${duplicateMap[c.id]} possible duplicate(s). Click to merge.`}
-                        data-tooltip-id="duplicate-tooltip"
-                        data-tooltip-content={lang === 'ru' ? `Найдено ${duplicateMap[c.id]} возможных дубликат(ов). Нажмите для объединения.` : `Found ${duplicateMap[c.id]} possible duplicate(s). Click to merge.`}
-                      >
-                        ⚠️ {duplicateMap[c.id]}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.company}>{c.company || '—'}</td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.position}>{c.position || '—'}</td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.email}>
-                    {c.email ? (
-                      <a href={`mailto:${c.email}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
-                        {c.email}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.phone}>
-                    {c.phone ? (
-                      <a href={`tel:${c.phone}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
-                        {c.phone}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.address}>{c.address || '—'}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    {c.website ? (
-                      <a
-                        href={c.website}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: 'var(--primary-color)', fontSize: '18px', textDecoration: 'none' }}
-                        title={c.website}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        🔗
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.comment}>
-                    {c.comment || '—'}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                {c.photo_path ? (
-                      <img
-                        src={`/files/${c.thumbnail_path || c.photo_path}`}
-                        alt="Thumbnail"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewingImage(c.photo_path);
-                        }}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          objectFit: 'cover',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          border: '1px solid #ddd'
-                        }}
-                        title={t.photo}
-                      />
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingOCR(c);
-                      }} 
-                      className="primary" 
-                      style={{ 
-                        padding: '6px 12px', 
-                        fontSize: '13px',
-                        backgroundColor: '#4CAF50'
-                      }}
-                      data-tooltip-id="ocr-tooltip"
-                      data-tooltip-content={lang === 'ru' ? 'Редактирование OCR' : 'OCR Editor'}
-                    >
-                      📝 {t.ocrEdit}
-                    </button>
-              </td>
-            </tr>
+                  {visibleColumns.map(col => renderCell(col, c, index))}
+                </tr>
               ))
             )}
         </tbody>
