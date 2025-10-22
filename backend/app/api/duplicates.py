@@ -42,8 +42,10 @@ def get_duplicates(
         limit: Maximum number of contacts to check (default 50)
     """
     try:
-        # Get all contacts
-        contacts = db.query(Contact).limit(limit).all()
+        # Use ContactRepository for DB access
+        from ..repositories import ContactRepository
+        contact_repo = ContactRepository(db)
+        contacts = contact_repo.find_all(limit=limit)
         
         if len(contacts) < 2:
             return {
@@ -176,12 +178,19 @@ def find_duplicates_manual(
     Manually trigger duplicate detection.
     If contact_ids provided, check only those contacts.
     Otherwise, check all contacts.
+    Uses ContactRepository and DuplicateRepository
     """
+    # Use repositories
+    from ..repositories import ContactRepository, DuplicateRepository
+    contact_repo = ContactRepository(db)
+    duplicate_repo = DuplicateRepository(db)
+    
     # Get contacts to check
     if contact_ids:
-        contacts = db.query(Contact).filter(Contact.id.in_(contact_ids)).all()
+        contacts = [contact_repo.get_by_id(cid) for cid in contact_ids]
+        contacts = [c for c in contacts if c is not None]
     else:
-        contacts = db.query(Contact).all()
+        contacts = contact_repo.get_all()
     
     if len(contacts) < 2:
         return {'message': 'Need at least 2 contacts to find duplicates', 'found': 0}
@@ -200,31 +209,31 @@ def find_duplicates_manual(
             'position': c.position,
         })
     
-    # Find duplicates
+    # Find duplicates using utility
     duplicates = duplicate_utils.find_duplicate_contacts(contact_dicts, threshold)
     
-    # Save to database
+    # Save to database using repository
     saved_count = 0
     for contact1, contact2, score, field_scores in duplicates:
+        contact_id_1 = min(contact1['id'], contact2['id'])
+        contact_id_2 = max(contact1['id'], contact2['id'])
+        
         # Check if already exists
-        existing = db.query(DuplicateContact).filter(
-            DuplicateContact.contact_id_1 == min(contact1['id'], contact2['id']),
-            DuplicateContact.contact_id_2 == max(contact1['id'], contact2['id'])
-        ).first()
+        existing = duplicate_repo.get_by_contact_pair(contact_id_1, contact_id_2)
         
         if not existing:
-            dup = DuplicateContact(
-                contact_id_1=min(contact1['id'], contact2['id']),
-                contact_id_2=max(contact1['id'], contact2['id']),
-                similarity_score=score,
-                match_fields=field_scores,
-                status='pending',
-                auto_detected=False
-            )
-            db.add(dup)
+            duplicate_data = {
+                'contact_id_1': contact_id_1,
+                'contact_id_2': contact_id_2,
+                'similarity_score': score,
+                'match_fields': field_scores,
+                'status': 'pending',
+                'auto_detected': False
+            }
+            duplicate_repo.create_duplicate(duplicate_data)
             saved_count += 1
     
-    db.commit()
+    duplicate_repo.commit()
     
     return {
         'message': f'Found {len(duplicates)} potential duplicates',
@@ -327,10 +336,16 @@ def merge_contacts_endpoint(
     Merge two contacts (advanced version with field selection).
     selected_fields: dict mapping field_name -> 'primary' or 'secondary'
     Example: {'email': 'primary', 'phone': 'secondary', 'company': 'keep_both'}
+    Uses ContactRepository and DuplicateRepository
     """
-    # Get contacts
-    contact1 = db.query(Contact).filter(Contact.id == contact_id_1).first()
-    contact2 = db.query(Contact).filter(Contact.id == contact_id_2).first()
+    # Use repositories
+    from ..repositories import ContactRepository, DuplicateRepository
+    contact_repo = ContactRepository(db)
+    duplicate_repo = DuplicateRepository(db)
+    
+    # Get contacts using repository
+    contact1 = contact_repo.get_by_id(contact_id_1)
+    contact2 = contact_repo.get_by_id(contact_id_2)
     
     if not contact1 or not contact2:
         raise HTTPException(status_code=404, detail='One or both contacts not found')
@@ -388,17 +403,18 @@ def merge_contacts_endpoint(
         if hasattr(contact1, field):
             setattr(contact1, field, value)
     
-    # Update duplicate record
-    dup = db.query(DuplicateContact).filter(
-        DuplicateContact.contact_id_1 == min(contact_id_1, contact_id_2),
-        DuplicateContact.contact_id_2 == max(contact_id_1, contact_id_2)
-    ).first()
+    # Update duplicate record using repository
+    contact_id_min = min(contact_id_1, contact_id_2)
+    contact_id_max = max(contact_id_1, contact_id_2)
+    dup = duplicate_repo.get_by_contact_pair(contact_id_min, contact_id_max)
     
     if dup:
-        dup.status = 'merged'
-        dup.reviewed_at = func.now()
-        dup.reviewed_by = current_user.id
-        dup.merged_into = contact_id_1
+        update_data = {
+            'status': 'merged',
+            'reviewed_by': current_user.id,
+            'merged_into': contact_id_1
+        }
+        duplicate_repo.update(dup, update_data)
     
     # Audit log
     create_audit_log(
@@ -410,10 +426,14 @@ def merge_contacts_endpoint(
         changes={'merged_from': contact_id_2, 'selected_fields': selected_fields}
     )
     
-    # Delete secondary contact
-    db.delete(contact2)
+    # Delete secondary contact using repository
+    contact_repo.delete(contact2)
     
-    db.commit()
+    # Commit both repositories
+    contact_repo.commit()
+    duplicate_repo.commit()
+    
+    # Refresh contact1
     db.refresh(contact1)
     
     return {

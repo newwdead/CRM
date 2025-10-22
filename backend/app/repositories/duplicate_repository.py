@@ -64,6 +64,24 @@ class DuplicateRepository:
             )
         ).all()
     
+    def get_by_contact_pair(self, contact_id_1: int, contact_id_2: int) -> Optional[DuplicateContact]:
+        """
+        Get duplicate by contact pair.
+        
+        Args:
+            contact_id_1: First contact ID
+            contact_id_2: Second contact ID
+            
+        Returns:
+            DuplicateContact instance or None
+        """
+        return self.db.query(DuplicateContact).filter(
+            and_(
+                DuplicateContact.contact_id_1 == contact_id_1,
+                DuplicateContact.contact_id_2 == contact_id_2
+            )
+        ).first()
+    
     def get_pending_duplicates(self) -> List[DuplicateContact]:
         """
         Get all pending (unresolved) duplicates.
@@ -106,6 +124,10 @@ class DuplicateRepository:
                 setattr(duplicate, key, value)
         self.db.add(duplicate)
         return duplicate
+    
+    def update(self, duplicate: DuplicateContact, update_data: Dict[str, Any]) -> DuplicateContact:
+        """Alias for update_duplicate for consistency with other repositories."""
+        return self.update_duplicate(duplicate, update_data)
     
     def mark_as_resolved(self, duplicate_id: int) -> DuplicateContact:
         """
