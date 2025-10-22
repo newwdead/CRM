@@ -116,7 +116,9 @@ async def login(
     # Update auth metrics
     auth_attempts_counter.labels(status='success').inc()
     user_logins_counter.inc()
-    users_total.set(db.query(User).count())
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    users_total.set(user_repo.count())
     
     logger.info(f"User logged in: {user.username}")
     
@@ -165,7 +167,9 @@ async def update_current_user(
     if user_update.password is not None:
         current_user.hashed_password = auth_utils.get_password_hash(user_update.password)
     
-    db.commit()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user_repo.commit()
     db.refresh(current_user)
     
     logger.info(f"User updated profile: {current_user.username}")
@@ -181,8 +185,11 @@ async def list_users(
     """
     List all users (admin only).
     Requires valid JWT token with admin privileges.
+    Uses UserRepository
     """
-    users = db.query(User).all()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    users = user_repo.get_all_users()
     return users
 
 
@@ -195,8 +202,11 @@ async def get_user(
     """
     Get user by ID (admin only).
     Requires valid JWT token with admin privileges.
+    Uses UserRepository
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -215,6 +225,7 @@ async def delete_user(
     Delete user by ID (admin only).
     Requires valid JWT token with admin privileges.
     Cannot delete yourself.
+    Uses UserRepository
     """
     if user_id == current_user.id:
         raise HTTPException(
@@ -222,15 +233,17 @@ async def delete_user(
             detail="Cannot delete yourself"
         )
     
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     
-    db.delete(user)
-    db.commit()
+    user_repo.delete_user(user)
+    user_repo.commit()
     
     logger.info(f"User deleted by admin {current_user.username}: {user.username}")
     
@@ -248,6 +261,7 @@ async def toggle_admin(
     Toggle admin status for a user (admin only).
     Requires valid JWT token with admin privileges.
     Cannot change your own admin status.
+    Uses UserRepository
     """
     if user_id == current_user.id:
         raise HTTPException(
@@ -255,7 +269,9 @@ async def toggle_admin(
             detail="Cannot change your own admin status"
         )
     
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -263,7 +279,7 @@ async def toggle_admin(
         )
     
     user.is_admin = is_admin
-    db.commit()
+    user_repo.commit()
     db.refresh(user)
     
     logger.info(f"Admin status changed by {current_user.username}: {user.username} -> {is_admin}")
@@ -282,8 +298,11 @@ async def reset_user_password(
     Reset user password (admin only).
     Sets a new password for the specified user.
     Requires valid JWT token with admin privileges.
+    Uses UserRepository
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -292,7 +311,7 @@ async def reset_user_password(
     
     # Hash the new password
     user.hashed_password = auth_utils.get_password_hash(new_password)
-    db.commit()
+    user_repo.commit()
     
     logger.info(f"Password reset by admin {current_user.username} for user: {user.username}")
     
@@ -313,8 +332,11 @@ async def activate_user(
     Activate or deactivate a user (admin only).
     Used to approve new user registrations.
     Requires valid JWT token with admin privileges.
+    Uses UserRepository
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -322,7 +344,7 @@ async def activate_user(
         )
     
     user.is_active = is_active
-    db.commit()
+    user_repo.commit()
     db.refresh(user)
     
     action = "activated" if is_active else "deactivated"
@@ -342,8 +364,11 @@ async def update_user_profile(
     Update user profile (admin only).
     Allows updating email, full_name, and password.
     Requires valid JWT token with admin privileges.
+    Uses UserRepository
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    from ..repositories import UserRepository
+    user_repo = UserRepository(db)
+    user = user_repo.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -353,11 +378,8 @@ async def update_user_profile(
     # Update fields if provided
     if update_data.email is not None:
         # Check if email already exists for another user
-        existing = db.query(User).filter(
-            User.email == update_data.email,
-            User.id != user_id
-        ).first()
-        if existing:
+        existing_user = user_repo.get_user_by_email(update_data.email)
+        if existing_user and existing_user.id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already in use by another user"
@@ -370,7 +392,7 @@ async def update_user_profile(
     if update_data.password is not None:
         user.hashed_password = auth_utils.get_password_hash(update_data.password)
     
-    db.commit()
+    user_repo.commit()
     db.refresh(user)
     
     logger.info(f"User profile updated by admin {current_user.username}: {user.username}")
