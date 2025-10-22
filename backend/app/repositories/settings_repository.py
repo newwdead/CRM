@@ -5,11 +5,11 @@ Handles all database operations for AppSetting models.
 
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-from ..models.settings import AppSetting, SystemAppSetting
+from ..models.settings import AppSetting, SystemSettings
 
 
-class AppSettingRepository:
-    """Repository for AppSetting model database operations."""
+class SettingsRepository:
+    """Repository for AppSetting and SystemSettings models database operations."""
     
     def __init__(self, db: Session):
         """
