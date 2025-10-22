@@ -176,6 +176,29 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     loadOCRBlocks();
   }, [contact.id]);
 
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (draggingBlock && editBlockMode) {
+        handleBlockDrag(e);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (draggingBlock) {
+        handleBlockDragEnd();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingBlock, editBlockMode]);
+
   const loadOCRBlocks = async () => {
     try {
       setLoading(true);

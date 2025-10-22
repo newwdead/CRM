@@ -535,7 +535,7 @@ def reprocess_contact_ocr(
     Reprocess OCR for a contact with updated block information.
     Takes modified block positions/sizes and re-extracts contact fields.
     """
-    from ..ocr_manager import OCRManager
+    from ..ocr_providers import OCRManager
     import json
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()

@@ -168,7 +168,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         return None
 
 
-@router.post('/upload/')
+@router.post('/upload')
 @limiter.limit("60/minute")
 async def upload_card(
     request: Request,
@@ -295,7 +295,7 @@ async def upload_card(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
-@router.post('/batch-upload/')
+@router.post('/batch-upload')
 @limiter.limit("10/hour")
 async def batch_upload(
     request: Request,
