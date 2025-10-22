@@ -16,6 +16,7 @@ from .. import auth_utils
 from .. import duplicate_utils
 from ..phone_utils import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
+from ..services.contact_service import ContactService
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -49,92 +50,16 @@ def list_contacts(
     """
     Get paginated list of contacts with advanced search and filtering.
     
-    Parameters:
-    - q: Full-text search across all fields (name, company, position, email, phone)
-    - company: Filter by company (case-insensitive partial match)
-    - position: Filter by position (case-insensitive partial match)
-    - tags: Filter by tag names (comma-separated, e.g., "vip,client")
-    - groups: Filter by group names (comma-separated, e.g., "partners,customers")
-    - sort_by: Field to sort by (id, full_name, company, position)
-    - sort_order: Sort direction (asc, desc)
-    - page: Page number (starts from 1)
-    - limit: Items per page (1-100, default 20)
+    All business logic is delegated to ContactService.
+    Роутер только валидирует параметры и вызывает сервис.
     """
-    # Optimize N+1 queries with eager loading
-    query = db.query(Contact).options(
-        joinedload(Contact.tags),
-        joinedload(Contact.groups)
+    service = ContactService(db)
+    return service.list_contacts(
+        q=q, company=company, position=position,
+        tags=tags, groups=groups,
+        sort_by=sort_by, sort_order=sort_order,
+        page=page, limit=limit
     )
-    
-    # Full-text search
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(
-            (Contact.full_name.ilike(search_term)) |
-            (Contact.company.ilike(search_term)) |
-            (Contact.position.ilike(search_term)) |
-            (Contact.email.ilike(search_term)) |
-            (Contact.phone.ilike(search_term)) |
-            (Contact.website.ilike(search_term)) |
-            (Contact.address.ilike(search_term))
-        )
-    
-    # Filter by company
-    if company:
-        query = query.filter(Contact.company.ilike(f"%{company}%"))
-    
-    # Filter by position
-    if position:
-        query = query.filter(Contact.position.ilike(f"%{position}%"))
-    
-    # Filter by tags
-    if tags:
-        tag_names = [name.strip() for name in tags.split(',') if name.strip()]
-        if tag_names:
-            # Get tag IDs for the given names
-            tag_records = db.query(Tag).filter(Tag.name.in_(tag_names)).all()
-            tag_ids = [tag.id for tag in tag_records]
-            
-            if tag_ids:
-                # Filter contacts that have ANY of the specified tags
-                query = query.filter(Contact.tags.any(Tag.id.in_(tag_ids)))
-    
-    # Filter by groups
-    if groups:
-        group_names = [name.strip() for name in groups.split(',') if name.strip()]
-        if group_names:
-            # Get group IDs for the given names
-            group_records = db.query(Group).filter(Group.name.in_(group_names)).all()
-            group_ids = [group.id for group in group_records]
-            
-            if group_ids:
-                # Filter contacts that have ANY of the specified groups
-                query = query.filter(Contact.groups.any(Group.id.in_(group_ids)))
-    
-    # Sorting
-    sort_field = getattr(Contact, sort_by, Contact.id)
-    if sort_order.lower() == 'asc':
-        query = query.order_by(sort_field.asc())
-    else:
-        query = query.order_by(sort_field.desc())
-    
-    # Get total count before pagination
-    total = query.count()
-    
-    # Calculate pagination
-    pages = (total + limit - 1) // limit  # Ceiling division
-    offset = (page - 1) * limit
-    
-    # Apply pagination
-    items = query.offset(offset).limit(limit).all()
-    
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": pages
-    }
 
 
 @router.get('/search/')
