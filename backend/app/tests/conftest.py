@@ -150,3 +150,30 @@ def admin_auth_token(client, test_db):
     assert response.status_code == 200, f"Admin login failed: {response.text}"
     return response.json()["access_token"]
 
+
+@pytest.fixture
+def test_contact(test_db):
+    """Create a test contact"""
+    from ..models import Contact
+    import uuid
+    
+    contact = Contact(
+        uid=f'test-uid-{uuid.uuid4()}',
+        first_name='John',
+        last_name='Doe',
+        email='john@test.com',
+        phone='+1234567890',
+        company='Test Company',
+        position='Manager'
+    )
+    test_db.add(contact)
+    test_db.commit()
+    test_db.refresh(contact)
+    return contact
+
+
+@pytest.fixture
+def db(test_db):
+    """Alias for test_db to match repository tests"""
+    return test_db
+
