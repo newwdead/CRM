@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import ContactEdit from '../ContactEdit';
-import OCREditorWithBlocks from '../OCREditorWithBlocks';
+import { OCREditorContainer } from '../../modules/ocr';
 import PageTitle from '../routing/PageTitle';
 import toast from 'react-hot-toast';
 
@@ -78,7 +78,7 @@ const ContactPage = ({ lang = 'ru' }) => {
           title={`${lang === 'ru' ? 'Редактор OCR' : 'OCR Editor'} - ${contact.first_name || contact.uid}`}
           lang={lang}
         />
-        <OCREditorWithBlocks
+        <OCREditorContainer
           contact={contact}
           onSave={handleOCRSave}
           onClose={handleBack}

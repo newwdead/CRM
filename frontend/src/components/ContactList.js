@@ -3,7 +3,7 @@ import ContactCard from './ContactCard';
 import { ContactListSkeleton } from './SkeletonLoader';
 import TableSettings from './TableSettings';
 import OCREditor from './OCREditor';
-import OCREditorWithBlocks from './OCREditorWithBlocks';
+import { OCREditorContainer } from '../modules/ocr';
 import DuplicateMergeModal from './DuplicateMergeModal';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
@@ -1019,7 +1019,7 @@ export default function ContactList({ lang = 'ru', onEdit }) {
 
       {/* OCR Editor Modal */}
       {editingOCR && (
-        <OCREditorWithBlocks
+        <OCREditorContainer
           contact={editingOCR}
           onSave={async (updatedData) => {
             try {
