@@ -1,0 +1,327 @@
+/* Mobile-specific styles for FastAPI Business Card CRM */
+
+/* Base mobile viewport */
+@media screen and (max-width: 768px) {
+  /* Body adjustments */
+  body.mobile {
+    -webkit-overflow-scrolling: touch;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Safe area support for notched devices */
+  body.mobile,
+  body.pwa {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Container adjustments */
+  .container {
+    padding: 12px 16px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* Space for bottom nav */
+  }
+
+  /* Card spacing */
+  .card {
+    margin-bottom: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Headers */
+  h1 {
+    font-size: 24px;
+    margin: 0 0 16px 0;
+  }
+
+  h2 {
+    font-size: 20px;
+    margin: 0 0 12px 0;
+  }
+
+  h3 {
+    font-size: 18px;
+    margin: 0 0 8px 0;
+  }
+
+  /* Buttons - larger touch targets */
+  button,
+  .btn {
+    min-height: 44px; /* iOS recommended */
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    touch-action: manipulation; /* Prevent double-tap zoom */
+  }
+
+  /* Form inputs */
+  input,
+  textarea,
+  select {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+
+  /* Tables - hide on mobile, use card view instead */
+  table {
+    display: none !important;
+  }
+
+  /* Navigation - hide main nav on mobile */
+  .nav {
+    display: none !important;
+  }
+
+  /* Modal - full screen on mobile */
+  .modal {
+    position: fixed;
+    inset: 0;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Grid - single column on mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* Landscape mode adjustments */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .container {
+    padding: 8px 12px;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+}
+
+/* Tablet adjustments (768px - 1024px) */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  body.tablet {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* Two-column layout for tablets */
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Touch-specific interactions */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  *:hover {
+    /* Reset hover states */
+  }
+
+  /* Add active/touch states instead */
+  button:active,
+  .btn:active,
+  a:active {
+    transform: scale(0.98);
+    opacity: 0.8;
+  }
+}
+
+/* PWA-specific styles */
+body.pwa {
+  /* Hide address bar on iOS PWA */
+  -webkit-app-region: drag;
+}
+
+body.pwa .container {
+  /* Additional padding for PWA status bar */
+  padding-top: calc(20px + env(safe-area-inset-top));
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  body.mobile {
+    background: #121212;
+    color: #ffffff;
+  }
+
+  .card {
+    background: #1e1e1e;
+    border-color: #333;
+  }
+
+  input,
+  textarea,
+  select {
+    background: #2a2a2a;
+    color: #ffffff;
+    border-color: #444;
+  }
+}
+
+/* Accessibility - high contrast mode */
+@media (prefers-contrast: high) {
+  button,
+  .btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduce motion for users with motion sensitivity */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Loading skeleton for mobile */
+.skeleton-mobile {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Swipe gestures */
+.swipeable {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* Bottom sheet/modal */
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+/* Pull to refresh indicator */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Camera overlay */
+.camera-overlay {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 9999;
+}
+
+/* Floating action button (FAB) */
+.fab {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-color, #2563eb);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 100;
+  transition: transform 0.2s;
+}
+
+.fab:active {
+  transform: scale(0.9);
+}
+
+/* Toast notifications - mobile optimized */
+.toast-mobile {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 1002;
+  min-width: 200px;
+  text-align: center;
+}
+
+/* Splash screen for PWA */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--primary-color, #2563eb);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 9999;
+}
+
+/* Mobile-specific utility classes */
+.mobile-show {
+  display: none !important;
+}
+
+@media screen and (max-width: 768px) {
+  .mobile-show {
+    display: block !important;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
