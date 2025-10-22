@@ -18,6 +18,11 @@ import logging
 from .database import engine, Base
 from .models import Contact
 from .api import api_router
+from .middleware import (
+    ErrorHandlerMiddleware,
+    SecurityHeadersMiddleware,
+    RequestLoggingMiddleware
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,7 +112,7 @@ backfill_uids()
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="2.22.0",
+    version="2.27.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -148,6 +153,16 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
+
+# Custom Middleware (order matters!)
+# 1. Request Logging (first to capture all requests)
+app.add_middleware(RequestLoggingMiddleware)
+
+# 2. Security Headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. Error Handler (last to catch all errors)
+app.add_middleware(ErrorHandlerMiddleware)
 
 # Include API routers (modular structure)
 app.include_router(api_router)
