@@ -1,5 +1,6 @@
 """
 Duplicate Detection API endpoints
+Migrated to use DuplicateService (Repository Pattern)
 """
 from fastapi import APIRouter, Depends, HTTPException, Body, status
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ import logging
 
 from ..database import get_db
 from ..models import Contact, User, DuplicateContact
+from ..services import DuplicateService
 from .. import duplicate_utils
 from .. import auth_utils
 from ..core.utils import create_audit_log
@@ -241,19 +243,17 @@ def update_duplicate_status(
 ):
     """
     Update duplicate status: pending, reviewed, ignored
+    Uses DuplicateService for business logic
     """
     if status not in ["pending", "reviewed", "ignored"]:
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
-    if not dup:
+    # Use DuplicateService
+    service = DuplicateService(db)
+    updated = service.update_duplicate_status(duplicate_id, status, current_user.id)
+    
+    if not updated:
         raise HTTPException(status_code=404, detail="Duplicate not found")
-
-    dup.status = status
-    dup.reviewed_at = func.now()
-    dup.reviewed_by = current_user.id
-
-    db.commit()
 
     return {"message": "Status updated", "duplicate_id": duplicate_id, "status": status}
 
@@ -266,16 +266,14 @@ def ignore_duplicate(
 ):
     """
     Mark a duplicate as ignored (convenience endpoint for marking false positives).
+    Uses DuplicateService
     """
-    dup = db.query(DuplicateContact).filter(DuplicateContact.id == duplicate_id).first()
-    if not dup:
+    # Use DuplicateService
+    service = DuplicateService(db)
+    updated = service.mark_as_ignored(duplicate_id, current_user.id)
+    
+    if not updated:
         raise HTTPException(status_code=404, detail="Duplicate not found")
-
-    dup.status = "ignored"
-    dup.reviewed_at = func.now()
-    dup.reviewed_by = current_user.id
-
-    db.commit()
 
     return {"message": "Duplicate marked as ignored", "duplicate_id": duplicate_id}
 
@@ -291,42 +289,14 @@ def merge_contacts_simple(
     Merge two contacts (simple version).
     The secondary contact's data is merged into the primary contact,
     and the secondary contact is deleted.
+    Uses DuplicateService for business logic
     """
-    # Get contacts
-    primary = db.query(Contact).filter(Contact.id == primary_id).first()
-    secondary = db.query(Contact).filter(Contact.id == secondary_id).first()
+    # Use DuplicateService
+    service = DuplicateService(db)
+    merged_contact = service.merge_contacts(primary_id, [secondary_id], current_user.id)
     
-    if not primary or not secondary:
+    if not merged_contact:
         raise HTTPException(status_code=404, detail='One or both contacts not found')
-    
-    # Merge non-empty fields from secondary into primary
-    merge_fields = [
-        'full_name', 'first_name', 'last_name', 'middle_name',
-        'email', 'phone', 'phone_mobile', 'phone_work', 'phone_additional',
-        'company', 'position', 'department',
-        'address', 'address_additional', 'website',
-        'birthday', 'comment'
-    ]
-    
-    for field in merge_fields:
-        primary_value = getattr(primary, field, None)
-        secondary_value = getattr(secondary, field, None)
-        
-        # If primary is empty but secondary has a value, copy it
-        if not primary_value and secondary_value:
-            setattr(primary, field, secondary_value)
-    
-    # Update duplicate record if exists
-    dup = db.query(DuplicateContact).filter(
-        DuplicateContact.contact_id_1 == min(primary_id, secondary_id),
-        DuplicateContact.contact_id_2 == max(primary_id, secondary_id)
-    ).first()
-    
-    if dup:
-        dup.status = 'merged'
-        dup.reviewed_at = func.now()
-        dup.reviewed_by = current_user.id
-        dup.merged_into = primary_id
     
     # Audit log
     create_audit_log(
@@ -337,12 +307,6 @@ def merge_contacts_simple(
         entity_type='contact',
         changes={'merged_from': secondary_id}
     )
-    
-    # Delete secondary contact
-    db.delete(secondary)
-    
-    db.commit()
-    db.refresh(primary)
     
     return {
         'message': 'Contacts merged successfully',
