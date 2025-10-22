@@ -6,12 +6,12 @@ Handles all database operations for DuplicateContact models.
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import List, Optional, Dict, Any
-from ..models.duplicate import DuplicateContactContact
+from ..models.duplicate import DuplicateContact
 from ..models.contact import Contact
 
 
-class DuplicateContactRepository:
-    """Repository for DuplicateContactContact model database operations."""
+class DuplicateRepository:
+    """Repository for DuplicateContact model database operations."""
     
     def __init__(self, db: Session):
         """
