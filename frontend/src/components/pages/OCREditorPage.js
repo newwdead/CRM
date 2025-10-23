@@ -32,7 +32,7 @@ const OCREditorPage = () => {
       }
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/contacts/${id}`,
+        `/api/contacts/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -59,7 +59,7 @@ const OCREditorPage = () => {
       const token = localStorage.getItem('token');
       
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/contacts/${id}`,
+        `/api/contacts/${id}`,
         {
           method: 'PUT',
           headers: {
