@@ -134,7 +134,6 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         data['photo_path'] = safe_name
         data['thumbnail_path'] = thumbnail_name
         data['ocr_raw'] = raw_json
-        data['recognition_method'] = recognition_method
         if user_id:
             data['user_id'] = user_id
         
@@ -159,7 +158,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
             "notes": contact.notes,
             "photo_path": contact.photo_path,
             "thumbnail_path": contact.thumbnail_path,
-            "recognition_method": contact.recognition_method,
+            "recognition_method": recognition_method,
         }
         
         return contact_dict
