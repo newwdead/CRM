@@ -238,7 +238,8 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
   return (
     <div style={{
       padding: '20px',
-      maxWidth: '1200px',
+      maxWidth: '100%',
+      width: '100%',
       margin: '0 auto'
     }}>
       <h2>{t.title}</h2>

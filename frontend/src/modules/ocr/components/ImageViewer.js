@@ -49,7 +49,8 @@ export const ImageViewer = ({
       style={{
         position: 'relative',
         width: '100%',
-        maxHeight: '600px',
+        minHeight: '400px',
+        maxHeight: '80vh',
         overflow: 'auto',
         border: '1px solid #ddd',
         borderRadius: '4px',
