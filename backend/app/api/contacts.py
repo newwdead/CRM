@@ -515,6 +515,101 @@ def merge_duplicates(
     }
 
 
+@router.get('/{contact_id}/scan-qr')
+def scan_qr_code_from_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Сканировать QR код из изображения контакта
+    """
+    from .. import qr_utils
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.photo_path:
+        raise HTTPException(status_code=400, detail='Contact has no image')
+    
+    # Read image
+    image_path = f'./uploads/{contact.photo_path}'
+    try:
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail='Image file not found')
+    
+    # Scan QR code
+    qr_data = qr_utils.scan_qr_code(image_bytes)
+    
+    if not qr_data:
+        return {
+            'has_qr': False,
+            'qr_data': None,
+            'contact_data': None,
+            'message': 'QR код не найден на изображении'
+        }
+    
+    # Parse QR data if it's a contact format (vCard or MeCard)
+    contact_data = qr_utils.extract_contact_from_qr(qr_data)
+    
+    # Save QR data to contact
+    contact.has_qr_code = 1
+    contact.qr_data = qr_data
+    db.commit()
+    
+    return {
+        'has_qr': True,
+        'qr_data': qr_data,
+        'contact_data': contact_data,
+        'qr_type': 'vCard' if 'BEGIN:VCARD' in qr_data.upper() else ('MeCard' if qr_data.upper().startswith('MECARD:') else 'Other'),
+        'message': 'QR код успешно распознан'
+    }
+
+
+@router.post('/{contact_id}/apply-qr-data')
+def apply_qr_data_to_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Применить данные из QR кода к контакту
+    """
+    from .. import qr_utils
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.qr_data:
+        raise HTTPException(status_code=400, detail='No QR data found for this contact')
+    
+    # Extract contact data from QR
+    contact_data = qr_utils.extract_contact_from_qr(contact.qr_data)
+    
+    if not contact_data:
+        raise HTTPException(status_code=400, detail='Could not parse contact data from QR code')
+    
+    # Apply data to contact (only non-empty fields)
+    updated_fields = []
+    for field, value in contact_data.items():
+        if value and hasattr(contact, field):
+            setattr(contact, field, value)
+            updated_fields.append(field)
+    
+    db.commit()
+    db.refresh(contact)
+    
+    return {
+        'status': 'success',
+        'updated_fields': updated_fields,
+        'message': f'Обновлено полей: {len(updated_fields)}'
+    }
+
+
 @router.post('/{contact_id}/reprocess-ocr')
 def reprocess_contact_ocr(
     contact_id: int,

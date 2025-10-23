@@ -24,6 +24,7 @@ const DuplicatesSimple = React.lazy(() => import('./components/DuplicatesSimple'
 const ImportExport = React.lazy(() => import('./components/ImportExport'));
 const Settings = React.lazy(() => import('./components/Settings'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+const QRViewer = React.lazy(() => import('./components/QRViewer'));
 
 /**
  * Scroll Restoration Component
@@ -169,6 +170,9 @@ function App() {
                       <Route path="/contacts" element={<ContactsPage lang={lang} />} />
                       <Route path="/contacts/:id" element={<ContactPage lang={lang} />} />
                       <Route path="/contacts/:id/ocr-editor" element={<OCREditorPage lang={lang} />} />
+
+                      {/* QR Code Viewer */}
+                      <Route path="/contacts/:id/qr" element={<QRViewer lang={lang} />} />
 
                       {/* Organizations */}
                       <Route path="/companies" element={<Companies lang={lang} />} />

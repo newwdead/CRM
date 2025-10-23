@@ -570,12 +570,35 @@ export default function ContactList({ lang = 'ru', onEdit }) {
               style={{ 
                 padding: '6px 12px', 
                 fontSize: '13px',
-                backgroundColor: '#4CAF50'
+                backgroundColor: '#4CAF50',
+                marginRight: '4px'
               }}
               title={lang === 'ru' ? 'Редактирование OCR' : 'OCR Editor'}
             >
               📝 {t.ocrEdit}
             </button>
+            
+            {/* QR Button - only show if QR code exists or image has photo */}
+            {(c.has_qr_code || c.photo_path) && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/contacts/${c.id}/qr`);
+                }} 
+                className="primary" 
+                style={{ 
+                  padding: '6px 12px', 
+                  fontSize: '13px',
+                  backgroundColor: c.has_qr_code ? '#10b981' : '#3b82f6'
+                }}
+                title={lang === 'ru' ? 
+                  (c.has_qr_code ? 'Просмотр QR кода' : 'Сканировать QR код') : 
+                  (c.has_qr_code ? 'View QR Code' : 'Scan QR Code')
+                }
+              >
+                {c.has_qr_code ? '✅ QR' : '🔍 QR'}
+              </button>
+            )}
           </td>
         );
 

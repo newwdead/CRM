@@ -88,6 +88,10 @@ class Contact(Base):
     thumbnail_path = Column(String, nullable=True)  # Thumbnail path
     ocr_raw = Column(String, nullable=True)  # Raw OCR text
     
+    # QR Code data
+    has_qr_code = Column(Integer, nullable=True, default=0)  # 1 if QR code detected, 0 otherwise
+    qr_data = Column(String, nullable=True)  # Raw QR code data (vCard, MeCard, URL, etc.)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
