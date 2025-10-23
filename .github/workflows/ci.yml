@@ -71,7 +71,7 @@ jobs:
         continue-on-error: true  # Don't fail build, coverage is informational
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./backend/coverage.xml
           flags: backend
