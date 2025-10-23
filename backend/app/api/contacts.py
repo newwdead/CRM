@@ -246,6 +246,7 @@ def get_contact_ocr_blocks(
         
         return {
             'contact_id': contact_id,
+            'image_url': f'/files/{contact.photo_path}',  # Image URL for frontend
             'image_width': result['image_width'],
             'image_height': result['image_height'],
             'blocks': result['blocks'],  # Word-level blocks
