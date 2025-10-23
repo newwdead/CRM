@@ -235,22 +235,38 @@ def get_contact_ocr_blocks(
         with open(image_path, 'rb') as f:
             image_bytes = f.read()
         
-        # Get Tesseract language from settings
-        tesseract_langs = get_setting(db, 'TESSERACT_LANGS', 'rus+eng')
+        # Check if contact has saved OCR blocks (user-modified)
+        import json
+        saved_blocks = None
+        if contact.ocr_raw:
+            try:
+                ocr_data = json.loads(contact.ocr_raw)
+                if isinstance(ocr_data, dict) and 'blocks' in ocr_data:
+                    saved_blocks = ocr_data['blocks']
+            except:
+                pass
         
-        # Extract blocks
-        result = tesseract_boxes.get_text_blocks(image_bytes, lang=tesseract_langs)
-        
-        # Group into lines for easier visualization
-        lines = tesseract_boxes.group_blocks_by_line(result['blocks'])
+        # If we have saved blocks, use them; otherwise extract from image
+        if saved_blocks:
+            # Use saved blocks from previous edit/reprocess
+            lines = saved_blocks
+            image_width = saved_blocks[0].get('image_width', 0) if saved_blocks else 0
+            image_height = saved_blocks[0].get('image_height', 0) if saved_blocks else 0
+        else:
+            # Extract blocks from image using Tesseract
+            tesseract_langs = get_setting(db, 'TESSERACT_LANGS', 'rus+eng')
+            result = tesseract_boxes.get_text_blocks(image_bytes, lang=tesseract_langs)
+            lines = tesseract_boxes.group_blocks_by_line(result['blocks'])
+            image_width = result['image_width']
+            image_height = result['image_height']
         
         return {
             'contact_id': contact_id,
             'image_url': f'/files/{contact.photo_path}',  # Image URL for frontend
-            'image_width': result['image_width'],
-            'image_height': result['image_height'],
-            'blocks': result['blocks'],  # Word-level blocks
-            'lines': lines,  # Line-level grouped blocks
+            'image_width': image_width,
+            'image_height': image_height,
+            'blocks': lines if not saved_blocks else [],  # Word-level blocks (legacy)
+            'lines': lines,  # Line-level grouped blocks or saved blocks
             'current_data': {
                 'first_name': contact.first_name,
                 'last_name': contact.last_name,
@@ -309,6 +325,37 @@ def save_ocr_correction(
     return {'status': 'success', 'message': 'Correction saved for training'}
 
 
+@router.post('/{contact_id}/save-ocr-blocks')
+def save_ocr_blocks(
+    contact_id: int,
+    blocks_data: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Save OCR blocks without reprocessing.
+    Stores user-modified blocks for future reference.
+    """
+    import json
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    blocks = blocks_data.get('blocks', [])
+    
+    # Save blocks to ocr_raw
+    ocr_data = {
+        'blocks': blocks,
+        'timestamp': str(contact.updated_at or '')
+    }
+    contact.ocr_raw = json.dumps(ocr_data, ensure_ascii=False)
+    
+    db.commit()
+    
+    return {'status': 'success', 'message': 'Blocks saved'}
+
+
 @router.post('/{contact_id}/reprocess-ocr')
 def reprocess_contact_ocr(
     contact_id: int,
@@ -320,7 +367,6 @@ def reprocess_contact_ocr(
     Reprocess OCR for a contact with updated block information.
     Takes modified block positions/sizes and re-extracts contact fields.
     """
-    from ..ocr_providers import OCRManager
     import json
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
@@ -338,20 +384,29 @@ def reprocess_contact_ocr(
     
     # Use OCR utils to extract fields from combined text
     from .. import ocr_utils
+    import re
     
     try:
-        # Parse the combined text to extract structured data
-        extracted_data = ocr_utils.parse_ocr_text(all_text)
-        # Enhance the data
-        extracted_data = ocr_utils.enhance_ocr_result(extracted_data, raw_text=all_text)
+        # Start with empty data dict
+        extracted_data = {}
+        
+        # Use enhance_ocr_result to parse the text
+        # It extracts emails, phones, addresses, names, etc from raw text
+        extracted_data = ocr_utils.enhance_ocr_result({}, raw_text=all_text)
         
         # Update contact with new data (only non-empty fields)
         for field, value in extracted_data.items():
             if value and hasattr(contact, field):
                 setattr(contact, field, value)
         
-        # Update OCR raw text
-        contact.ocr_raw = all_text
+        # Update OCR raw text and save blocks for future reference
+        import json
+        ocr_data = {
+            'text': all_text,
+            'blocks': blocks,  # Save user-modified blocks
+            'timestamp': str(db.query(Contact).filter(Contact.id == contact_id).first().updated_at or '')
+        }
+        contact.ocr_raw = json.dumps(ocr_data, ensure_ascii=False)
         
         db.commit()
         db.refresh(contact)
