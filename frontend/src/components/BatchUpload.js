@@ -109,7 +109,7 @@ export default function BatchUpload({ lang = 'ru' }) {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/batch-upload/', {
+      const res = await fetch('/api/ocr/batch-upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -142,7 +142,7 @@ export default function BatchUpload({ lang = 'ru' }) {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`/api/batch-status/${taskId}`, {
+        const res = await fetch(`/api/ocr/batch-status/${taskId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 

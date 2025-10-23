@@ -113,7 +113,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const url = `/api/upload/?provider=${encodeURIComponent(provider)}`;
+      const url = `/api/ocr/upload?provider=${encodeURIComponent(provider)}`;
       
       const token = localStorage.getItem('token');
       const headers = {};
