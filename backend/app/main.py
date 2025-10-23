@@ -165,7 +165,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 
 # Include API routers (modular structure)
-app.include_router(api_router, prefix="/api")
+# Note: Nginx already handles /api/ prefix and proxies to / on backend
+app.include_router(api_router)
 
 
 # ============================================================================
