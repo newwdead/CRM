@@ -154,7 +154,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
             "phone": contact.phone,
             "website": contact.website,
             "address": contact.address,
-            "notes": contact.notes,
+            "notes": contact.comment,  # Contact model uses comment, not notes
             "photo_path": contact.photo_path,
             "thumbnail_path": contact.thumbnail_path,
             "recognition_method": recognition_method,
