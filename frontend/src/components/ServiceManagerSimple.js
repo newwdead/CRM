@@ -24,7 +24,7 @@ const ServiceManagerSimple = () => {
         throw new Error('No authentication token found');
       }
       
-      const response = await fetch('/services/status', {
+      const response = await fetch('/api/services/status', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -18,7 +18,7 @@ function SystemResources() {
   const fetchResources = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/system/resources', {
+      const response = await fetch('/api/system/resources', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
