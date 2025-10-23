@@ -86,6 +86,28 @@ def db_session(test_db):
 
 
 @pytest.fixture
+def test_user(test_db, test_user_data):
+    """Create and return a test User instance"""
+    from ..models import User
+    from passlib.context import CryptContext
+    
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
+    user = User(
+        username=test_user_data["username"],
+        email=test_user_data["email"],
+        hashed_password=pwd_context.hash(test_user_data["password"]),
+        full_name=test_user_data.get("full_name", "Test User"),
+        is_active=True,
+        is_admin=False
+    )
+    test_db.add(user)
+    test_db.commit()
+    test_db.refresh(user)
+    return user
+
+
+@pytest.fixture
 def auth_token(client, test_db, test_user_data):
     """Create a regular user and return auth token"""
     from ..models import User
