@@ -233,7 +233,13 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
     );
   }
 
-  const imageUrl = contact.image_url || contact.card_image;
+  // Contact model uses photo_path, not image_url or card_image
+  // photo_path is relative to uploads/ directory, need to add /api/uploads/ prefix
+  const imageUrl = contact.photo_path 
+    ? `/api/uploads/${contact.photo_path}` 
+    : contact.thumbnail_path 
+    ? `/api/uploads/${contact.thumbnail_path}` 
+    : null;
 
   return (
     <div style={{
