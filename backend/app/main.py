@@ -165,7 +165,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 
 # Include API routers (modular structure)
-app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
 
 
 # ============================================================================
