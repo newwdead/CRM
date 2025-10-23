@@ -74,10 +74,8 @@ export const ImageViewer = ({
           alt="Business card"
           style={{
             display: 'block',
-            maxWidth: '100%',
+            width: '100%',
             height: 'auto',
-            transform: `scale(${imageScale})`,
-            transformOrigin: 'top left',
             userSelect: 'none'
           }}
         />
