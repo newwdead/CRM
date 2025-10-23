@@ -14,6 +14,7 @@ import { ImageViewer } from './ImageViewer';
 import { BlockCanvas } from './BlockCanvas';
 import { BlockToolbar } from './BlockToolbar';
 import { BlocksList } from './BlocksList';
+import { FieldMapper } from './FieldMapper';
 
 export const OCREditorContainer = ({ contact, onSave, onClose }) => {
   const [editedData, setEditedData] = useState({});
@@ -30,6 +31,7 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
   // Используем хуки
   const {
     blocks,
+    setBlocks,
     loading,
     reprocessing,
     imageScale,
@@ -294,6 +296,20 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
         assigningToField={assigningToField}
         language={language}
       />
+
+      {/* Field Mapper */}
+      <div style={{ marginTop: '20px' }}>
+        <FieldMapper
+          blocks={blocks}
+          onBlocksUpdate={(updatedBlocks) => {
+            // Update blocks state from FieldMapper
+            setBlocks(updatedBlocks);
+          }}
+          contactId={contact.id}
+          selectedBlock={selectedBlocks[0]}
+          language={language}
+        />
+      </div>
 
       {/* Edit block text modal */}
       {editingBlockText !== null && (

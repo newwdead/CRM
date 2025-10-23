@@ -149,6 +149,7 @@ export const useOCRBlocks = (contact, language = 'ru') => {
 
   return {
     blocks,
+    setBlocks,
     loading,
     reprocessing,
     imageScale,

@@ -10,6 +10,7 @@ from .duplicates import router as duplicates_router
 from .settings import router as settings_router
 from .admin import router as admin_router
 from .ocr import router as ocr_router
+from .ocr_blocks import router as ocr_blocks_router
 from .tags import router as tags_router
 from .groups import router as groups_router
 from .health import router as health_router
@@ -30,6 +31,7 @@ api_router.include_router(duplicates_router, prefix="/duplicates", tags=["Duplic
 api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
 api_router.include_router(admin_router, prefix="", tags=["Admin"])  # No prefix for backward compatibility
 api_router.include_router(ocr_router, prefix="/ocr", tags=["OCR"])
+api_router.include_router(ocr_blocks_router, prefix="/ocr-blocks", tags=["OCR Blocks"])
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])
 api_router.include_router(telegram_router, prefix="", tags=["Telegram"])  # Absolute paths preserved
