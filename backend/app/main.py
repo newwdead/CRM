@@ -112,7 +112,7 @@ backfill_uids()
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="3.2.9",
+    version="3.3.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
