@@ -134,8 +134,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         data['photo_path'] = safe_name
         data['thumbnail_path'] = thumbnail_name
         data['ocr_raw'] = raw_json
-        if user_id:
-            data['user_id'] = user_id
+        # Note: user_id is not a field in Contact model, skip it
         
         # Save to database using ContactRepository
         from ..repositories import ContactRepository
