@@ -127,47 +127,51 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
   const handleImageMouseDown = (event) => {
     if (!isAddingBlock) return;
     
-    const container = imageRef.current;
-    if (!container) return;
-    
+    // Get container element
+    const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / imageScale;
-    const y = (event.clientY - rect.top) / imageScale;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
     
+    console.log('[OCR] Add block - mouse down at:', { x, y });
     setNewBlockStart({ x, y });
   };
 
   const handleImageMouseUp = (event) => {
     if (!isAddingBlock || !newBlockStart) return;
     
-    const container = imageRef.current;
-    if (!container) return;
-    
+    // Get container element
+    const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / imageScale;
-    const y = (event.clientY - rect.top) / imageScale;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
     
     const width = Math.abs(x - newBlockStart.x);
     const height = Math.abs(y - newBlockStart.y);
     
+    console.log('[OCR] Add block - mouse up at:', { x, y, width, height });
+    
     if (width < 20 || height < 10) {
+      toast.info(language === 'ru' ? 'Блок слишком маленький' : 'Block too small');
       setIsAddingBlock(false);
       setNewBlockStart(null);
       return;
     }
     
     const newBlock = {
-      text: language === 'ru' ? 'Новый текст' : 'New text',
+      text: language === 'ru' ? 'Новый блок (кликните для редактирования)' : 'New block (click to edit)',
       box: {
         x: Math.min(newBlockStart.x, x),
         y: Math.min(newBlockStart.y, y),
         width: width,
         height: height
       },
-      confidence: 0
+      confidence: 100
     };
     
+    console.log('[OCR] Creating new block:', newBlock);
     addBlock(newBlock);
+    toast.success(language === 'ru' ? 'Блок добавлен!' : 'Block added!');
     setIsAddingBlock(false);
     setNewBlockStart(null);
   };
