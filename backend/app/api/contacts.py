@@ -336,12 +336,14 @@ def reprocess_contact_ocr(
     # Combine all block texts
     all_text = '\n'.join([block.get('text', '') for block in blocks])
     
-    # Use OCR Manager to re-extract fields from combined text
-    ocr_manager = OCRManager()
+    # Use OCR utils to extract fields from combined text
+    from .. import ocr_utils
     
     try:
-        # Extract structured data from the combined OCR text
-        extracted_data = ocr_manager.extract_contact_fields(all_text)
+        # Parse the combined text to extract structured data
+        extracted_data = ocr_utils.parse_ocr_text(all_text)
+        # Enhance the data
+        extracted_data = ocr_utils.enhance_ocr_result(extracted_data, raw_text=all_text)
         
         # Update contact with new data (only non-empty fields)
         for field, value in extracted_data.items():

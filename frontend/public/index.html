@@ -44,8 +44,20 @@
   
   <title>ibbase - Business Card CRM</title>
   
-  <!-- Service Worker Registration -->
+  <!-- Service Worker Registration - DISABLED to prevent caching issues -->
   <script>
+    // Unregister any existing service workers to prevent caching issues
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister().then(function(boolean) {
+            console.log('SW unregistered:', boolean);
+          });
+        }
+      });
+    }
+    
+    /* DISABLED - Service Worker causes cache issues
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
@@ -76,6 +88,7 @@
         });
       });
     }
+    */
     
     // PWA Install prompt
     let deferredPrompt;
