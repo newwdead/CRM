@@ -53,16 +53,26 @@ export const FieldMapper = ({ blocks, onBlocksUpdate, contactId, selectedBlock, 
   const loadAvailableFields = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('[FieldMapper] Loading fields for contact:', contactId);
+      
       const response = await fetch(`/api/ocr-blocks/${contactId}/available-fields`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (!response.ok) throw new Error('Failed to load fields');
+      console.log('[FieldMapper] Response status:', response.status);
+      
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('[FieldMapper] Failed to load fields:', error);
+        throw new Error('Failed to load fields');
+      }
       
       const data = await response.json();
+      console.log('[FieldMapper] Loaded fields:', data.fields?.length);
       setAvailableFields(data.fields);
     } catch (error) {
-      console.error('Error loading fields:', error);
+      console.error('[FieldMapper] Error loading fields:', error);
+      toast.error('Не удалось загрузить список полей');
     }
   };
   
@@ -190,6 +200,13 @@ export const FieldMapper = ({ blocks, onBlocksUpdate, contactId, selectedBlock, 
       <h4 style={{ marginBottom: '15px', fontSize: '16px', fontWeight: 'bold' }}>
         {t.title}
       </h4>
+      
+      {/* Debug info */}
+      {availableFields.length === 0 && (
+        <div style={{ padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px', marginBottom: '10px', fontSize: '12px' }}>
+          ⚠️ Поля не загружены. Проверьте консоль браузера.
+        </div>
+      )}
       
       {/* Blocks List */}
       <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
