@@ -234,11 +234,11 @@ export const OCREditorContainer = ({ contact, onSave, onClose }) => {
   }
 
   // Contact model uses photo_path, not image_url or card_image
-  // photo_path is relative to uploads/ directory, need to add /api/uploads/ prefix
+  // photo_path is relative to uploads/ directory, backend mounts it at /files/
   const imageUrl = contact.photo_path 
-    ? `/api/uploads/${contact.photo_path}` 
+    ? `/files/${contact.photo_path}` 
     : contact.thumbnail_path 
-    ? `/api/uploads/${contact.thumbnail_path}` 
+    ? `/files/${contact.thumbnail_path}` 
     : null;
 
   return (
