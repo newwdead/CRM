@@ -147,7 +147,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         contact_dict = {
             "id": contact.id,
             "uid": contact.uid,
-            "name": contact.name,
+            "name": contact.full_name,  # Contact model uses full_name, not name
             "company": contact.company,
             "position": contact.position,
             "email": contact.email,
