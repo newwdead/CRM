@@ -128,6 +128,15 @@ class UserRepository:
         """
         return self.db.query(User).count()
     
+    def count(self) -> int:
+        """
+        Count total number of users (alias for count_users).
+        
+        Returns:
+            Total count
+        """
+        return self.count_users()
+    
     def count_by_is_active(self, is_active: bool) -> int:
         """
         Count users by active status.
