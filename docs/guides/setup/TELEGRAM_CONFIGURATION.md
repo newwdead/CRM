@@ -85,11 +85,11 @@ WHERE key LIKE '%TELEGRAM%' OR key LIKE 'tg.%'
 ORDER BY key;
 
 -- Текущие настройки:
--- TELEGRAM_BOT_TOKEN   = 8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_1Qw9Pm5s (для Admin Panel)
--- TELEGRAM_WEBHOOK_URL = https://ibbase.ru/telegram/webhook (для Admin Panel)
+-- TELEGRAM_BOT_TOKEN   = YOUR_BOT_TOKEN_HERE (для Admin Panel)
+-- TELEGRAM_WEBHOOK_URL = https://yourdomain.com/telegram/webhook (для Admin Panel)
 -- TELEGRAM_ENABLED     = true (для Admin Panel)
 -- tg.enabled           = true (для webhook handler)
--- tg.token             = 8424260030:AAEjZnx2zFQ4KvtP7SjnaHVxlL_1Qw9Pm5s (для webhook handler)
+-- tg.token             = YOUR_BOT_TOKEN_HERE (для webhook handler)
 -- tg.provider          = auto (для webhook handler)
 
 -- Обновить webhook URL

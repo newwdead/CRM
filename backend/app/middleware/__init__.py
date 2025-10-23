@@ -1,15 +1,12 @@
 """
-Middleware Package
-Custom middleware for request/response processing.
+Middleware modules for FastAPI application
 """
 
-from .error_handler import ErrorHandlerMiddleware
-from .security_headers import SecurityHeadersMiddleware
-from .request_logging import RequestLoggingMiddleware
+from .security import SecurityHeadersMiddleware, security_headers_middleware
+from .rate_limit import enhanced_rate_limit
 
 __all__ = [
-    'ErrorHandlerMiddleware',
     'SecurityHeadersMiddleware',
-    'RequestLoggingMiddleware',
+    'security_headers_middleware',
+    'enhanced_rate_limit'
 ]
-

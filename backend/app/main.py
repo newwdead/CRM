@@ -23,6 +23,8 @@ from .middleware import (
     SecurityHeadersMiddleware,
     RequestLoggingMiddleware
 )
+from .middleware.security import security_headers_middleware
+from .middleware.rate_limit import enhanced_rate_limit, rate_limit_handler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -100,9 +102,39 @@ def backfill_uids():
         logger.error(f"UID backfill failed: {e}")
 
 
+# Security validation on startup
+def validate_security_config():
+    """Validate security configuration on startup"""
+    import secrets as sec
+    
+    secret_key = os.getenv("SECRET_KEY", "")
+    weak_keys = [
+        "your-secret-key-change-this-in-production",
+        "your-secret-key-change-in-production",
+        "secret",
+        "password",
+        "123456"
+    ]
+    
+    if not secret_key or any(weak in secret_key.lower() for weak in weak_keys):
+        logger.error(
+            "⚠️  SECURITY WARNING: Weak or default SECRET_KEY detected! "
+            "Generate a strong key with: "
+            "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+        if os.getenv("ENVIRONMENT") == "production":
+            raise RuntimeError("Cannot start in production with weak SECRET_KEY!")
+        else:
+            logger.warning("Starting with weak key (development mode only)")
+    
+    if len(secret_key) < 32:
+        logger.warning(f"SECRET_KEY too short ({len(secret_key)} chars). Recommended: 32+ chars")
+
+
 # Initialize database on startup
 init_db_with_retry()
 backfill_uids()
+validate_security_config()
 
 
 # ============================================================================
@@ -112,7 +144,7 @@ backfill_uids()
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="3.4.0",
+    version="3.4.1",  # Security hardening update
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -133,25 +165,33 @@ os.makedirs('uploads', exist_ok=True)
 app.mount('/files', StaticFiles(directory='uploads'), name='files')
 
 # CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Allow origins from environment variable or use defaults
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+else:
+    # Default allowed origins
+    allowed_origins = [
         # Production
         "https://ibbase.ru",
         "https://www.ibbase.ru",
         "https://api.ibbase.ru",
-        "https://monitoring.ibbase.ru",
-        "http://ibbase.ru",
-        "http://www.ibbase.ru",
-        # Development
-        "http://localhost:3000",
-        "http://localhost:80",
-        "http://frontend:80",
-        "http://127.0.0.1:3000"
-    ],
+        # Development (only if not production)
+        *([
+            "http://localhost:3000",
+            "http://localhost:80",
+            "http://127.0.0.1:3000"
+        ] if os.getenv("ENVIRONMENT") != "production" else [])
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Custom Middleware (order matters!)

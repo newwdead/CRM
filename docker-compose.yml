@@ -3,9 +3,9 @@ services:
     image: postgres:15
     container_name: bizcard-db
     environment:
-      POSTGRES_DB: bizcard_crm
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-bizcard_crm}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env file}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -35,7 +35,7 @@ services:
       - SERVER_HOST=ibbase.ru
       - DOMAIN=ibbase.ru
       - USE_HTTPS=true
-      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bizcard_crm}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
@@ -47,7 +47,7 @@ services:
       - WHATSAPP_API_URL=${WHATSAPP_API_URL:-https://graph.facebook.com/v18.0}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-ibbase_verify_token_2024}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:?WHATSAPP_VERIFY_TOKEN must be set in .env file}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
@@ -68,7 +68,7 @@ services:
     environment:
       - TZ=Europe/Berlin
       - C_FORCE_ROOT=true
-      - DATABASE_URL=postgresql://postgres:password@db:5432/bizcard_crm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bizcard_crm}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
@@ -80,7 +80,7 @@ services:
       - WHATSAPP_API_URL=${WHATSAPP_API_URL:-https://graph.facebook.com/v18.0}
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-ibbase_verify_token_2024}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:?WHATSAPP_VERIFY_TOKEN must be set in .env file}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
@@ -102,8 +102,8 @@ services:
     container_name: bizcard-label-studio
     environment:
       - LABEL_STUDIO_HOST=http://localhost:8081
-      - LABEL_STUDIO_USERNAME=admin@ibbase.ru
-      - LABEL_STUDIO_PASSWORD=labelstudio2024
+      - LABEL_STUDIO_USERNAME=${LABEL_STUDIO_USERNAME:-admin@ibbase.ru}
+      - LABEL_STUDIO_PASSWORD=${LABEL_STUDIO_PASSWORD:?LABEL_STUDIO_PASSWORD must be set in .env file}
       - LABEL_STUDIO_USER_TOKEN=${LABEL_STUDIO_TOKEN:-}
       - LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
       - LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files

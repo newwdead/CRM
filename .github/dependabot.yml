@@ -1,108 +1,100 @@
 # Dependabot configuration for automated dependency updates
-# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+# https://docs.github.com/en/code-security/dependabot
 
 version: 2
 updates:
-  # Backend Python dependencies
+  # Python dependencies (backend)
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-      timezone: "Europe/Moscow"
     open-pull-requests-limit: 5
     reviewers:
-      - "newwdead"
+      - "repository-owner"
     labels:
       - "dependencies"
-      - "backend"
       - "python"
+      - "backend"
     commit-message:
-      prefix: "deps(backend)"
+      prefix: "chore(deps)"
       include: "scope"
     ignore:
-      # Ignore major version updates for critical packages
-      - dependency-name: "fastapi"
-        update-types: ["version-update:semver-major"]
+      # Ignore major version updates for stable dependencies
       - dependency-name: "sqlalchemy"
         update-types: ["version-update:semver-major"]
-  
-  # Frontend NPM dependencies
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+
+  # Node.js dependencies (frontend)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-      timezone: "Europe/Moscow"
     open-pull-requests-limit: 5
     reviewers:
-      - "newwdead"
+      - "repository-owner"
     labels:
       - "dependencies"
-      - "frontend"
       - "javascript"
+      - "frontend"
     commit-message:
-      prefix: "deps(frontend)"
+      prefix: "chore(deps)"
       include: "scope"
     ignore:
-      # Ignore major version updates for React
+      # Ignore React major updates (requires testing)
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
-  
+
   # Docker base images
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
       interval: "weekly"
-      day: "tuesday"
-      time: "09:00"
-      timezone: "Europe/Moscow"
+      day: "monday"
+      time: "10:00"
     open-pull-requests-limit: 3
     reviewers:
-      - "newwdead"
+      - "repository-owner"
     labels:
       - "dependencies"
       - "docker"
-      - "backend"
     commit-message:
-      prefix: "deps(docker)"
-  
+      prefix: "chore(docker)"
+
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-      day: "tuesday"
-      time: "09:00"
-      timezone: "Europe/Moscow"
+      day: "monday"
+      time: "10:00"
     open-pull-requests-limit: 3
     reviewers:
-      - "newwdead"
+      - "repository-owner"
     labels:
       - "dependencies"
       - "docker"
-      - "frontend"
     commit-message:
-      prefix: "deps(docker)"
-  
+      prefix: "chore(docker)"
+
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "wednesday"
-      time: "09:00"
-      timezone: "Europe/Moscow"
-    open-pull-requests-limit: 5
+      day: "monday"
+      time: "11:00"
+    open-pull-requests-limit: 3
     reviewers:
-      - "newwdead"
+      - "repository-owner"
     labels:
       - "dependencies"
       - "github-actions"
-      - "ci-cd"
+      - "ci/cd"
     commit-message:
-      prefix: "deps(actions)"
-
+      prefix: "chore(ci)"
