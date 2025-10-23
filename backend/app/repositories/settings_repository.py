@@ -143,4 +143,43 @@ class SettingsRepository:
     def refresh(self, instance) -> None:
         """Refresh instance from database."""
         self.db.refresh(instance)
+    
+    # Alias methods for API compatibility
+    def get_app_setting(self, key: str) -> Optional[AppSetting]:
+        """
+        Get setting by key (alias for get_setting_by_key).
+        
+        Args:
+            key: Setting key
+        
+        Returns:
+            AppSetting instance or None
+        """
+        return self.get_setting_by_key(key)
+    
+    def create_app_setting(self, key: str, value: str) -> AppSetting:
+        """
+        Create a new app setting with key and value (alias).
+        
+        Args:
+            key: Setting key
+            value: Setting value
+        
+        Returns:
+            Created AppSetting instance
+        """
+        return self.create_setting({'key': key, 'value': value})
+    
+    def update_app_setting(self, key: str, value: str) -> Optional[AppSetting]:
+        """
+        Update app setting value by key (alias for update_setting_value).
+        
+        Args:
+            key: Setting key
+            value: New value
+        
+        Returns:
+            Updated AppSetting instance or None
+        """
+        return self.update_setting_value(key, value)
 
