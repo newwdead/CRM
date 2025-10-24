@@ -182,7 +182,7 @@ export default function BatchUpload({ lang = 'ru' }) {
   };
 
   return (
-    <div className="card">
+    <div className="modern-card">
       <h3>{t.title}</h3>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
         {t.subtitle}
@@ -220,7 +220,7 @@ export default function BatchUpload({ lang = 'ru' }) {
           </div>
 
           {/* Requirements */}
-          <div className="alert info" style={{ marginBottom: '24px' }}>
+          <div className="modern-alert modern-alert-info" style={{ marginBottom: '24px' }}>
             <h4 style={{ marginTop: 0 }}>📋 {t.requirements}</h4>
             <ul style={{ marginBottom: 0, paddingLeft: '20px' }}>
               <li>{t.req1}</li>
@@ -338,15 +338,15 @@ export default function BatchUpload({ lang = 'ru' }) {
                       gap: '12px',
                       marginBottom: '16px'
                     }}>
-                      <div className="alert info" style={{ margin: 0, padding: '16px' }}>
+                      <div className="modern-alert modern-alert-info" style={{ margin: 0, padding: '16px' }}>
                         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{progress.result.total}</div>
                         <div style={{ fontSize: '12px' }}>{t.total}</div>
                       </div>
-                      <div className="alert success" style={{ margin: 0, padding: '16px' }}>
+                      <div className="modern-alert modern-alert-success" style={{ margin: 0, padding: '16px' }}>
                         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{progress.result.success}</div>
                         <div style={{ fontSize: '12px' }}>{t.success}</div>
                       </div>
-                      <div className="alert error" style={{ margin: 0, padding: '16px' }}>
+                      <div className="modern-alert modern-alert-danger" style={{ margin: 0, padding: '16px' }}>
                         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{progress.result.failed}</div>
                         <div style={{ fontSize: '12px' }}>{t.errors}</div>
                       </div>
