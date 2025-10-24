@@ -330,14 +330,118 @@ async def create_backup(
 ):
     """
     Create a new database backup (admin only).
-    NOTE: This is a placeholder - actual backup logic should be implemented.
+    Uses pg_dump to create a compressed SQL dump.
     """
-    # TODO: Implement actual backup creation logic
+    import subprocess
+    import os
+    from datetime import datetime
+    
     logger.info(f"Backup requested by admin: {current_user.username}")
     
-    return {
-        "success": True,
-        "message": "Backup creation initiated",
-        "note": "Backup implementation pending"
-    }
+    # Get database connection details from environment
+    db_host = os.getenv("POSTGRES_HOST", "db")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB", "bizcard_crm")
+    db_user = os.getenv("POSTGRES_USER", "postgres")
+    db_password = os.getenv("POSTGRES_PASSWORD", "")
+    
+    # Create backups directory if it doesn't exist
+    backup_dir = Path("backups")
+    backup_dir.mkdir(exist_ok=True)
+    
+    # Generate backup filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"backup_{timestamp}.sql.gz"
+    backup_path = backup_dir / backup_filename
+    
+    try:
+        # Set PGPASSWORD environment variable for pg_dump
+        env = os.environ.copy()
+        env["PGPASSWORD"] = db_password
+        
+        # Run pg_dump with gzip compression
+        pg_dump_cmd = [
+            "pg_dump",
+            "-h", db_host,
+            "-p", db_port,
+            "-U", db_user,
+            "-d", db_name,
+            "--no-password",
+            "--format=plain",
+            "--no-owner",
+            "--no-acl"
+        ]
+        
+        gzip_cmd = ["gzip", "-"]
+        
+        # Execute pg_dump | gzip > backup_file
+        with open(backup_path, "wb") as f:
+            pg_dump_proc = subprocess.Popen(
+                pg_dump_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env
+            )
+            gzip_proc = subprocess.Popen(
+                gzip_cmd,
+                stdin=pg_dump_proc.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE
+            )
+            
+            # Wait for both processes to complete
+            pg_dump_proc.stdout.close()
+            gzip_stdout, gzip_stderr = gzip_proc.communicate()
+            pg_dump_stderr = pg_dump_proc.stderr.read()
+            
+            # Check for errors
+            if pg_dump_proc.returncode != 0:
+                error_msg = pg_dump_stderr.decode('utf-8') if pg_dump_stderr else "Unknown error"
+                logger.error(f"pg_dump failed: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Backup failed: {error_msg}"
+                )
+            
+            if gzip_proc.returncode != 0:
+                error_msg = gzip_stderr.decode('utf-8') if gzip_stderr else "Unknown error"
+                logger.error(f"gzip failed: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Compression failed: {error_msg}"
+                )
+        
+        # Get backup file size
+        backup_size = backup_path.stat().st_size
+        size_mb = backup_size / (1024 * 1024)
+        
+        logger.info(f"Backup created successfully: {backup_filename} ({size_mb:.2f} MB)")
+        
+        return {
+            "success": True,
+            "message": f"Backup created successfully: {backup_filename}",
+            "filename": backup_filename,
+            "size_bytes": backup_size,
+            "size_mb": round(size_mb, 2),
+            "created_at": timestamp,
+            "created_by": current_user.username
+        }
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Backup timed out after 300 seconds")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Backup timed out (>5 minutes)"
+        )
+    except Exception as e:
+        logger.error(f"Backup creation failed: {str(e)}", exc_info=True)
+        
+        # Clean up partial backup file
+        if backup_path.exists():
+            backup_path.unlink()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backup failed: {str(e)}"
+        )
 
