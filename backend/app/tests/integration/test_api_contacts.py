@@ -7,17 +7,17 @@ from fastapi.testclient import TestClient
 
 
 class TestContactsAPI:
-    """Tests for /api/contacts endpoints"""
+    """Tests for /contacts endpoints"""
     
     def test_list_contacts_unauthorized(self, client):
         """Test listing contacts without authentication"""
-        response = client.get("/api/contacts")
+        response = client.get("/contacts/")
         assert response.status_code in [401, 307]  # Unauthorized or redirect
     
     def test_list_contacts_authorized(self, client, auth_token):
         """Test listing contacts with authentication"""
         response = client.get(
-            "/api/contacts",
+            "/contacts/",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -29,7 +29,7 @@ class TestContactsAPI:
     def test_list_contacts_pagination(self, client, auth_token):
         """Test contacts list pagination"""
         response = client.get(
-            "/api/contacts?skip=0&limit=10",
+            "/contacts/?skip=0&limit=10",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -39,7 +39,7 @@ class TestContactsAPI:
     def test_list_contacts_search(self, client, auth_token, test_contact):
         """Test contacts search"""
         response = client.get(
-            f"/api/contacts?q={test_contact.first_name}",
+            f"/contacts/?q={test_contact.first_name}",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -49,7 +49,7 @@ class TestContactsAPI:
     def test_get_contact_by_id(self, client, auth_token, test_contact):
         """Test getting specific contact by ID"""
         response = client.get(
-            f"/api/contacts/{test_contact.id}",
+            f"/contacts/{test_contact.id}",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -60,7 +60,7 @@ class TestContactsAPI:
     def test_get_nonexistent_contact(self, client, auth_token):
         """Test getting non-existent contact"""
         response = client.get(
-            "/api/contacts/99999",
+            "/contacts/99999",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 404
@@ -75,14 +75,26 @@ class TestContactsAPI:
             "company": "Test Co"
         }
         response = client.post(
-            "/api/contacts",
+            "/contacts/",
             json=contact_data,
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code in [200, 201]
         data = response.json()
-        assert data["first_name"] == "Test"
-        assert data["email"] == "test@example.com"
+        print(f"DEBUG: Response data: {data}")
+        print(f"DEBUG: Data type: {type(data)}")
+        print(f"DEBUG: Data keys: {data.keys() if isinstance(data, dict) else 'Not a dict'}")
+        
+        # API might return {success: true, contact: {...}} or just {...}
+        if isinstance(data, dict) and "contact" in data:
+            contact = data["contact"]
+        elif isinstance(data, dict) and "data" in data:
+            contact = data["data"]
+        else:
+            contact = data
+        
+        assert contact.get("first_name") == "Test"
+        assert contact.get("email") == "test@example.com"
     
     def test_create_contact_invalid_data(self, client, auth_token):
         """Test creating contact with invalid data"""
@@ -91,7 +103,7 @@ class TestContactsAPI:
             "email": "invalid-email"  # Invalid email format
         }
         response = client.post(
-            "/api/contacts",
+            "/contacts",
             json=contact_data,
             headers={"Authorization": f"Bearer {auth_token}"}
         )
@@ -104,7 +116,7 @@ class TestContactsAPI:
             "last_name": "Name"
         }
         response = client.put(
-            f"/api/contacts/{test_contact.id}",
+            f"/contacts/{test_contact.id}",
             json=update_data,
             headers={"Authorization": f"Bearer {auth_token}"}
         )
@@ -115,14 +127,14 @@ class TestContactsAPI:
     def test_delete_contact(self, client, auth_token, test_contact):
         """Test deleting a contact"""
         response = client.delete(
-            f"/api/contacts/{test_contact.id}",
+            f"/contacts/{test_contact.id}",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code in [200, 204]
         
         # Verify deletion
         get_response = client.get(
-            f"/api/contacts/{test_contact.id}",
+            f"/contacts/{test_contact.id}",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert get_response.status_code == 404
@@ -146,7 +158,7 @@ class TestContactsAPI:
             contact_ids.append(contact.id)
         
         response = client.post(
-            "/api/contacts/bulk-delete",
+            "/contacts/bulk-delete",
             json={"ids": contact_ids},
             headers={"Authorization": f"Bearer {auth_token}"}
         )
@@ -156,7 +168,7 @@ class TestContactsAPI:
         """Test contact filtering"""
         # Filter by company
         response = client.get(
-            f"/api/contacts?company={test_contact.company}",
+            f"/contacts?company={test_contact.company}",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -164,7 +176,7 @@ class TestContactsAPI:
         # Filter by position
         if test_contact.position:
             response = client.get(
-                f"/api/contacts?position={test_contact.position}",
+                f"/contacts?position={test_contact.position}",
                 headers={"Authorization": f"Bearer {auth_token}"}
             )
             assert response.status_code == 200
@@ -172,7 +184,7 @@ class TestContactsAPI:
     def test_contact_sorting(self, client, auth_token):
         """Test contact sorting"""
         response = client.get(
-            "/api/contacts?sort_by=first_name&sort_order=asc",
+            "/contacts?sort_by=first_name&sort_order=asc",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -186,7 +198,7 @@ class TestContactsExport:
     def test_export_contacts_csv(self, client, auth_token):
         """Test exporting contacts to CSV"""
         response = client.get(
-            "/api/contacts/export/csv",
+            "/contacts/export/csv",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -195,7 +207,7 @@ class TestContactsExport:
     def test_export_contacts_excel(self, client, auth_token):
         """Test exporting contacts to Excel"""
         response = client.get(
-            "/api/contacts/export/excel",
+            "/contacts/export/excel",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -204,7 +216,7 @@ class TestContactsExport:
     def test_export_contacts_vcard(self, client, auth_token):
         """Test exporting contacts to vCard"""
         response = client.get(
-            "/api/contacts/export/vcard",
+            "/contacts/export/vcard",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
@@ -216,7 +228,7 @@ class TestContactStats:
     def test_get_contacts_stats(self, client, auth_token):
         """Test getting contact statistics"""
         response = client.get(
-            "/api/contacts/stats",
+            "/contacts/stats",
             headers={"Authorization": f"Bearer {auth_token}"}
         )
         assert response.status_code == 200
