@@ -12,8 +12,8 @@ const SystemSettings = () => {
 
   const translations = {
     en: {
-      title: 'System Settings',
-      subtitle: 'Configure and manage system integrations',
+      title: 'System Integrations',
+      subtitle: 'Configure and manage integrations (OCR, Telegram, WhatsApp, etc.)',
       refresh: 'Refresh',
       enabled: 'Enabled',
       disabled: 'Disabled',
@@ -54,8 +54,8 @@ const SystemSettings = () => {
       }
     },
     ru: {
-      title: 'Системные Настройки',
-      subtitle: 'Настройка и управление интеграциями системы',
+      title: 'Интеграции Системы',
+      subtitle: 'Настройка и управление интеграциями (OCR, Telegram, WhatsApp и др.)',
       refresh: 'Обновить',
       enabled: 'Включено',
       disabled: 'Отключено',

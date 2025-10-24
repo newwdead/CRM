@@ -61,7 +61,7 @@ function AdminPanel({ t, lang }) {
           }}
           onClick={() => setActiveTab('settings')}
         >
-          ⚙️ Settings
+          🔌 Integrations
         </button>
         <button
           style={{
