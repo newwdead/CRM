@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { HelmetProvider } from 'react-helmet-async';
 import toast, { Toaster } from 'react-hot-toast';
 
+// Accessibility styles
+import './styles/accessibility.css';
+
 // Token management
 import { initTokenManager, clearTokens, getAccessToken } from './utils/tokenManager';
 

@@ -1,0 +1,266 @@
+/**
+ * Accessibility Styles
+ * Focus indicators, screen reader support, keyboard navigation
+ */
+
+/* ============================================================================
+   FOCUS INDICATORS
+   ============================================================================ */
+
+/* Clear focus indicators for all interactive elements */
+*:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Button focus */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Remove outline for mouse users, keep for keyboard users */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================================================
+   TOUCH TARGETS (минимум 44x44px для mobile)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  button,
+  a.button,
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+
+  /* Icon buttons */
+  button[aria-label]:not([aria-label=""]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ============================================================================
+   SCREEN READER ONLY
+   ============================================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   SKIP LINKS
+   ============================================================================ */
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #2563eb;
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 100;
+  border-radius: 0 0 4px 0;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE
+   ============================================================================ */
+
+@media (prefers-contrast: high) {
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    border: 2px solid currentColor;
+  }
+}
+
+/* ============================================================================
+   REDUCED MOTION
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   KEYBOARD NAVIGATION HELPERS
+   ============================================================================ */
+
+/* Table keyboard navigation */
+table tr:focus-within {
+  background-color: #f3f4f6;
+}
+
+/* List keyboard navigation */
+[role="listbox"] [role="option"]:focus,
+[role="menu"] [role="menuitem"]:focus {
+  background-color: #2563eb;
+  color: white;
+}
+
+/* ============================================================================
+   COLOR CONTRAST
+   ============================================================================ */
+
+/* Ensure minimum WCAG AA contrast ratio */
+.text-low-contrast {
+  color: #4b5563; /* Minimum 4.5:1 on white */
+}
+
+.text-high-contrast {
+  color: #111827; /* 15:1 on white */
+}
+
+/* ============================================================================
+   LOADING & BUSY STATES
+   ============================================================================ */
+
+[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+/* ============================================================================
+   ERROR STATES
+   ============================================================================ */
+
+[aria-invalid="true"] {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2;
+}
+
+[aria-invalid="true"]:focus {
+  outline-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Error message styling */
+[role="alert"] {
+  padding: 12px;
+  border-left: 4px solid #ef4444;
+  background-color: #fef2f2;
+  color: #991b1b;
+  margin: 8px 0;
+}
+
+/* ============================================================================
+   LIVE REGIONS
+   ============================================================================ */
+
+[aria-live="polite"],
+[aria-live="assertive"] {
+  position: relative;
+}
+
+/* ============================================================================
+   DISABLED STATES
+   ============================================================================ */
+
+[disabled],
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ============================================================================
+   TOOLTIPS & HINTS
+   ============================================================================ */
+
+[aria-describedby] {
+  position: relative;
+}
+
+/* ============================================================================
+   MODAL & DIALOG
+   ============================================================================ */
+
+[role="dialog"],
+[role="alertdialog"] {
+  position: fixed;
+  z-index: 1000;
+}
+
+/* Backdrop */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+/* ============================================================================
+   RESPONSIVE TEXT SIZES
+   ============================================================================ */
+
+/* Ensure text is readable at all sizes */
+body {
+  font-size: 16px; /* Base size for good readability */
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.focusable:focus-visible {
+  clip: auto;
+  clip-path: none;
+  height: auto;
+  overflow: visible;
+  position: static;
+  white-space: normal;
+  width: auto;
+}
+
