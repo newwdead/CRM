@@ -18,7 +18,7 @@ from .celery_app import celery_app
 from .database import SessionLocal
 from .models import Contact
 from .integrations.ocr.providers import OCRManager
-from .ocr_utils import enhance_ocr_result
+from .integrations.ocr.utils import enhance_ocr_result
 from .core import qr as qr_utils
 from .integrations.ocr.image_utils import downscale_image_bytes, create_thumbnail
 
