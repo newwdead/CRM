@@ -12,6 +12,7 @@ from ..database import get_db
 from ..models import User
 from .. import schemas
 from ..core import auth as auth_utils
+from ..core import security
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -114,15 +115,15 @@ async def login(
     )
     
     # Create refresh token (long-lived)
-    refresh_token_expires = timedelta(days=auth_utils.REFRESH_TOKEN_EXPIRE_DAYS)
-    refresh_token = auth_utils.create_refresh_token(
+    refresh_token_expires = timedelta(days=security.REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = security.create_refresh_token(
         data={"sub": user.username},
         expires_delta=refresh_token_expires
     )
     
     # Store hashed refresh token in database (token rotation)
     from datetime import datetime
-    user.refresh_token_hash = auth_utils.hash_token(refresh_token)
+    user.refresh_token_hash = security.hash_token(refresh_token)
     user.refresh_token_expires_at = datetime.utcnow() + refresh_token_expires
     user.last_refresh_at = datetime.utcnow()
     db.commit()
@@ -158,7 +159,7 @@ async def refresh_token(
     - **refresh_token**: Valid refresh token from login
     """
     # Decode and verify refresh token
-    payload = auth_utils.decode_refresh_token(refresh_request.refresh_token)
+    payload = security.decode_refresh_token(refresh_request.refresh_token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -190,7 +191,7 @@ async def refresh_token(
         )
     
     # Verify refresh token matches stored hash (token rotation security)
-    refresh_token_hash = auth_utils.hash_token(refresh_request.refresh_token)
+    refresh_token_hash = security.hash_token(refresh_request.refresh_token)
     if user.refresh_token_hash != refresh_token_hash:
         logger.warning(f"Refresh token mismatch for user {username} - possible token reuse attack")
         raise HTTPException(
@@ -216,14 +217,14 @@ async def refresh_token(
     )
     
     # Create new refresh token (token rotation)
-    refresh_token_expires = timedelta(days=auth_utils.REFRESH_TOKEN_EXPIRE_DAYS)
-    new_refresh_token = auth_utils.create_refresh_token(
+    refresh_token_expires = timedelta(days=security.REFRESH_TOKEN_EXPIRE_DAYS)
+    new_refresh_token = security.create_refresh_token(
         data={"sub": user.username},
         expires_delta=refresh_token_expires
     )
     
     # Update stored refresh token hash
-    user.refresh_token_hash = auth_utils.hash_token(new_refresh_token)
+    user.refresh_token_hash = security.hash_token(new_refresh_token)
     user.refresh_token_expires_at = datetime.utcnow() + refresh_token_expires
     user.last_refresh_at = datetime.utcnow()
     db.commit()
