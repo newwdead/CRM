@@ -24,6 +24,7 @@ api_router = APIRouter()
 
 # Import two_factor router
 from .two_factor import router as two_factor_router
+from .two_factor_verify import router as two_factor_verify_router
 
 # Include sub-routers (order matters for path matching)
 api_router.include_router(health_router, tags=["Health"])  # No prefix - /health, /version
