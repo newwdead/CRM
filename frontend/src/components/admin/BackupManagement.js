@@ -13,7 +13,86 @@ function BackupManagement() {
 
   useEffect(() => {
     fetchBackups();
+    fetchBackupConfig();
   }, []);
+
+  const fetchBackupConfig = async () => {
+    try {
+      const response = await fetch('/api/settings/integrations/backup', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBackupConfig(data);
+        setConfigForm(data.config || {});
+      }
+    } catch (error) {
+      logger.error('Error fetching backup config:', error);
+    }
+  };
+
+  const toggleBackupIntegration = async () => {
+    try {
+      const response = await fetch('/api/settings/integrations/backup/toggle', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        toast.success(backupConfig.enabled ? 'Backup disabled' : 'Backup enabled');
+        fetchBackupConfig();
+      }
+    } catch (error) {
+      toast.error('Failed to toggle backup');
+      logger.error('Error toggling backup:', error);
+    }
+  };
+
+  const saveBackupConfig = async () => {
+    try {
+      const response = await fetch('/api/settings/integrations/backup/config', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ config: configForm })
+      });
+      if (response.ok) {
+        toast.success('Configuration saved');
+        setEditingConfig(false);
+        fetchBackupConfig();
+      } else {
+        toast.error('Failed to save configuration');
+      }
+    } catch (error) {
+      toast.error('Failed to save configuration');
+      logger.error('Error saving config:', error);
+    }
+  };
+
+  const testBackupConnection = async () => {
+    try {
+      const response = await fetch('/api/settings/integrations/backup/test', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      if (response.ok) {
+        toast.success('Backup system test successful');
+      } else {
+        toast.error('Backup system test failed');
+      }
+    } catch (error) {
+      toast.error('Failed to test backup');
+      logger.error('Error testing backup:', error);
+    }
+  };
 
   const fetchBackups = async () => {
     setLoading(true);
