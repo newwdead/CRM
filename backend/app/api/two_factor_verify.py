@@ -12,7 +12,7 @@ from ..database import get_db
 from ..auth_utils import decode_access_token, create_access_token
 from ..models.user import User
 from ..models.two_factor_auth import TwoFactorAuth, TwoFactorBackupCode
-from ..core.two_factor import verify_totp, verify_backup_code
+from ..core.two_factor import verify_2fa_token, verify_2fa_backup_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,7 +90,7 @@ async def verify_two_factor_login(
         # Verify token
         if request.is_backup_code:
             # Verify backup code
-            is_valid = verify_backup_code(
+            is_valid = verify_2fa_backup_code(
                 db=db,
                 user_id=user.id,
                 code=request.token
@@ -105,7 +105,7 @@ async def verify_two_factor_login(
             logger.info(f"User {user.username} logged in using backup code")
         else:
             # Verify TOTP
-            is_valid = verify_totp(
+            is_valid = verify_2fa_token(
                 secret=two_fa.secret,
                 token=request.token
             )
