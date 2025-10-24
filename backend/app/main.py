@@ -150,7 +150,7 @@ validate_security_config()
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="3.4.1",  # Security hardening update
+    version="4.0.0",  # Major dependencies update: Python 3.11, FastAPI 0.115, React 18.3
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -224,7 +224,7 @@ async def startup_event():
     """Run on application startup"""
     logger.info("=" * 60)
     logger.info("🚀 FastAPI Business Card CRM starting...")
-    logger.info(f"📦 Version: 2.16")
+    logger.info(f"📦 Version: 4.0.0")
     logger.info(f"🔧 Environment: {os.getenv('ENV', 'development')}")
     logger.info(f"🗄️  Database: {os.getenv('DATABASE_URL', 'sqlite')[:30]}...")
     logger.info("=" * 60)
