@@ -22,9 +22,13 @@ from .services import router as services_router
 # Create main API router
 api_router = APIRouter()
 
+# Import two_factor router
+from .two_factor import router as two_factor_router
+
 # Include sub-routers (order matters for path matching)
 api_router.include_router(health_router, tags=["Health"])  # No prefix - /health, /version
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(two_factor_router, prefix="/auth/2fa", tags=["2FA", "Authentication"])
 api_router.include_router(contacts_router, prefix="/contacts", tags=["Contacts"])
 api_router.include_router(exports_router, prefix="", tags=["Export/Import"])  # Absolute paths preserved
 api_router.include_router(duplicates_router, prefix="/duplicates", tags=["Duplicates"])

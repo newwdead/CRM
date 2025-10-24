@@ -6,6 +6,7 @@ Import all models here to ensure they are registered with SQLAlchemy.
 from .base import Base
 from .user import User
 from .contact import Contact, Tag, Group, contact_tags, contact_groups
+from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode
 from .duplicate import DuplicateContact
 from .settings import AppSetting, SystemSettings
 from .audit import AuditLog
@@ -24,6 +25,8 @@ __all__ = [
     'SystemSettings',
     'AuditLog',
     'OCRCorrection',
+    'TwoFactorAuth',
+    'TwoFactorBackupCode',
 ]
 
 

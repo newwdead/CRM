@@ -21,7 +21,7 @@ from .. import ocr_utils
 from .. import qr_utils
 from .. import image_processing
 from ..image_utils import create_thumbnail, downscale_image_bytes
-from ..utils.file_security import validate_and_secure_file, sanitize_filename
+from ..file_security import validate_and_secure_file, sanitize_filename
 
 # Prometheus metrics
 from ..core.metrics import (
