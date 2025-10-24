@@ -392,20 +392,24 @@ async def create_backup(
             # Wait for both processes to complete
             pg_dump_proc.stdout.close()
             gzip_stdout, gzip_stderr = gzip_proc.communicate()
+            
+            # Wait for pg_dump to finish and get its output
+            pg_dump_proc.wait()
             pg_dump_stderr = pg_dump_proc.stderr.read()
             
-            # Check for errors
-            if pg_dump_proc.returncode != 0:
-                error_msg = pg_dump_stderr.decode('utf-8') if pg_dump_stderr else "Unknown error"
-                logger.error(f"pg_dump failed: {error_msg}")
+            # Check for errors with better error messages
+            if pg_dump_proc.returncode is not None and pg_dump_proc.returncode != 0:
+                error_msg = pg_dump_stderr.decode('utf-8').strip() if pg_dump_stderr else f"pg_dump exited with code {pg_dump_proc.returncode}"
+                logger.error(f"pg_dump failed (exit code {pg_dump_proc.returncode}): {error_msg}")
+                logger.error(f"pg_dump command: {' '.join(pg_dump_cmd)}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Backup failed: {error_msg}"
                 )
             
-            if gzip_proc.returncode != 0:
-                error_msg = gzip_stderr.decode('utf-8') if gzip_stderr else "Unknown error"
-                logger.error(f"gzip failed: {error_msg}")
+            if gzip_proc.returncode is not None and gzip_proc.returncode != 0:
+                error_msg = gzip_stderr.decode('utf-8').strip() if gzip_stderr else f"gzip exited with code {gzip_proc.returncode}"
+                logger.error(f"gzip failed (exit code {gzip_proc.returncode}): {error_msg}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Compression failed: {error_msg}"
