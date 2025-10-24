@@ -1,13 +1,13 @@
-name: "CodeQL Analysis"
+name: CodeQL Analysis
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '30 9 * * 1'
-  workflow_dispatch:
+    # Run weekly on Monday at 12:00 UTC
+    - cron: '0 12 * * 1'
 
 jobs:
   analyze:
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python', 'javascript' ]
+        language: [ 'javascript', 'python' ]
 
     steps:
     - name: Checkout repository
@@ -31,6 +31,7 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        queries: security-and-quality
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
@@ -39,4 +40,3 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
-
