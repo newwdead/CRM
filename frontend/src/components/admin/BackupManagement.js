@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
+import toast from 'react-hot-toast';
 
 /**
  * Backup Management Component
- * Manages database backups - creation, listing, and deletion
+ * Manages database backups - creation, listing, deletion, and configuration
+ * Combined functionality from Admin Panel → Backups + System Settings → Backup
  */
 function BackupManagement() {
-  const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState({ backups: [], total: 0, total_size_human: '0 MB', backup_dir: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [backupConfig, setBackupConfig] = useState(null);
+  const [editingConfig, setEditingConfig] = useState(false);
+  const [configForm, setConfigForm] = useState({});
 
   useEffect(() => {
     fetchBackups();
