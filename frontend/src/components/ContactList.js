@@ -8,7 +8,8 @@ import DuplicateMergeModal from './DuplicateMergeModal';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
-export default function ContactList({ lang = 'ru', onEdit }) {
+// Memoize to prevent unnecessary re-renders
+const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
   const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -1056,4 +1057,6 @@ export default function ContactList({ lang = 'ru', onEdit }) {
       <Tooltip id="duplicate-tooltip" place="top" />
     </div>
   );
-}
+});
+
+export default ContactList;

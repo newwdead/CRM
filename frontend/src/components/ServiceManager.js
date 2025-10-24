@@ -601,5 +601,6 @@ const ServiceManager = () => {
   );
 };
 
-export default ServiceManager;
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(ServiceManager);
 

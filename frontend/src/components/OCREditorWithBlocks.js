@@ -1146,5 +1146,6 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   );
 };
 
-export default OCREditorWithBlocks;
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(OCREditorWithBlocks);
 

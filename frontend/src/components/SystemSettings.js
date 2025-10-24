@@ -599,5 +599,6 @@ const SystemSettings = () => {
   );
 };
 
-export default SystemSettings;
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(SystemSettings);
 

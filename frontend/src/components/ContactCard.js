@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
  * Full contact card (CRM-style) - displays all contact information
  * Opens when clicking on a contact in the list
  */
-export default function ContactCard({ contactId, lang = 'ru', onClose }) {
+const ContactCard = React.memo(function ContactCard({ contactId, lang = 'ru', onClose }) {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -531,5 +531,7 @@ export default function ContactCard({ contactId, lang = 'ru', onClose }) {
       </div>
     </div>
   );
-}
+});
+
+export default ContactCard;
 
