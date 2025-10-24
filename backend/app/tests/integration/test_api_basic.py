@@ -20,7 +20,7 @@ class TestHealthEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "version" in data
-        assert data["version"] == "4.0.0"
+        assert data["version"] == "4.2.0"
         assert "python" in data
         assert "fastapi" in data
         assert "react" in data
