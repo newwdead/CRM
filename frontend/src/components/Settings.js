@@ -97,10 +97,6 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
             {t.ocrTab}
           </button>
         </div>
-        
-        <div className="alert info" style={{ marginTop: '16px', marginBottom: '16px' }}>
-          ℹ️ {lang === 'ru' ? 'Настройки Telegram теперь доступны в Админ Панели → System Settings' : 'Telegram settings are now available in Admin Panel → System Settings'}
-        </div>
 
         {/* Tab Content */}
         {activeTab === 'general' && (
