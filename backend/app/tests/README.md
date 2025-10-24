@@ -1,263 +1,163 @@
-# Backend Tests
+# 🧪 Test Suite Organization
 
-**Test Coverage:** Target 80%+
+Organized test suite for FastAPI Business Card CRM backend.
 
----
-
-## 📁 Test Structure
+## 📂 Structure
 
 ```
-backend/app/tests/
-├── conftest.py                   # Pytest fixtures & configuration
-├── test_repositories.py          # Repository Layer tests
-├── test_services.py              # Service Layer tests (NEW)
-├── test_api_contacts.py          # Contacts API tests (NEW)
-├── test_api_basic.py             # Basic API tests
-├── test_api_admin.py             # Admin API tests
-├── test_api_ocr.py               # OCR API tests
-├── test_api_settings.py          # Settings API tests
-├── test_duplicate_utils.py       # Duplicate detection tests
-└── test_phone_utils.py           # Phone utilities tests
+tests/
+├── README.md            # This file
+├── conftest.py          # Shared fixtures and configuration
+├── __init__.py
+├── unit/                # Unit tests (fast, isolated)
+│   ├── __init__.py
+│   ├── test_phone_utils.py
+│   └── test_duplicate_utils.py
+├── integration/         # Integration tests (DB, services)
+│   ├── __init__.py
+│   ├── test_api_admin.py
+│   ├── test_api_basic.py
+│   ├── test_api_contacts.py
+│   ├── test_api_ocr.py
+│   ├── test_api_settings.py
+│   ├── test_repositories.py
+│   └── test_services.py
+└── security/            # Security tests (auth, vulnerabilities)
+    ├── __init__.py
+    ├── test_file_security.py
+    ├── test_refresh_tokens.py
+    ├── test_security_auth.py
+    ├── test_security_dependencies.py
+    ├── test_security_headers.py
+    ├── test_security_jwt.py
+    ├── test_security_passwords.py
+    └── test_two_factor.py
 ```
-
----
-
-## 🚀 Running Tests
-
-### All Tests
-```bash
-cd backend
-pytest
-```
-
-### Specific Test File
-```bash
-pytest app/tests/test_repositories.py -v
-```
-
-### With Coverage Report
-```bash
-pytest --cov=app --cov-report=html --cov-report=term
-```
-
-### Watch Mode (auto-run on changes)
-```bash
-pytest-watch
-```
-
----
 
 ## 📊 Test Categories
 
-### 1. Repository Tests (`test_repositories.py`)
-Tests for database abstraction layer:
-- CRUD operations
-- Filtering & searching
-- Bulk operations
-- Error handling
+### 🔹 Unit Tests (2 tests)
+**Location:** `unit/`  
+**Purpose:** Fast, isolated tests for individual functions and utilities.  
+**Run:** `pytest app/tests/unit -m unit`
 
-**Coverage:** 100% (30+ tests)
+- `test_phone_utils.py` - Phone number formatting and validation
+- `test_duplicate_utils.py` - Duplicate detection algorithms
 
-### 2. Service Tests (`test_services.py`) ⭐ NEW
-Tests for business logic layer:
-- Service methods
-- Data validation
-- Business rules
-- Performance
+### 🔹 Integration Tests (7 tests)
+**Location:** `integration/`  
+**Purpose:** Tests that verify interaction between components (API, DB, services).  
+**Run:** `pytest app/tests/integration -m integration`
 
-**Coverage:** 100% (25+ tests)
+- `test_api_admin.py` - Admin API endpoints
+- `test_api_basic.py` - Basic API functionality
+- `test_api_contacts.py` - Contact management API
+- `test_api_ocr.py` - OCR processing API
+- `test_api_settings.py` - Settings API
+- `test_repositories.py` - Repository layer tests
+- `test_services.py` - Service layer tests
 
-### 3. API Tests (`test_api_*.py`) ⭐ EXPANDED
-Tests for REST API endpoints:
-- Authentication
-- Request/Response validation
-- Error handling
-- Edge cases
+### 🔹 Security Tests (8 tests)
+**Location:** `security/`  
+**Purpose:** Security-focused tests (auth, permissions, vulnerabilities).  
+**Run:** `pytest app/tests/security -m security`
 
-**Files:**
-- `test_api_contacts.py` - 25+ tests ⭐ NEW
-- `test_api_basic.py` - Basic endpoints
-- `test_api_admin.py` - Admin endpoints
-- `test_api_ocr.py` - OCR endpoints
-- `test_api_settings.py` - Settings endpoints
+- `test_file_security.py` - File upload security
+- `test_refresh_tokens.py` - JWT refresh token security
+- `test_security_auth.py` - Authentication security
+- `test_security_dependencies.py` - Dependency security scanning
+- `test_security_headers.py` - HTTP security headers
+- `test_security_jwt.py` - JWT token security
+- `test_security_passwords.py` - Password hashing and validation
+- `test_two_factor.py` - 2FA implementation security
 
-**Coverage:** ~80%
+## 🚀 Running Tests
 
-### 4. Utility Tests
-Tests for helper functions:
-- `test_duplicate_utils.py` - Duplicate detection
-- `test_phone_utils.py` - Phone number parsing
-
----
-
-## 🛠️ Fixtures
-
-### Database Fixtures
-- `test_db` - Fresh test database for each test
-- `db_session` - Alias for test_db
-- `db` - Alias for compatibility
-
-### Authentication Fixtures
-- `auth_token` - JWT token for regular user
-- `admin_auth_token` - JWT token for admin user
-
-### Data Fixtures
-- `test_contact` - Sample contact in DB
-- `test_user_data` - Sample user data dict
-- `test_contact_data` - Sample contact data dict
-
----
-
-## ✅ Test Coverage Goals
-
-| Component | Current | Target |
-|-----------|---------|--------|
-| Repositories | 100% | 100% ✅ |
-| Services | 100% | 100% ✅ |
-| API Endpoints | ~80% | 80% ✅ |
-| Utilities | ~70% | 80% ⏳ |
-| **Overall** | **~75%** | **80%** ⏳ |
-
----
-
-## 📝 Writing New Tests
-
-### Example Test Structure
-
-```python
-class TestMyFeature:
-    """Tests for MyFeature"""
-    
-    def test_basic_functionality(self, db, test_contact):
-        """Test basic feature"""
-        # Arrange
-        input_data = {"field": "value"}
-        
-        # Act
-        result = my_function(input_data)
-        
-        # Assert
-        assert result is not None
-        assert result.field == "value"
-    
-    def test_error_handling(self):
-        """Test error cases"""
-        with pytest.raises(ValueError):
-            my_function(None)
-```
-
-### Best Practices
-
-1. **Use Descriptive Names**
-   ```python
-   # Good
-   def test_create_contact_with_valid_data(...)
-   
-   # Bad
-   def test_contact(...)
-   ```
-
-2. **Test One Thing**
-   Each test should verify one specific behavior
-
-3. **Use Fixtures**
-   Reuse common setup via fixtures
-
-4. **Test Edge Cases**
-   - Empty inputs
-   - Invalid data
-   - Boundary values
-   - Race conditions
-
-5. **Keep Tests Fast**
-   - Use in-memory DB when possible
-   - Mock external services
-   - Minimize DB queries
-
----
-
-## 🔧 Configuration
-
-### pytest.ini
-```ini
-[tool:pytest]
-testpaths = app/tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts = -v --strict-markers
-markers =
-    slow: marks tests as slow
-    integration: marks tests as integration tests
-    unit: marks tests as unit tests
-```
-
-### Coverage Config (.coveragerc)
-```ini
-[run]
-source = app
-omit =
-    */tests/*
-    */migrations/*
-    */__pycache__/*
-
-[report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    raise AssertionError
-    raise NotImplementedError
-```
-
----
-
-## 🐛 Debugging Tests
-
-### Run with Debug Output
+### Run all tests
 ```bash
-pytest -vv -s
+pytest
 ```
 
-### Run Single Test
+### Run specific category
 ```bash
-pytest app/tests/test_services.py::TestContactService::test_create_contact -vv
+pytest app/tests/unit              # Unit tests only
+pytest app/tests/integration       # Integration tests only
+pytest app/tests/security          # Security tests only
 ```
 
-### Drop into Debugger on Failure
+### Run with markers (coming soon)
 ```bash
-pytest --pdb
+pytest -m unit                     # All unit tests
+pytest -m integration              # All integration tests
+pytest -m security                 # All security tests
+pytest -m "not integration"        # Skip integration tests
 ```
 
-### Show Local Variables on Failure
+### Run specific file
 ```bash
-pytest -l
+pytest app/tests/unit/test_phone_utils.py
+pytest app/tests/security/test_two_factor.py
 ```
 
----
-
-## 📈 Coverage Report
-
-Generate HTML coverage report:
+### Run with coverage
 ```bash
 pytest --cov=app --cov-report=html
-open htmlcov/index.html
+```
+
+## 📈 Test Statistics
+
+**Total Tests:** 17  
+**Coverage:** ~86.5% (115/133 tests passing)
+
+| Category    | Count | Purpose                          |
+|-------------|-------|----------------------------------|
+| Unit        | 2     | Fast, isolated function tests    |
+| Integration | 7     | API, DB, service integration     |
+| Security    | 8     | Auth, permissions, vulnerabilities|
+
+## 🎯 Best Practices
+
+1. **Unit Tests:** Should be fast (<1s) and not require external dependencies
+2. **Integration Tests:** Can use database, but should use test fixtures
+3. **Security Tests:** Focus on authentication, authorization, and vulnerability scanning
+4. **Fixtures:** Shared fixtures in `conftest.py`
+5. **Naming:** Always prefix test files with `test_`
+6. **Assertions:** Use descriptive assertion messages
+
+## 📝 Adding New Tests
+
+### Unit Test Example
+```python
+# tests/unit/test_my_util.py
+def test_my_function():
+    result = my_function("input")
+    assert result == "expected"
+```
+
+### Integration Test Example
+```python
+# tests/integration/test_my_api.py
+def test_api_endpoint(client, db_session):
+    response = client.get("/api/endpoint")
+    assert response.status_code == 200
+```
+
+### Security Test Example
+```python
+# tests/security/test_my_security.py
+def test_unauthorized_access(client):
+    response = client.get("/api/protected")
+    assert response.status_code == 401
 ```
 
 ---
 
-## 🚨 CI/CD Integration
+## 🔗 Related Documentation
 
-Tests run automatically on:
-- ✅ Every push to `main`
-- ✅ Every pull request
-- ✅ Pre-commit hooks
-
-See `.github/workflows/ci-cd.yml` for configuration.
+- [Main README](../../../../README.md)
+- [Backend 3-Layer Pattern](../../BACKEND_3_LAYER_PATTERN.md)
+- [Security Documentation](../../../../SECURITY.md)
 
 ---
 
-**Created:** 2025-10-22  
-**Version:** 2.31.0  
-**Total Tests:** 80+  
-**Coverage:** ~75% (target: 80%)
-
+*Last Updated: 2025-10-24 (v3.7.x - Phase 3)*

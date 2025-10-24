@@ -2,7 +2,7 @@
 Unit tests for phone number formatting utilities
 """
 import pytest
-from ..core.phone import format_phone_number
+from ...core.phone import format_phone_number
 
 
 class TestPhoneFormatting:

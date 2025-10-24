@@ -2,7 +2,7 @@
 Unit tests for duplicate detection utilities
 """
 import pytest
-from ..duplicate_utils import (
+from ...core.duplicates import (
     calculate_field_similarity,
     calculate_contact_similarity,
     find_duplicate_contacts,
