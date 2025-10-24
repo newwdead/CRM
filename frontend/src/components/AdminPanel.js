@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Documentation from './Documentation';
 import { ServicesPanel } from '../modules/admin/services';
 import SystemSettings from './SystemSettings';
@@ -11,10 +12,20 @@ import SystemResources from './admin/SystemResources';
  * Admin Panel - Main Admin Dashboard
  * Orchestrates all admin-related components
  * 
+ * v4.6.0: Fixed URL navigation - now reads ?tab= parameter
  * Refactored from 1372 lines to 113 lines
  */
 function AdminPanel({ t, lang }) {
-  const [activeTab, setActiveTab] = useState('users');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'users');
+  
+  // Update active tab when URL changes
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams, activeTab]);
 
   return (
     <div className="admin-panel" style={{ padding: '20px' }}>
