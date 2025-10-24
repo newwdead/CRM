@@ -73,28 +73,39 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
               <div className="logo">
                 <span className="logo-icon">💼</span>
                 <h1>ibbase</h1>
+                <span className="logo-tagline">
+                  {lang === 'ru' ? 'CRM Визиток' : 'Business Card CRM'}
+                </span>
               </div>
             </Link>
           </div>
 
           <div className="header-right">
-            <button 
-              onClick={toggleLanguage} 
-              className="btn btn-secondary lang-btn"
-              title={lang === 'en' ? 'Switch to Russian' : 'Переключить на English'}
-            >
-              🌐 {lang === 'en' ? 'RU' : 'EN'}
-            </button>
-            <div className="user-info">
-              <span className="user-welcome">
-                👋 {t.welcome}, <strong>{user?.full_name || user?.username}</strong>
+            <div className="user-info-compact">
+              <span className="user-name">
+                {user?.full_name || user?.username}
               </span>
               {user?.is_admin && (
-                <span className="badge badge-primary">{t.admin}</span>
+                <span className="badge badge-admin" title={lang === 'ru' ? 'Администратор' : 'Administrator'}>
+                  🛡️ {lang === 'ru' ? 'Админ' : 'Admin'}
+                </span>
               )}
             </div>
-            <button onClick={onLogout} className="btn btn-secondary">
-              🚪 {t.logout}
+            <button 
+              onClick={toggleLanguage} 
+              className="btn btn-icon"
+              title={lang === 'en' ? 'Switch to Russian' : 'Переключить на English'}
+              aria-label="Change language"
+            >
+              {lang === 'en' ? '🇷🇺' : '🇬🇧'}
+            </button>
+            <button 
+              onClick={onLogout} 
+              className="btn btn-icon"
+              title={t.logout}
+              aria-label="Logout"
+            >
+              🚪
             </button>
           </div>
         </div>
