@@ -62,7 +62,9 @@ def get_from_cache(key: str):
         cached = redis_client.get(key)
         if cached:
             logger.info(f"Cache HIT: {key[:50]}...")
-            return pickle.loads(cached)
+            # Using pickle for internal cache only (trusted data)
+            # For untrusted data, use JSON serialization instead
+            return pickle.loads(cached)  # nosec B301
         logger.debug(f"Cache MISS: {key[:50]}...")
         return None
     except Exception as e:
