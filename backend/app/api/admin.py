@@ -301,27 +301,74 @@ async def list_backups(
 ):
     """
     List available database backups (admin only).
+    Returns list sorted by creation time (newest first).
     """
-    backup_dir = Path("/home/ubuntu/fastapi-bizcard-crm-ready/backups")
+    from datetime import datetime
+    
+    # Use relative path (same as create_backup)
+    backup_dir = Path("backups")
     
     if not backup_dir.exists():
-        return {"backups": [], "total": 0}
+        logger.info("Backups directory does not exist")
+        return []
     
     backups = []
-    for backup_file in sorted(backup_dir.glob("*.sql.gz"), key=lambda p: p.stat().st_mtime, reverse=True):
-        stat = backup_file.stat()
-        backups.append({
-            "filename": backup_file.name,
-            "size": stat.st_size,
-            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-            "created_at": stat.st_mtime,
-        })
+    try:
+        backup_files = list(backup_dir.glob('*.sql.gz')) + list(backup_dir.glob('*.sql'))
+        
+        if not backup_files:
+            logger.info("No backup files found")
+            return []
+        
+        for file in sorted(backup_files, key=lambda x: x.stat().st_mtime, reverse=True):
+            try:
+                stat = file.stat()
+                created_dt = datetime.fromtimestamp(stat.st_mtime)
+                size_mb = stat.st_size / (1024 * 1024)
+                
+                backups.append({
+                    'filename': file.name,
+                    'size_bytes': stat.st_size,
+                    'size_mb': round(size_mb, 2),
+                    'created_timestamp': stat.st_mtime,
+                    'created_date': created_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                    'created_relative': _get_relative_time(created_dt)
+                })
+            except Exception as e:
+                logger.warning(f"Failed to get stats for {file.name}: {e}")
+                continue
+        
+        logger.info(f"Found {len(backups)} backup files")
+        return backups
+        
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list backups: {str(e)}"
+        )
+
+
+def _get_relative_time(dt):
+    """Get human-readable relative time"""
+    from datetime import datetime, timedelta
     
-    return {
-        "backups": backups,
-        "total": len(backups),
-        "backup_dir": str(backup_dir)
-    }
+    now = datetime.now()
+    diff = now - dt
+    
+    if diff < timedelta(minutes=1):
+        return "just now"
+    elif diff < timedelta(hours=1):
+        minutes = int(diff.total_seconds() / 60)
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif diff < timedelta(days=1):
+        hours = int(diff.total_seconds() / 3600)
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    elif diff < timedelta(days=30):
+        days = diff.days
+        return f"{days} day{'s' if days != 1 else ''} ago"
+    else:
+        return dt.strftime("%Y-%m-%d")
 
 
 @router.post('/backups/create')
