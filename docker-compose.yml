@@ -56,7 +56,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
-      - ./backups:/home/ubuntu/fastapi-bizcard-crm-ready/backups
+      - ./backups:/app/backups
       - ./scripts:/home/ubuntu/fastapi-bizcard-crm-ready/scripts:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - .:/home/ubuntu/fastapi-bizcard-crm-ready:ro
