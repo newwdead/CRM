@@ -157,7 +157,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("=" * 60)
     logger.info("🚀 FastAPI Business Card CRM starting...")
-    logger.info(f"📦 Version: 4.0.0")
+    logger.info(f"📦 Version: 4.1.0")
     logger.info(f"🔧 Environment: {os.getenv('ENV', 'development')}")
     logger.info(f"🗄️  Database: {os.getenv('DATABASE_URL', 'sqlite')[:30]}...")
     logger.info("=" * 60)
@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="4.0.0",  # Major dependencies update: Python 3.11, FastAPI 0.115, React 18.3
+    version="4.1.0",  # Bug fixes, lifespan migration, Celery fix, performance analysis
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan  # Use lifespan context manager instead of on_event
@@ -250,7 +250,7 @@ async def root():
     """API root endpoint"""
     return {
         "name": "BizCard CRM API",
-        "version": "4.0.0",
+        "version": "4.1.0",
         "python": "3.11",
         "fastapi": "0.115.0",
         "status": "running",
