@@ -245,7 +245,9 @@ async def root():
     """API root endpoint"""
     return {
         "name": "BizCard CRM API",
-        "version": "2.16",
+        "version": "4.0.0",
+        "python": "3.11",
+        "fastapi": "0.115.0",
         "status": "running",
         "docs": "/docs",
         "health": "/health"
