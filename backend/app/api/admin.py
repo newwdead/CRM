@@ -310,7 +310,13 @@ async def list_backups(
     
     if not backup_dir.exists():
         logger.info("Backups directory does not exist")
-        return []
+        return {
+            'backups': [],
+            'total': 0,
+            'total_size_bytes': 0,
+            'total_size_human': '0 MB',
+            'backup_dir': str(backup_dir.absolute())
+        }
     
     backups = []
     try:
@@ -318,7 +324,13 @@ async def list_backups(
         
         if not backup_files:
             logger.info("No backup files found")
-            return []
+            return {
+                'backups': [],
+                'total': 0,
+                'total_size_bytes': 0,
+                'total_size_human': '0 MB',
+                'backup_dir': str(backup_dir.absolute())
+            }
         
         for file in sorted(backup_files, key=lambda x: x.stat().st_mtime, reverse=True):
             try:
@@ -339,7 +351,18 @@ async def list_backups(
                 continue
         
         logger.info(f"Found {len(backups)} backup files")
-        return backups
+        
+        # Calculate total size
+        total_size_bytes = sum(b['size_bytes'] for b in backups)
+        total_size_mb = total_size_bytes / (1024 * 1024)
+        
+        return {
+            'backups': backups,
+            'total': len(backups),
+            'total_size_bytes': total_size_bytes,
+            'total_size_human': f"{total_size_mb:.2f} MB" if total_size_mb < 1024 else f"{total_size_mb/1024:.2f} GB",
+            'backup_dir': str(backup_dir.absolute())
+        }
         
     except Exception as e:
         logger.error(f"Error listing backups: {e}", exc_info=True)

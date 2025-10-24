@@ -155,8 +155,8 @@ function BackupManagement() {
                     <td>
                       <code style={{ fontSize: '0.85em' }}>{backup.filename}</code>
                     </td>
-                    <td>{backup.created_at_human}</td>
-                    <td>{backup.size_human}</td>
+                    <td>{backup.created_date} ({backup.created_relative})</td>
+                    <td>{backup.size_mb} MB</td>
                     <td style={{ textAlign: 'center' }}>
                       <button
                         onClick={() => handleDeleteBackup(backup.filename)}
