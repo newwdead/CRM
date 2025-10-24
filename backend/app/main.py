@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="4.2.0",  # Pydantic V2, SQLAlchemy 2.0, Test Coverage +37%
+    version="4.2.1",  # UI Testing Reports, Console Cleanup, Performance Audit
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan  # Use lifespan context manager instead of on_event
