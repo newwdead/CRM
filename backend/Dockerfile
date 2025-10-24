@@ -2,7 +2,7 @@
 # Target: ~700MB (from 1.29GB - 45% reduction)
 # Build time: ~2-3 minutes (vs 20+ minutes for multi-stage)
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Install runtime + Docker CLI in one layer, then cleanup
 RUN apt-get update && apt-get install -y --no-install-recommends \
