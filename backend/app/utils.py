@@ -12,7 +12,8 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from .models import Contact, AuditLog, User
-from . import ocr_utils, qr_utils
+from . import ocr_utils
+from .core import qr as qr_utils
 from .ocr_providers import OCRManager
 from .core.metrics import (
     qr_scan_counter,

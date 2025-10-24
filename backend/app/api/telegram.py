@@ -11,7 +11,7 @@ import logging
 
 from ..database import get_db
 from ..models import User, AppSetting
-from ..auth_utils import get_current_active_user, get_current_admin_user
+from ..core.auth import get_current_active_user, get_current_admin_user
 from .. import image_processing
 
 router = APIRouter()

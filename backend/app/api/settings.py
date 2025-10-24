@@ -10,7 +10,7 @@ import logging
 from ..database import get_db
 from ..models import User, Contact, AppSetting
 from .. import schemas
-from .. import auth_utils
+from ..core import auth as auth_utils
 from ..core.utils import get_setting, set_setting
 
 # Logger

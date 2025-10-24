@@ -12,9 +12,9 @@ from ..database import get_db
 from ..models import Contact, User, DuplicateContact, Tag, Group
 from ..core.utils import get_setting
 from .. import schemas
-from .. import auth_utils
+from ..core import auth as auth_utils
 from .. import duplicate_utils
-from ..phone_utils import format_phone_number
+from ..core.phone import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
 from ..services.contact_service import ContactService
 
@@ -524,7 +524,7 @@ def scan_qr_code_from_contact(
     """
     Сканировать QR код из изображения контакта
     """
-    from .. import qr_utils
+    from ..core import qr as qr_utils
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
@@ -578,7 +578,7 @@ def apply_qr_data_to_contact(
     """
     Применить данные из QR кода к контакту
     """
-    from .. import qr_utils
+    from ..core import qr as qr_utils
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:

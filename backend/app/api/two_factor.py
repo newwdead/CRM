@@ -10,7 +10,7 @@ import logging
 
 from ..database import get_db
 from ..models.user import User
-from .. import auth_utils
+from ..core import auth as auth_utils
 from ..core.two_factor import (
     setup_2fa_for_user,
     enable_2fa_for_user,

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List
 import subprocess
 import os
-from .. import auth_utils
+from ..core import auth as auth_utils
 from ..models import User
 
 router = APIRouter()

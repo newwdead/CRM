@@ -11,7 +11,7 @@ import logging
 from ..database import get_db
 from ..models import User
 from .. import schemas
-from .. import auth_utils
+from ..core import auth as auth_utils
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 

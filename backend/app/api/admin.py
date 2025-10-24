@@ -11,7 +11,7 @@ import logging
 from ..database import get_db
 from ..models import Contact, User, Tag, Group, AuditLog
 from .. import schemas
-from .. import auth_utils
+from ..core import auth as auth_utils
 
 # Logger
 logger = logging.getLogger(__name__)

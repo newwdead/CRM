@@ -14,7 +14,7 @@ import logging
 
 from ..database import get_db
 from ..models import User, Contact
-from ..auth_utils import get_current_active_user
+from ..core.auth import get_current_active_user
 from ..utils import create_audit_log
 
 router = APIRouter()

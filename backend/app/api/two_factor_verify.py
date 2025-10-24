@@ -9,7 +9,7 @@ from typing import Optional
 import logging
 
 from ..database import get_db
-from ..auth_utils import decode_access_token, create_access_token
+from ..core.auth import decode_access_token, create_access_token
 from ..models.user import User
 from ..models.two_factor_auth import TwoFactorAuth, TwoFactorBackupCode
 from ..core.two_factor import verify_totp_code, verify_backup_code

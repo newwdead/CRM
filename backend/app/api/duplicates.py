@@ -12,7 +12,7 @@ from ..database import get_db
 from ..models import Contact, User, DuplicateContact
 from ..services import DuplicateService
 from .. import duplicate_utils
-from .. import auth_utils
+from ..core import auth as auth_utils
 from ..core.utils import create_audit_log
 
 # Logger

@@ -17,7 +17,7 @@ import logging
 from .base import BaseService
 from ..models import Contact, User, Tag, Group, DuplicateContact, AuditLog
 from .. import duplicate_utils
-from ..phone_utils import format_phone_number
+from ..core.phone import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
 from ..core.metrics import (
     contacts_created_counter,

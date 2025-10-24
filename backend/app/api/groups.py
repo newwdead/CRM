@@ -8,7 +8,7 @@ from typing import List
 from ..database import get_db
 from ..models import User, Contact, Group
 from .. import schemas
-from ..auth_utils import get_current_active_user, get_current_admin_user
+from ..core.auth import get_current_active_user, get_current_admin_user
 
 router = APIRouter()
 

@@ -18,7 +18,7 @@ from ..models import Contact, OCRCorrection
 from ..ocr_providers import OCRManager
 from .. import ocr_utils
 from .. import image_processing
-from .. import qr_utils
+from ..core import qr as qr_utils
 
 
 class OCRService(BaseService):

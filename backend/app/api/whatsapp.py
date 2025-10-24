@@ -8,7 +8,7 @@ import json
 
 from ..database import get_db
 from ..models import User, Contact
-from ..auth_utils import get_current_admin_user
+from ..core.auth import get_current_admin_user
 from ..core.metrics import telegram_messages_counter
 
 router = APIRouter()
