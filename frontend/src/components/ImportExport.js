@@ -79,7 +79,7 @@ export default function ImportExport({ lang = 'ru' }) {
   };
 
   return (
-    <div className="card">
+    <div className="modern-card">
       <h3>{t.title}</h3>
 
       {/* Export Section */}
