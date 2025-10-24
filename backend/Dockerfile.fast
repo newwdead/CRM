@@ -43,10 +43,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt \
     && rm -rf /root/.cache/pip \
     && find /usr/local/lib/python3.10 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.10 -name "*.pyc" -delete \
-    && find /usr/local/lib/python3.10 -name "*.pyo" -delete \
-    && find /usr/local/lib/python3.10 -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.10 -type d -name "test" -exec rm -rf {} + 2>/dev/null || true \
-    && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/* /var/log/*
+    && find /usr/local/lib/python3.10 -name "*.pyo" -delete
 
 # Copy application
 COPY ./app /app/app
