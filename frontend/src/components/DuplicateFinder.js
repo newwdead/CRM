@@ -154,7 +154,7 @@ export default function DuplicateFinder({ lang = 'ru' }) {
   };
 
   return (
-    <div className="card">
+    <div className="modern-card">
       <h2 style={{ marginBottom: '8px' }}>🔍 {t.title}</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>{t.subtitle}</p>
 
