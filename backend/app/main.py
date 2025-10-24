@@ -10,6 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from prometheus_fastapi_instrumentator import Instrumentator
+from contextlib import asynccontextmanager
 import os
 import time
 import logging
@@ -144,6 +145,30 @@ validate_security_config()
 
 
 # ============================================================================
+# Lifespan Context Manager (replaces deprecated @app.on_event)
+# ============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI application.
+    Handles startup and shutdown events.
+    """
+    # Startup
+    logger.info("=" * 60)
+    logger.info("🚀 FastAPI Business Card CRM starting...")
+    logger.info(f"📦 Version: 4.0.0")
+    logger.info(f"🔧 Environment: {os.getenv('ENV', 'development')}")
+    logger.info(f"🗄️  Database: {os.getenv('DATABASE_URL', 'sqlite')[:30]}...")
+    logger.info("=" * 60)
+    
+    yield
+    
+    # Shutdown
+    logger.info("👋 FastAPI Business Card CRM shutting down...")
+
+
+# ============================================================================
 # FastAPI Application
 # ============================================================================
 
@@ -152,7 +177,8 @@ app = FastAPI(
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
     version="4.0.0",  # Major dependencies update: Python 3.11, FastAPI 0.115, React 18.3
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan  # Use lifespan context manager instead of on_event
 )
 
 # Prometheus instrumentation
@@ -213,27 +239,6 @@ app.add_middleware(ErrorHandlerMiddleware)
 # Include API routers (modular structure)
 # Note: Nginx already handles /api/ prefix and proxies to / on backend
 app.include_router(api_router)
-
-
-# ============================================================================
-# Application Events
-# ============================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Run on application startup"""
-    logger.info("=" * 60)
-    logger.info("🚀 FastAPI Business Card CRM starting...")
-    logger.info(f"📦 Version: 4.0.0")
-    logger.info(f"🔧 Environment: {os.getenv('ENV', 'development')}")
-    logger.info(f"🗄️  Database: {os.getenv('DATABASE_URL', 'sqlite')[:30]}...")
-    logger.info("=" * 60)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on application shutdown"""
-    logger.info("👋 FastAPI Business Card CRM shutting down...")
 
 
 # ============================================================================
