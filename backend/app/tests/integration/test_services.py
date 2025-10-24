@@ -5,8 +5,8 @@ Tests for Service Layer
 import pytest
 from sqlalchemy.orm import Session
 
-from ..models import Contact
-from ..services import ContactService
+from app.models import Contact
+from app.services import ContactService
 
 
 class TestContactService:

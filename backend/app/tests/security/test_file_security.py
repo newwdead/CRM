@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image
 import io
 
-from app.utils.file_security import (
+from app.core.file_security import (
     sanitize_filename,
     detect_file_type,
     validate_file_size,

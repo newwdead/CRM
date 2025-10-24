@@ -7,8 +7,8 @@ import pytest
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from ..models import Contact, DuplicateContact, User, OCRCorrection, AppSetting, AuditLog
-from ..repositories import (
+from app.models import Contact, DuplicateContact, User, OCRCorrection, AppSetting, AuditLog
+from app.repositories import (
     ContactRepository,
     DuplicateRepository,
     UserRepository,
