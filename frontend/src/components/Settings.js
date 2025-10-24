@@ -5,7 +5,7 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
   const [activeTab, setActiveTab] = useState('general');
 
   const t = lang === 'ru' ? {
-    title: '⚙️ Настройки',
+    title: '👤 Мои Настройки',
     generalTab: 'Общие',
     ocrTab: 'OCR Провайдеры',
     interfaceLanguage: 'Язык интерфейса',
@@ -21,7 +21,7 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
     enableAutoRefresh: 'Автоматически обновлять список контактов',
     refreshInterval: 'Интервал обновления (сек)',
   } : {
-    title: '⚙️ Settings',
+    title: '👤 User Preferences',
     generalTab: 'General',
     ocrTab: 'OCR Providers',
     interfaceLanguage: 'Interface Language',
@@ -76,6 +76,11 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
     <div>
       <div className="card">
         <h2>{t.title}</h2>
+        <p style={{ color: '#666', marginTop: '8px', marginBottom: '16px' }}>
+          {lang === 'ru' 
+            ? 'Персональные настройки интерфейса. Изменения сохраняются в вашем браузере.' 
+            : 'Personal interface settings. Changes are saved in your browser.'}
+        </p>
         
         {/* Tabs */}
         <div className="tabs">
