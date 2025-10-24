@@ -39,7 +39,8 @@ def get_cache_key(prefix: str, data: bytes, extra: str = "") -> str:
     Returns:
         Cache key string
     """
-    hash_value = hashlib.md5(data).hexdigest()
+    # Using MD5 for cache key generation only (not for security)
+    hash_value = hashlib.md5(data, usedforsecurity=False).hexdigest()  # nosec B324
     if extra:
         return f"{prefix}:{extra}:{hash_value}"
     return f"{prefix}:{hash_value}"
