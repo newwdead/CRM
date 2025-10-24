@@ -9,12 +9,15 @@ import logger from '../../utils/logger';
 /**
  * Main Layout Component
  * Contains header, navigation, breadcrumbs, and footer
+ * Enhanced with grouped navigation and dropdown menus in v4.4.0
  */
 const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [ver, setVer] = useState({ version: '', commit: '', message: '' });
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const t = translations[lang];
 
@@ -35,11 +38,29 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
       .catch(err => logger.error('Failed to fetch version:', err));
   }, []);
 
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (!e.target.closest('.dropdown')) {
+        setActionsOpen(false);
+        setAdminOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
   const isActive = (path) => {
     if (path === '/') {
       return location.pathname === '/';
     }
     return location.pathname.startsWith(path);
+  };
+
+  const isActionsActive = () => {
+    return ['/upload', '/batch-upload', '/import-export', '/duplicates'].some(path => 
+      location.pathname.startsWith(path)
+    );
   };
 
   return (
@@ -78,36 +99,149 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="nav">
-          <Link to="/" className={`nav-btn ${isActive('/') && location.pathname === '/' ? 'active' : ''}`}>
+        {/* Enhanced Navigation with Groups */}
+        <nav className="nav" style={{ position: 'relative' }}>
+          {/* Home */}
+          <Link 
+            to="/" 
+            className={`nav-btn ${isActive('/') && location.pathname === '/' ? 'active' : ''}`}
+            title={lang === 'ru' ? 'Главная страница' : 'Home page'}
+          >
             🏠 {t.home}
           </Link>
-          <Link to="/contacts" className={`nav-btn ${isActive('/contacts') ? 'active' : ''}`}>
+
+          {/* Data Section */}
+          <Link 
+            to="/contacts" 
+            className={`nav-btn ${isActive('/contacts') ? 'active' : ''}`}
+            title={lang === 'ru' ? 'Список контактов' : 'Contact list'}
+          >
             📇 {t.contacts}
           </Link>
-          <Link to="/companies" className={`nav-btn ${isActive('/companies') ? 'active' : ''}`}>
+          <Link 
+            to="/companies" 
+            className={`nav-btn ${isActive('/companies') ? 'active' : ''}`}
+            title={lang === 'ru' ? 'Список организаций' : 'Company list'}
+          >
             🏢 {t.companies || (lang === 'ru' ? 'Организации' : 'Companies')}
           </Link>
-          <Link to="/duplicates" className={`nav-btn ${isActive('/duplicates') ? 'active' : ''}`}>
-            🔍 {lang === 'ru' ? 'Дубликаты' : 'Duplicates'}
+
+          {/* Actions Dropdown */}
+          <div className="dropdown">
+            <button
+              className={`nav-btn dropdown-trigger ${isActionsActive() ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActionsOpen(!actionsOpen);
+                setAdminOpen(false);
+              }}
+              title={lang === 'ru' ? 'Действия с визитками' : 'Business card actions'}
+            >
+              ⚡ {lang === 'ru' ? 'Действия' : 'Actions'} ▾
+            </button>
+            {actionsOpen && (
+              <div className="dropdown-menu" onClick={() => setActionsOpen(false)}>
+                <Link 
+                  to="/upload" 
+                  className={`dropdown-item ${isActive('/upload') ? 'active' : ''}`}
+                >
+                  📤 {t.uploadCard}
+                </Link>
+                <Link 
+                  to="/batch-upload" 
+                  className={`dropdown-item ${isActive('/batch-upload') ? 'active' : ''}`}
+                >
+                  📦 {lang === 'ru' ? 'Пакетная загрузка' : 'Batch Upload'}
+                </Link>
+                <Link 
+                  to="/import-export" 
+                  className={`dropdown-item ${isActive('/import-export') ? 'active' : ''}`}
+                >
+                  📊 {t.importExport}
+                </Link>
+                <div className="dropdown-divider"></div>
+                <Link 
+                  to="/duplicates" 
+                  className={`dropdown-item ${isActive('/duplicates') ? 'active' : ''}`}
+                >
+                  🔍 {lang === 'ru' ? 'Поиск дубликатов' : 'Find Duplicates'}
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Settings */}
+          <Link 
+            to="/settings" 
+            className={`nav-btn ${isActive('/settings') ? 'active' : ''}`}
+            title={lang === 'ru' ? 'Мои настройки' : 'My preferences'}
+          >
+            👤 {lang === 'ru' ? 'Настройки' : 'Preferences'}
           </Link>
-          <Link to="/upload" className={`nav-btn ${isActive('/upload') ? 'active' : ''}`}>
-            📤 {t.uploadCard}
-          </Link>
-          <Link to="/batch-upload" className={`nav-btn ${isActive('/batch-upload') ? 'active' : ''}`}>
-            📦 {lang === 'ru' ? 'Пакетная' : 'Batch'}
-          </Link>
-          <Link to="/import-export" className={`nav-btn ${isActive('/import-export') ? 'active' : ''}`}>
-            📊 {t.importExport}
-          </Link>
-          <Link to="/settings" className={`nav-btn ${isActive('/settings') ? 'active' : ''}`}>
-            ⚙️ {t.settings}
-          </Link>
+
+          {/* Admin Dropdown */}
           {user?.is_admin && (
-            <Link to="/admin" className={`nav-btn ${isActive('/admin') ? 'active' : ''}`}>
-              🛡️ {t.adminPanel}
-            </Link>
+            <div className="dropdown">
+              <button
+                className={`nav-btn dropdown-trigger ${isActive('/admin') ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAdminOpen(!adminOpen);
+                  setActionsOpen(false);
+                }}
+                title={lang === 'ru' ? 'Административная панель' : 'Admin panel'}
+              >
+                🛡️ {t.adminPanel} ▾
+              </button>
+              {adminOpen && (
+                <div className="dropdown-menu" onClick={() => setAdminOpen(false)}>
+                  <Link 
+                    to="/admin" 
+                    className="dropdown-item"
+                  >
+                    📊 {lang === 'ru' ? 'Обзор' : 'Overview'}
+                  </Link>
+                  <div className="dropdown-divider"></div>
+                  <div className="dropdown-header">
+                    {lang === 'ru' ? 'Управление' : 'Management'}
+                  </div>
+                  <Link 
+                    to="/admin?tab=users" 
+                    className="dropdown-item"
+                  >
+                    👥 {lang === 'ru' ? 'Пользователи' : 'Users'}
+                  </Link>
+                  <Link 
+                    to="/admin?tab=backups" 
+                    className="dropdown-item"
+                  >
+                    💾 {lang === 'ru' ? 'Резервные копии' : 'Backups'}
+                  </Link>
+                  <div className="dropdown-divider"></div>
+                  <div className="dropdown-header">
+                    {lang === 'ru' ? 'Система' : 'System'}
+                  </div>
+                  <Link 
+                    to="/admin?tab=settings" 
+                    className="dropdown-item"
+                  >
+                    🔌 {lang === 'ru' ? 'Интеграции' : 'Integrations'}
+                  </Link>
+                  <Link 
+                    to="/admin?tab=services" 
+                    className="dropdown-item"
+                  >
+                    🎛️ {lang === 'ru' ? 'Сервисы' : 'Services'}
+                  </Link>
+                  <Link 
+                    to="/admin?tab=resources" 
+                    className="dropdown-item"
+                  >
+                    🖥️ {lang === 'ru' ? 'Ресурсы' : 'Resources'}
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
         </nav>
       </header>
@@ -143,9 +277,91 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
           { keys: ['Esc'], description: lang === 'ru' ? 'Закрыть модальное окно' : 'Close modal' },
         ]}
       />
+
+      {/* Dropdown Styles */}
+      <style jsx="true">{`
+        .dropdown {
+          position: relative;
+          display: inline-block;
+        }
+
+        .dropdown-trigger {
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .dropdown-menu {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          margin-top: 8px;
+          min-width: 220px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          overflow: hidden;
+          animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .dropdown-item {
+          display: block;
+          padding: 10px 16px;
+          color: #333;
+          text-decoration: none;
+          transition: background-color 0.2s;
+          font-size: 14px;
+        }
+
+        .dropdown-item:hover {
+          background-color: #f6f8fa;
+        }
+
+        .dropdown-item.active {
+          background-color: #e7f3ff;
+          color: #2563eb;
+          font-weight: 600;
+        }
+
+        .dropdown-divider {
+          height: 1px;
+          background-color: #e1e4e8;
+          margin: 6px 0;
+        }
+
+        .dropdown-header {
+          padding: 8px 16px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .dropdown-menu {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            width: auto;
+            max-width: none;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default MainLayout;
-
