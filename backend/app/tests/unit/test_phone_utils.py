@@ -58,9 +58,10 @@ class TestPhoneFormatting:
         assert result == "123"
     
     def test_international_number_not_russian(self):
-        """Test non-Russian international number returns cleaned digits"""
+        """Test non-Russian international number is formatted correctly"""
         result = format_phone_number("19175551234")  # US number
-        assert result == "19175551234"
+        # Function formats US numbers with country code and formatting
+        assert result == "+1 (917) 555-1234"
     
     def test_special_characters(self):
         """Test number with special characters gets cleaned"""

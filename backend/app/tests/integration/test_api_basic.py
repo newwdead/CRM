@@ -20,8 +20,10 @@ class TestHealthEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "version" in data
-        assert "commit" in data
-        assert "message" in data
+        assert data["version"] == "4.0.0"
+        assert "python" in data
+        assert "fastapi" in data
+        assert "react" in data
 
 
 class TestAuthEndpoints:
@@ -107,16 +109,16 @@ class TestDuplicateEndpoints:
     
     def test_get_duplicates_unauthorized(self, client):
         """Test getting duplicates without auth"""
-        response = client.get("/api/duplicates")
+        response = client.get("/duplicates")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
     def test_find_duplicates_unauthorized(self, client):
         """Test manual duplicate search without auth"""
-        response = client.post("/api/duplicates/find", json={"threshold": 0.75})
+        response = client.post("/duplicates/find", json={"threshold": 0.75})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
     def test_update_duplicate_status_unauthorized(self, client):
         """Test updating duplicate status without auth"""
-        response = client.put("/api/duplicates/1/status", json={"status": "reviewed"})
+        response = client.put("/duplicates/1/status", json={"status": "reviewed"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
