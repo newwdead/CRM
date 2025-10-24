@@ -7,26 +7,51 @@ import httpx
 from typing import Dict, AsyncGenerator
 
 
-@pytest.fixture
-def async_client():
-    """Create async HTTP client for E2E tests"""
-    return httpx.AsyncClient(
-        base_url="http://localhost:8000",
-        timeout=30.0,
-        follow_redirects=True
-    )
-
-
-@pytest.fixture
-def test_user_credentials() -> Dict[str, str]:
-    """Test user credentials"""
-    import time
-    timestamp = int(time.time() * 1000)  # millisecond precision
+@pytest.fixture(scope="session")
+def e2e_test_user():
+    """
+    Create E2E test user directly in database
+    Returns credentials dict
+    """
+    from app.database import SessionLocal
+    from app.models import User
+    from app.core.auth import get_password_hash
+    
+    db = SessionLocal()
+    
+    # E2E test user credentials
+    username = "e2e_test_user"
+    password = "E2ETestPass123!"
+    
+    # Check if user exists
+    existing_user = db.query(User).filter(User.username == username).first()
+    
+    if not existing_user:
+        # Create new E2E test user
+        new_user = User(
+            username=username,
+            email="e2e_test@example.com",
+            hashed_password=get_password_hash(password),
+            full_name="E2E Test User",
+            is_active=True,
+            is_admin=False
+        )
+        db.add(new_user)
+        db.commit()
+        print(f"✅ Created E2E test user: {username}")
+    else:
+        # Update existing user to ensure correct password
+        existing_user.hashed_password = get_password_hash(password)
+        existing_user.is_active = True
+        db.commit()
+        print(f"✅ Updated E2E test user: {username}")
+    
+    db.close()
+    
     return {
-        "username": f"testuser_e2e_{timestamp}",
-        "email": f"testuser_e2e_{timestamp}@example.com",
-        "password": "TestPassword123!",
-        "full_name": "E2E Test User"
+        "username": username,
+        "password": password,
+        "email": "e2e_test@example.com"
     }
 
 
