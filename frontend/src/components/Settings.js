@@ -168,44 +168,6 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
         gap: '20px',
         marginBottom: '24px'
       }}>
-        {/* Language Card */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          style={{
-            backgroundColor: '#fff',
-            borderRadius: '12px',
-            padding: '24px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            border: '2px solid #e1e4e8'
-          }}
-        >
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#333', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px' }}>🌐</span>
-            {t.interfaceLanguage}
-          </h3>
-          <select
-            value={localLang}
-            onChange={(e) => setLocalLang(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              fontSize: '14px',
-              border: '1px solid #e1e4e8',
-              borderRadius: '6px',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
-              transition: 'border-color 0.2s'
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-            onBlur={(e) => e.target.style.borderColor = '#e1e4e8'}
-          >
-            <option value="ru">🇷🇺 Русский</option>
-            <option value="en">🇬🇧 English</option>
-          </select>
-        </motion.div>
-
         {/* OCR Provider Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
