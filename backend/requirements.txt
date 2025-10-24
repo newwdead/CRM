@@ -48,7 +48,7 @@ prometheus-fastapi-instrumentator==7.0.0
 prometheus-client==0.21.0
 
 # Background Tasks
-celery==5.4.0
+celery==5.5.3
 redis==5.2.0
 
 # Fuzzy Matching
