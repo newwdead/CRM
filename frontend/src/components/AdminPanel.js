@@ -22,10 +22,10 @@ function AdminPanel({ t, lang }) {
   // Update active tab when URL changes
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && tabFromUrl !== activeTab) {
+    if (tabFromUrl) {
       setActiveTab(tabFromUrl);
     }
-  }, [searchParams, activeTab]);
+  }, [searchParams]); // Remove activeTab from dependencies to avoid loops
 
   const tabs = [
     { id: 'users', icon: '👥', label: 'Users' },
