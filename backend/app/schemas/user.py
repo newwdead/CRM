@@ -1,7 +1,7 @@
 """
 User authentication and profile schemas.
 """
-from .base import BaseModel, EmailStr, validator, Optional, datetime
+from .base import BaseModel, EmailStr, field_validator, Optional, datetime
 
 
 class UserRegister(BaseModel):
@@ -11,7 +11,8 @@ class UserRegister(BaseModel):
     password: str
     full_name: Optional[str] = None
     
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def username_alphanumeric(cls, v):
         if not v.isalnum() and '_' not in v and '-' not in v:
             raise ValueError('Username must be alphanumeric (can contain _ and -)')
@@ -21,7 +22,8 @@ class UserRegister(BaseModel):
             raise ValueError('Username must be at most 50 characters')
         return v
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_strength(cls, v):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters')
@@ -72,7 +74,8 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     password: Optional[str] = None
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_strength(cls, v):
         if v is not None and len(v) < 6:
             raise ValueError('Password must be at least 6 characters')
