@@ -1,10 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * KeyboardHint Component
- * Display keyboard shortcuts hint
+ * Display keyboard shortcuts hint with dismiss option
  */
 const KeyboardHint = ({ shortcuts = [], className = '' }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    // Check if user previously dismissed
+    const dismissed = localStorage.getItem('keyboardHintsDismissed');
+    if (dismissed === 'true') {
+      setIsVisible(false);
+    }
+  }, []);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    localStorage.setItem('keyboardHintsDismissed', 'true');
+  };
+
+  if (!isVisible) {
+    return null;
+  }
+
   if (shortcuts.length === 0) {
     shortcuts = [
       { keys: ['Ctrl', 'K'], description: 'Quick search' },
@@ -30,8 +49,35 @@ const KeyboardHint = ({ shortcuts = [], className = '' }) => {
       role="complementary"
       aria-label="Keyboard shortcuts"
     >
-      <div style={{ fontWeight: 600, marginBottom: '8px', fontSize: '0.9em' }}>
-        ⌨️ Keyboard Shortcuts
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '8px' 
+      }}>
+        <div style={{ fontWeight: 600, fontSize: '0.9em' }}>
+          ⌨️ Keyboard Shortcuts
+        </div>
+        <button
+          onClick={handleDismiss}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            padding: '0 4px',
+            fontSize: '1.2em',
+            lineHeight: 1,
+            opacity: 0.7,
+            transition: 'opacity 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.opacity = 1}
+          onMouseOut={(e) => e.target.style.opacity = 0.7}
+          aria-label="Dismiss keyboard hints"
+          title="Hide keyboard shortcuts (click again in footer to show)"
+        >
+          ×
+        </button>
       </div>
       {shortcuts.map((shortcut, idx) => (
         <div 
