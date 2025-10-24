@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { setTokens } from '../utils/tokenManager';
 
 export default function Login({ lang = 'ru', onLogin, onSwitchToRegister }) {
   const [username, setUsername] = useState('');
@@ -58,8 +59,13 @@ export default function Login({ lang = 'ru', onLogin, onSwitchToRegister }) {
 
       const data = await response.json();
       
-      // Save token
-      localStorage.setItem('access_token', data.access_token);
+      // Save tokens using token manager (with auto-refresh)
+      if (data.refresh_token) {
+        setTokens(data.access_token, data.refresh_token, data.expires_in || 900);
+      } else {
+        // Fallback for old token format (no refresh token)
+        localStorage.setItem('access_token', data.access_token);
+      }
       
       // Fetch user info
       const userResponse = await fetch('/api/auth/me', {

@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { HelmetProvider } from 'react-helmet-async';
 import toast, { Toaster } from 'react-hot-toast';
 
+// Token management
+import { initTokenManager, clearTokens, getAccessToken } from './utils/tokenManager';
+
 // Routing components
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import MainLayout from './components/routing/MainLayout';
@@ -67,9 +70,12 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [lang, setLang] = useState(localStorage.getItem('lang') || 'ru');
 
-  // Check authentication on mount
+  // Initialize token manager and check authentication on mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // Initialize automatic token refresh
+    initTokenManager();
+    
+    const token = getAccessToken() || localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     
     if (token && savedUser) {
@@ -104,9 +110,16 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Clear all tokens and cancel auto-refresh
+    clearTokens();
+    
+    // Legacy token cleanup
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    
     setIsAuthenticated(false);
+    
+    // Show logout notification
+    toast.success(lang === 'ru' ? 'Вы вышли из системы' : 'Logged out successfully');
   };
 
   const toggleLanguage = () => {
