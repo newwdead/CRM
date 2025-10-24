@@ -1,6 +1,7 @@
 """
 User model for authentication and authorization.
 """
+from sqlalchemy.orm import relationship
 from .base import Base, Column, Integer, String, Boolean, DateTime, func
 
 
@@ -17,6 +18,10 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    backup_codes = relationship("TwoFactorBackupCode", back_populates="user", cascade="all, delete-orphan")
 
 
 
