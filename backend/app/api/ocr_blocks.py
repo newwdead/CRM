@@ -11,7 +11,7 @@ import json
 from ..database import get_db
 from ..models.contact import Contact
 from ..core import auth as auth_utils
-from .. import tesseract_boxes
+from ..integrations.ocr import tesseract_boxes
 from ..models.user import User
 
 router = APIRouter()

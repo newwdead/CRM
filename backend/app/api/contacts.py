@@ -13,7 +13,7 @@ from ..models import Contact, User, DuplicateContact, Tag, Group
 from ..core.utils import get_setting
 from .. import schemas
 from ..core import auth as auth_utils
-from .. import duplicate_utils
+from ..core import duplicates as duplicate_utils
 from ..core.phone import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
 from ..services.contact_service import ContactService
@@ -217,7 +217,7 @@ def get_contact_ocr_blocks(
     Get OCR bounding boxes and text blocks for a contact's image.
     Returns coordinates and text for visual editing.
     """
-    from .. import tesseract_boxes
+    from ..integrations.ocr import tesseract_boxes
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
@@ -637,7 +637,7 @@ def reprocess_contact_ocr(
     all_text = '\n'.join([block.get('text', '') for block in blocks])
     
     # Use OCR utils to extract fields from combined text
-    from .. import ocr_utils
+    from ..integrations.ocr import utils as ocr_utils
     import re
     
     try:

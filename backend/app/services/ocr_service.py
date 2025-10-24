@@ -15,9 +15,9 @@ import io
 
 from .base import BaseService
 from ..models import Contact, OCRCorrection
-from ..ocr_providers import OCRManager
-from .. import ocr_utils
-from .. import image_processing
+from ..integrations.ocr.providers import OCRManager
+from ..integrations.ocr import utils as ocr_utils
+from ..integrations.ocr import image_processing
 from ..core import qr as qr_utils
 
 

@@ -16,8 +16,8 @@ import pytesseract
 import requests
 from urllib.parse import urlparse
 
-# Import caching utilities
-from .cache import get_cache_key, get_from_cache, set_to_cache
+# Import caching utilities  
+from ...cache import get_cache_key, get_from_cache, set_to_cache
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

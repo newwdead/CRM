@@ -12,7 +12,7 @@ import logging
 from ..database import get_db
 from ..models import User, AppSetting
 from ..core.auth import get_current_active_user, get_current_admin_user
-from .. import image_processing
+from ..integrations.ocr import image_processing
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

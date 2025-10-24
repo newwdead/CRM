@@ -12,9 +12,9 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from .models import Contact, AuditLog, User
-from . import ocr_utils
+from .integrations.ocr import utils as ocr_utils
 from .core import qr as qr_utils
-from .ocr_providers import OCRManager
+from .integrations.ocr.providers import OCRManager
 from .core.metrics import (
     qr_scan_counter,
     ocr_processing_counter,

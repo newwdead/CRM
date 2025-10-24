@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 from .celery_app import celery_app
 from .database import SessionLocal
 from .models import Contact
-from .ocr_providers import OCRManager
+from .integrations.ocr.providers import OCRManager
 from .ocr_utils import enhance_ocr_result
 from .core import qr as qr_utils
-from .image_utils import downscale_image_bytes, create_thumbnail
+from .integrations.ocr.image_utils import downscale_image_bytes, create_thumbnail
 
 logger = logging.getLogger(__name__)
 

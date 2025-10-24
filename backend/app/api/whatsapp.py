@@ -26,7 +26,7 @@ def whatsapp_webhook_verify(
     Verify WhatsApp webhook.
     This endpoint is called by Meta/Facebook to verify webhook configuration.
     """
-    from .. import whatsapp_utils
+    from ..integrations import whatsapp as whatsapp_utils
     
     logger.info(f"WhatsApp webhook verification request: mode={hub_mode}, token={hub_verify_token}")
     
@@ -50,7 +50,7 @@ async def whatsapp_webhook_receive(
     Receive WhatsApp webhook messages.
     Automatically processes business card images sent via WhatsApp.
     """
-    from .. import whatsapp_utils
+    from ..integrations import whatsapp as whatsapp_utils
     from ..tasks import process_single_card
     
     try:
@@ -148,7 +148,7 @@ def whatsapp_send_message(
     Send a WhatsApp message.
     Admin only.
     """
-    from .. import whatsapp_utils
+    from ..integrations import whatsapp as whatsapp_utils
     
     result = whatsapp_utils.send_text_message(to, message)
     
