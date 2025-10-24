@@ -19,6 +19,11 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    # JWT Refresh Token fields
+    refresh_token_hash = Column(String, nullable=True, index=True)
+    refresh_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_refresh_at = Column(DateTime(timezone=True), nullable=True)
+    
     # Relationships
     two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")
     backup_codes = relationship("TwoFactorBackupCode", back_populates="user", cascade="all, delete-orphan")

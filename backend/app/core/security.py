@@ -16,7 +16,8 @@ from ..models import User
 # Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production-please-make-it-strong-and-random")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))  # 15 minutes default
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))  # 30 days default
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -80,6 +81,66 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Create a JWT refresh token with longer expiration.
+    
+    Args:
+        data: Dictionary containing user data (usually {"sub": username})
+        expires_delta: Custom expiration time, defaults to REFRESH_TOKEN_EXPIRE_DAYS
+    
+    Returns:
+        Encoded JWT refresh token string
+    """
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    to_encode.update({
+        "exp": expire,
+        "type": "refresh"  # Mark as refresh token
+    })
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def decode_refresh_token(token: str) -> Optional[dict]:
+    """
+    Decode and verify a refresh token.
+    
+    Args:
+        token: JWT refresh token string
+    
+    Returns:
+        Decoded token payload or None if invalid
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Verify it's a refresh token
+        if payload.get("type") != "refresh":
+            return None
+        return payload
+    except JWTError:
+        return None
+
+
+def hash_token(token: str) -> str:
+    """
+    Hash a token for secure storage in database.
+    Uses SHA256 for fast verification without storing plain tokens.
+    
+    Args:
+        token: Token string to hash
+    
+    Returns:
+        SHA256 hash of the token
+    """
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 # ============================================================================

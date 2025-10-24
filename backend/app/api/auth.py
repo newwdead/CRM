@@ -106,12 +106,26 @@ async def login(
             detail="Your account is awaiting administrator approval. Please contact the system administrator."
         )
     
-    # Create access token
+    # Create access token (short-lived)
     access_token_expires = timedelta(minutes=auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth_utils.create_access_token(
         data={"sub": user.username},
         expires_delta=access_token_expires
     )
+    
+    # Create refresh token (long-lived)
+    refresh_token_expires = timedelta(days=auth_utils.REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = auth_utils.create_refresh_token(
+        data={"sub": user.username},
+        expires_delta=refresh_token_expires
+    )
+    
+    # Store hashed refresh token in database (token rotation)
+    from datetime import datetime
+    user.refresh_token_hash = auth_utils.hash_token(refresh_token)
+    user.refresh_token_expires_at = datetime.utcnow() + refresh_token_expires
+    user.last_refresh_at = datetime.utcnow()
+    db.commit()
     
     # Update auth metrics
     auth_attempts_counter.labels(status='success').inc()
@@ -122,7 +136,106 @@ async def login(
     
     logger.info(f"User logged in: {user.username}")
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": access_token_expires.total_seconds()
+    }
+
+
+@router.post('/refresh', response_model=schemas.Token)
+@limiter.limit("60/minute")  # 60 refresh attempts per minute per IP
+async def refresh_token(
+    request: Request,
+    refresh_request: schemas.RefreshTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token.
+    Returns new access token and refresh token (token rotation).
+    
+    - **refresh_token**: Valid refresh token from login
+    """
+    # Decode and verify refresh token
+    payload = auth_utils.decode_refresh_token(refresh_request.refresh_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    username: str = payload.get("sub")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Get user from database
+    user = auth_utils.get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user"
+        )
+    
+    # Verify refresh token matches stored hash (token rotation security)
+    refresh_token_hash = auth_utils.hash_token(refresh_request.refresh_token)
+    if user.refresh_token_hash != refresh_token_hash:
+        logger.warning(f"Refresh token mismatch for user {username} - possible token reuse attack")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token - token may have been rotated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if refresh token is expired
+    from datetime import datetime
+    if user.refresh_token_expires_at and user.refresh_token_expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired - please login again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create new access token
+    access_token_expires = timedelta(minutes=auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth_utils.create_access_token(
+        data={"sub": user.username},
+        expires_delta=access_token_expires
+    )
+    
+    # Create new refresh token (token rotation)
+    refresh_token_expires = timedelta(days=auth_utils.REFRESH_TOKEN_EXPIRE_DAYS)
+    new_refresh_token = auth_utils.create_refresh_token(
+        data={"sub": user.username},
+        expires_delta=refresh_token_expires
+    )
+    
+    # Update stored refresh token hash
+    user.refresh_token_hash = auth_utils.hash_token(new_refresh_token)
+    user.refresh_token_expires_at = datetime.utcnow() + refresh_token_expires
+    user.last_refresh_at = datetime.utcnow()
+    db.commit()
+    
+    logger.info(f"Token refreshed for user: {user.username}")
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "expires_in": access_token_expires.total_seconds()
+    }
 
 
 @router.get('/me', response_model=schemas.UserResponse)
