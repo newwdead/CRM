@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Breadcrumbs from './Breadcrumbs';
 import SearchOverlay from '../SearchOverlay';
+import KeyboardHint from '../common/KeyboardHint';
 import translations from '../../translations';
+import logger from '../../utils/logger';
 
 /**
  * Main Layout Component
@@ -22,7 +24,7 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
       try {
         setUser(JSON.parse(userStr));
       } catch (error) {
-        console.error('Failed to parse user:', error);
+        logger.error('Failed to parse user:', error);
       }
     }
 
@@ -30,7 +32,7 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
     fetch('/api/version')
       .then(r => r.json())
       .then(data => setVer(data))
-      .catch(err => console.error('Failed to fetch version:', err));
+      .catch(err => logger.error('Failed to fetch version:', err));
   }, []);
 
   const isActive = (path) => {
@@ -135,6 +137,14 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
       <SearchOverlay 
         lang={lang} 
         onContactSelect={(contactId) => navigate(`/contacts/${contactId}`)}
+      />
+
+      {/* Keyboard Shortcuts Hint */}
+      <KeyboardHint 
+        shortcuts={[
+          { keys: ['Ctrl', 'K'], description: lang === 'ru' ? 'Быстрый поиск' : 'Quick search' },
+          { keys: ['Esc'], description: lang === 'ru' ? 'Закрыть модальное окно' : 'Close modal' },
+        ]}
       />
     </div>
   );
