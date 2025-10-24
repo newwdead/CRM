@@ -5,6 +5,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 // Accessibility styles
 import './styles/accessibility.css';
+import './styles/modern-ui.css';
 
 // Token management
 import { initTokenManager, clearTokens, getAccessToken } from './utils/tokenManager';

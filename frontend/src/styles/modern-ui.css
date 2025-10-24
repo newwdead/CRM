@@ -1,0 +1,449 @@
+/**
+ * Modern UI System - v4.5.0
+ * Unified design system for all pages
+ * Based on Settings.js modern card layout
+ */
+
+/* ============================================================================
+   PAGE LAYOUT
+   ============================================================================ */
+
+.modern-page {
+  padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+
+.modern-page-header {
+  margin-bottom: 24px;
+}
+
+.modern-page-title {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modern-page-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* ============================================================================
+   CARD SYSTEM
+   ============================================================================ */
+
+.modern-card {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e1e4e8;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.modern-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modern-card-title {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modern-card-subtitle {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* ============================================================================
+   GRID LAYOUTS
+   ============================================================================ */
+
+.modern-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.modern-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+}
+
+.modern-grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+@media (max-width: 768px) {
+  .modern-grid,
+  .modern-grid-2,
+  .modern-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================
+   FORM ELEMENTS
+   ============================================================================ */
+
+.modern-input,
+.modern-select,
+.modern-textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  background-color: #fff;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.modern-input:focus,
+.modern-select:focus,
+.modern-textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.modern-input:hover,
+.modern-select:hover,
+.modern-textarea:hover {
+  border-color: #c5c9cd;
+}
+
+.modern-select {
+  cursor: pointer;
+}
+
+.modern-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.modern-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+.modern-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modern-btn:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.modern-btn:active {
+  transform: translateY(0);
+}
+
+.modern-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modern-btn-secondary {
+  background-color: #6c757d;
+}
+
+.modern-btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+.modern-btn-success {
+  background-color: #28a745;
+}
+
+.modern-btn-success:hover {
+  background-color: #218838;
+}
+
+.modern-btn-danger {
+  background-color: #dc3545;
+}
+
+.modern-btn-danger:hover {
+  background-color: #c82333;
+}
+
+.modern-btn-outline {
+  background-color: transparent;
+  color: #2563eb;
+  border: 2px solid #2563eb;
+}
+
+.modern-btn-outline:hover {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+.modern-btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+}
+
+.modern-btn-sm {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+/* ============================================================================
+   ALERTS / INFO BOXES
+   ============================================================================ */
+
+.modern-alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.modern-alert-info {
+  background-color: #e7f3ff;
+  border: 1px solid #2563eb;
+  color: #004085;
+}
+
+.modern-alert-success {
+  background-color: #d4edda;
+  border: 1px solid #28a745;
+  color: #155724;
+}
+
+.modern-alert-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+}
+
+.modern-alert-danger {
+  background-color: #f8d7da;
+  border: 1px solid #dc3545;
+  color: #721c24;
+}
+
+/* ============================================================================
+   CHECKBOXES & RADIOS
+   ============================================================================ */
+
+.modern-checkbox,
+.modern-radio {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.modern-checkbox:hover,
+.modern-radio:hover {
+  background-color: #f6f8fa;
+}
+
+.modern-checkbox input[type="checkbox"],
+.modern-radio input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+.modern-checkbox-label,
+.modern-radio-label {
+  font-size: 14px;
+  color: #333;
+}
+
+/* ============================================================================
+   DIVIDERS
+   ============================================================================ */
+
+.modern-divider {
+  height: 1px;
+  background-color: #e1e4e8;
+  margin: 20px 0;
+}
+
+/* ============================================================================
+   LOADING STATES
+   ============================================================================ */
+
+.modern-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: modern-spin 0.8s linear infinite;
+}
+
+@keyframes modern-spin {
+  to { transform: rotate(360deg); }
+}
+
+.modern-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: modern-skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes modern-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================================================
+   BADGES
+   ============================================================================ */
+
+.modern-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modern-badge-primary {
+  background-color: #e7f3ff;
+  color: #2563eb;
+}
+
+.modern-badge-success {
+  background-color: #d4edda;
+  color: #28a745;
+}
+
+.modern-badge-warning {
+  background-color: #fff3cd;
+  color: #ffc107;
+}
+
+.modern-badge-danger {
+  background-color: #f8d7da;
+  color: #dc3545;
+}
+
+/* ============================================================================
+   EMPTY STATES
+   ============================================================================ */
+
+.modern-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.modern-empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.modern-empty-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.modern-empty-text {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+}
+
+/* ============================================================================
+   STATS CARDS
+   ============================================================================ */
+
+.modern-stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modern-stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.modern-stat-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* ============================================================================
+   UTILITIES
+   ============================================================================ */
+
+.modern-text-muted {
+  color: #666;
+}
+
+.modern-text-center {
+  text-align: center;
+}
+
+.modern-mb-0 { margin-bottom: 0; }
+.modern-mb-1 { margin-bottom: 8px; }
+.modern-mb-2 { margin-bottom: 16px; }
+.modern-mb-3 { margin-bottom: 24px; }
+.modern-mb-4 { margin-bottom: 32px; }
+
+.modern-mt-0 { margin-top: 0; }
+.modern-mt-1 { margin-top: 8px; }
+.modern-mt-2 { margin-top: 16px; }
+.modern-mt-3 { margin-top: 24px; }
+.modern-mt-4 { margin-top: 32px; }
+
