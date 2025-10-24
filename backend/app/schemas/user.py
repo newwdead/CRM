@@ -1,7 +1,7 @@
 """
 User authentication and profile schemas.
 """
-from .base import BaseModel, EmailStr, field_validator, Optional, datetime
+from .base import BaseModel, EmailStr, field_validator, ConfigDict, Optional, datetime
 
 
 class UserRegister(BaseModel):
@@ -64,8 +64,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):

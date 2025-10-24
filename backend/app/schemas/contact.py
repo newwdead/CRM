@@ -1,7 +1,7 @@
 """
 Contact, Tag, and Group schemas for CRM functionality.
 """
-from .base import BaseModel, Optional, List, datetime
+from .base import BaseModel, Optional, List, datetime, ConfigDict
 
 
 # ============================================================================
@@ -30,8 +30,7 @@ class TagResponse(TagBase):
     id: int
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -62,8 +61,7 @@ class GroupResponse(GroupBase):
     id: int
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -126,8 +124,7 @@ class ContactResponse(ContactBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedContactsResponse(BaseModel):
@@ -138,8 +135,7 @@ class PaginatedContactsResponse(BaseModel):
     limit: int
     pages: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Update forward references for nested models

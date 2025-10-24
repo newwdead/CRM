@@ -1,7 +1,7 @@
 """
 Duplicate contact schemas.
 """
-from .base import BaseModel, Optional, datetime
+from .base import BaseModel, Optional, datetime, ConfigDict
 from .contact import ContactResponse
 from typing import Dict
 
@@ -24,8 +24,7 @@ class DuplicateContactResponse(BaseModel):
     contact_1: Optional[ContactResponse] = None
     contact_2: Optional[ContactResponse] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 

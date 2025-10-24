@@ -1,7 +1,7 @@
 """
 Audit log schemas.
 """
-from .base import BaseModel, Optional, datetime
+from .base import BaseModel, Optional, datetime, ConfigDict
 
 
 class AuditLogResponse(BaseModel):
@@ -15,8 +15,7 @@ class AuditLogResponse(BaseModel):
     changes: Optional[str] = None
     timestamp: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
