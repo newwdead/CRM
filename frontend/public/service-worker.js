@@ -1,8 +1,8 @@
 // ibbase Service Worker
-// Version 2.4.0
+// Version 2.4.1
 
-const CACHE_NAME = 'ibbase-v2.4.0';
-const RUNTIME_CACHE = 'ibbase-runtime';
+const CACHE_NAME = 'ibbase-v2.4.1';
+const RUNTIME_CACHE = 'ibbase-runtime-v2.4.1';
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
