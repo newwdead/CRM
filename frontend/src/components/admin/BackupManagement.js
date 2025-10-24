@@ -19,10 +19,14 @@ function BackupManagement() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/backups/', {
+      // Use /api/ prefix for Nginx routing
+      const response = await fetch('/api/backups', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'  // Disable caching
       });
       if (response.ok) {
         const data = await response.json();
@@ -48,8 +52,11 @@ function BackupManagement() {
       const response = await fetch('/api/backups/create', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
       });
       if (response.ok) {
         const data = await response.json();
