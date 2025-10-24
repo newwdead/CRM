@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import toast, { Toaster } from 'react-hot-toast';
+import logger from '../utils/logger';
 
 export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
   const [file, setFile] = useState(null);
@@ -66,7 +67,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
         setAvailableProviders(data.available || []);
       }
     } catch (e) {
-      console.error('Failed to load providers:', e);
+      logger.error('Failed to load providers:', e);
     }
   };
 
@@ -188,7 +189,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
   };
 
   return (
-    <div className="card">
+    <div className="modern-card">
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -212,7 +213,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
         }}
       />
       
-      <h3>{t.title}</h3>
+      <h3 className="modern-card-title">{t.title}</h3>
 
       {/* Drag & Drop Zone with react-dropzone */}
       <div
@@ -248,6 +249,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
       <div className="form-group">
         <label>{t.provider}</label>
         <select
+          className="modern-select"
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
           disabled={uploading}
@@ -268,18 +270,12 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
       <button
         onClick={upload}
         disabled={!file || uploading}
-        className="success"
+        className="modern-btn modern-btn-success"
         style={{ width: '100%', maxWidth: '400px' }}
       >
         {uploading ? (
           <>
-            <div className="spinner" style={{ 
-              width: '16px', 
-              height: '16px', 
-              display: 'inline-block', 
-              marginRight: '8px',
-              borderWidth: '2px'
-            }}></div>
+            <span className="modern-spinner" style={{ marginRight: '8px' }}></span>
             {t.uploading}
           </>
         ) : (
@@ -293,7 +289,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>{t.resultTitle}</h3>
 
-            <div className="alert success">
+            <div className="modern-alert modern-alert-success">
               ✅ {t.success}
             </div>
 
@@ -350,7 +346,11 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
               </div>
             </div>
 
-            <button onClick={() => setShowResult(false)} style={{ marginTop: '16px', width: '100%' }}>
+            <button 
+              onClick={() => setShowResult(false)} 
+              className="modern-btn" 
+              style={{ marginTop: '16px', width: '100%' }}
+            >
               {t.close}
             </button>
           </div>
