@@ -20,15 +20,21 @@ from .models import Contact
 from .api import api_router
 from .middleware import (
     ErrorHandlerMiddleware,
-    SecurityHeadersMiddleware,
-    RequestLoggingMiddleware
+    SecurityHeadersMiddleware
 )
+from .middleware.enhanced_logging import EnhancedLoggingMiddleware
 from .middleware.security import security_headers_middleware
 from .middleware.rate_limit import enhanced_rate_limit, rate_limit_handler
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure structured logging
+from .core.logging_config import setup_logging, get_logger
+
+# Setup structured JSON logging (set json_logs=False for development)
+setup_logging(
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    json_logs=os.getenv("JSON_LOGS", "true").lower() == "true"
+)
+logger = get_logger(__name__)
 
 # Initialize Rate limiter
 limiter = Limiter(
@@ -195,8 +201,8 @@ app.add_middleware(
 )
 
 # Custom Middleware (order matters!)
-# 1. Request Logging (first to capture all requests)
-app.add_middleware(RequestLoggingMiddleware)
+# 1. Enhanced Logging with structured JSON (first to capture all requests)
+app.add_middleware(EnhancedLoggingMiddleware)
 
 # 2. Security Headers
 app.add_middleware(SecurityHeadersMiddleware)
