@@ -39,7 +39,6 @@ const SystemSettings = () => {
         telegram: 'Telegram Integration',
         whatsapp: 'WhatsApp Integration',
         auth: 'Authentication',
-        backup: 'Backup & Recovery',
         monitoring: 'Monitoring',
         celery: 'Background Tasks',
         redis: 'Cache & Queue'
@@ -49,7 +48,6 @@ const SystemSettings = () => {
         telegram: 'Receive business cards via Telegram bot',
         whatsapp: 'Receive business cards via WhatsApp Business',
         auth: 'User authentication and authorization settings',
-        backup: 'Automatic database backup configuration',
         monitoring: 'Prometheus and Grafana monitoring',
         celery: 'Asynchronous task processing',
         redis: 'Redis cache and message broker'
@@ -83,7 +81,6 @@ const SystemSettings = () => {
         telegram: 'Интеграция Telegram',
         whatsapp: 'Интеграция WhatsApp',
         auth: 'Аутентификация',
-        backup: 'Резервное копирование',
         monitoring: 'Мониторинг',
         celery: 'Фоновые задачи',
         redis: 'Кеш и очередь'
@@ -93,7 +90,6 @@ const SystemSettings = () => {
         telegram: 'Получение визиток через Telegram бота',
         whatsapp: 'Получение визиток через WhatsApp Business',
         auth: 'Настройки аутентификации и авторизации пользователей',
-        backup: 'Автоматическое резервное копирование базы данных',
         monitoring: 'Мониторинг с Prometheus и Grafana',
         celery: 'Асинхронная обработка задач',
         redis: 'Кеш Redis и брокер сообщений'
@@ -236,7 +232,6 @@ const SystemSettings = () => {
       telegram: '✈️',
       whatsapp: '💬',
       auth: '🔐',
-      backup: '💾',
       monitoring: '📊',
       celery: '⚡',
       redis: '🔴'
