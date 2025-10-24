@@ -54,9 +54,6 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
                 <h1>ibbase</h1>
               </div>
             </Link>
-            {ver.version && (
-              <span className="badge badge-primary version-badge">v{ver.version}</span>
-            )}
           </div>
 
           <div className="header-right">
