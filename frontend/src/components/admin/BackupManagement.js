@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 
 /**
  * Backup Management Component
@@ -16,6 +17,7 @@ function BackupManagement() {
 
   const fetchBackups = async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/backups/', {
         headers: {
@@ -25,9 +27,14 @@ function BackupManagement() {
       if (response.ok) {
         const data = await response.json();
         setBackups(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.detail || 'Failed to fetch backups');
+        logger.error('Failed to fetch backups:', response.status, errorData);
       }
     } catch (error) {
-      console.error('Error fetching backups:', error);
+      setError('Network error: Failed to connect to server');
+      logger.error('Error fetching backups:', error);
     } finally {
       setLoading(false);
     }
