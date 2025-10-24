@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR, Duplicate Detection, and CRM features",
-    version="5.0.1",  # CRITICAL FIX: Admin Panel tabs ↔ URL bidirectional sync fully working!
+    version="5.0.2",  # Resizable table columns + Language sync improvements
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan  # Use lifespan context manager instead of on_event
