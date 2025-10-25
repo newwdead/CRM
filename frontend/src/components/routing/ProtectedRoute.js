@@ -9,7 +9,8 @@ import { getAccessToken } from '../../utils/tokenManager';
  */
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const location = useLocation();
-  const token = getAccessToken(); // Use tokenManager instead of direct localStorage
+  // Check both new and old token storage for backward compatibility
+  const token = getAccessToken() || localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
 
   // Not authenticated - redirect to login

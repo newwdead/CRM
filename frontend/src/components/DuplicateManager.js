@@ -72,7 +72,8 @@ const DuplicateManager = ({ lang = 'ru' }) => {
   // Загрузка всех контактов
   const loadContacts = async () => {
     try {
-      const token = getAccessToken();
+      // Check both new and old token storage for backward compatibility
+      const token = getAccessToken() || localStorage.getItem('token');
       if (!token) {
         toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
         // Redirect to login if no token
@@ -269,7 +270,8 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     setMerging(true);
     
     try {
-      const token = getAccessToken();
+      // Check both new and old token storage for backward compatibility
+      const token = getAccessToken() || localStorage.getItem('token');
       if (!token) {
         toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
         setTimeout(() => {
