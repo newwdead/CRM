@@ -216,8 +216,15 @@ function App() {
                       {/* Import/Export */}
                       <Route path="/import-export" element={<ImportExport t={t} lang={lang} />} />
 
-                      {/* Duplicate Manager */}
-                      <Route path="/duplicates" element={<DuplicateManager lang={lang} />} />
+                      {/* Duplicate Manager (Protected) */}
+                      <Route 
+                        path="/duplicates" 
+                        element={
+                          <ProtectedRoute>
+                            <DuplicateManager lang={lang} />
+                          </ProtectedRoute>
+                        } 
+                      />
 
                       {/* Settings */}
                       <Route path="/settings" element={<Settings t={t} lang={lang} />} />

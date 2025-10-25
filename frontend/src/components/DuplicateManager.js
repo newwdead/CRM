@@ -74,7 +74,12 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     try {
       const token = getAccessToken();
       if (!token) {
-        throw new Error('No access token');
+        toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
+        // Redirect to login if no token
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
       }
       
       const response = await fetch('/api/contacts/?skip=0&limit=10000', {
@@ -84,7 +89,17 @@ const DuplicateManager = ({ lang = 'ru' }) => {
         }
       });
       
-      if (!response.ok) throw new Error('Failed to load contacts');
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1500);
+          return;
+        }
+        throw new Error('Failed to load contacts');
+      }
+      
       const data = await response.json();
       setContacts(data.items || []);
     } catch (error) {
@@ -256,7 +271,11 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     try {
       const token = getAccessToken();
       if (!token) {
-        throw new Error('No access token');
+        toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
       }
       
       const response = await fetch('/api/contacts/merge', {
@@ -272,6 +291,13 @@ const DuplicateManager = ({ lang = 'ru' }) => {
       });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1500);
+          return;
+        }
         throw new Error('Failed to merge contacts');
       }
       
