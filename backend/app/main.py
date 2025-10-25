@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR and CRM features",
-    version="5.0.2",  # Resizable table columns + Language sync improvements
+    version="5.0.4",  # Security documentation + Grafana dashboards fix + Production stability
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan  # Use lifespan context manager instead of on_event
@@ -250,7 +250,7 @@ async def root():
     """API root endpoint"""
     return {
         "name": "BizCard CRM API",
-        "version": "4.2.0",
+        "version": "5.0.4",
         "python": "3.11",
         "fastapi": "0.115.0",
         "status": "running",
