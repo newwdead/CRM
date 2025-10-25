@@ -11,7 +11,9 @@ const API_BASE = '/api';
 export const getContacts = async (params = {}) => {
   const token = localStorage.getItem('token');
   const queryParams = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/contacts/?${queryParams}`;
+  const url = queryParams 
+    ? `${API_BASE}/contacts?${queryParams}`
+    : `${API_BASE}/contacts`;
   
   const response = await fetch(url, {
     headers: { 'Authorization': `Bearer ${token}` }

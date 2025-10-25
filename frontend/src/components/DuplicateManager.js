@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from './common';
 import { getAccessToken } from '../utils/tokenManager';
+import { getContacts } from '../modules/contacts/api/contactsApi';
 
 /**
  * Независимый модуль для управления дубликатами контактов
@@ -72,39 +73,31 @@ const DuplicateManager = ({ lang = 'ru' }) => {
   // Загрузка всех контактов
   const loadContacts = async () => {
     try {
-      // Check both new and old token storage for backward compatibility
+      // Check token
       const token = getAccessToken() || localStorage.getItem('token');
       if (!token) {
         toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
-        // Redirect to login if no token
         setTimeout(() => {
           window.location.href = '/login';
         }, 1500);
         return;
       }
       
-      const response = await fetch('/api/contacts?skip=0&limit=10000', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 1500);
-          return;
-        }
-        throw new Error('Failed to load contacts');
-      }
-      
-      const data = await response.json();
-      setContacts(data.items || []);
+      // Use existing working API from contactsApi module
+      const data = await getContacts({ skip: 0, limit: 10000 });
+      setContacts(data.items || data || []);
     } catch (error) {
       console.error('Error loading contacts:', error);
+      
+      // Check if it's an auth error
+      if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+        toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
+      }
+      
       toast.error(t.loadError);
     } finally {
       setLoading(false);
