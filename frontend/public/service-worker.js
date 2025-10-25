@@ -1,8 +1,8 @@
 // ibbase Service Worker
-// Version 5.0.3
+// Version 5.1.0 - Fixed Mixed Content & URL issues
 
-const CACHE_NAME = 'ibbase-v5.0.3';
-const RUNTIME_CACHE = 'ibbase-runtime-v5.0.3';
+const CACHE_NAME = 'ibbase-v5.1.0';
+const RUNTIME_CACHE = 'ibbase-runtime-v5.1.0';
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
