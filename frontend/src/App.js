@@ -8,6 +8,7 @@ import './styles/accessibility.css';
 import './styles/modern-ui.css';
 import './styles/admin-tabs.css';
 import './styles/resizable-table.css';
+import './navigation.css';
 
 // Token management
 import { initTokenManager, clearTokens, getAccessToken } from './utils/tokenManager';
