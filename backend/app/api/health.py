@@ -95,14 +95,14 @@ def get_system_resources():
         'prometheus': {
             'name': 'Prometheus',
             'description': 'Сбор метрик и мониторинг системы',
-            'url': f'http://{domain}:9090' if domain != 'localhost' else None,
+            'url': f'https://monitoring.{domain}' if domain != 'localhost' else None,
             'local_url': 'http://localhost:9090',
             'status': 'available'
         },
         'grafana': {
             'name': 'Grafana',
             'description': 'Визуализация метрик и дашборды мониторинга',
-            'url': f'http://{domain}:3001' if domain != 'localhost' else None,
+            'url': f'https://monitoring.{domain}' if domain != 'localhost' else None,
             'local_url': 'http://localhost:3001',
             'status': 'available'
         },
