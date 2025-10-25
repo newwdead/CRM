@@ -36,13 +36,13 @@ scrape_configs:
           type: 'system'
           host: 'ibbase.ru'
 
-  # 3. cAdvisor - Метрики Docker контейнеров
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['bizcard-cadvisor:8080']
-        labels:
-          service: 'cadvisor'
-          type: 'docker'
+  # 3. cAdvisor - Метрики Docker контейнеров (DISABLED - container keeps crashing)
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['bizcard-cadvisor:8080']
+  #       labels:
+  #         service: 'cadvisor'
+  #         type: 'docker'
 
   # 4. PostgreSQL Exporter
   - job_name: 'postgres'
@@ -66,26 +66,26 @@ scrape_configs:
   - job_name: 'fastapi-backend'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['backend:8000']
+      - targets: ['bizcard-backend:8000']
         labels:
           service: 'fastapi'
           type: 'application'
           component: 'backend'
 
-  # 7. FastAPI Health checks
-  - job_name: 'fastapi-health'
-    metrics_path: '/health'
-    static_configs:
-      - targets: ['backend:8000']
-        labels:
-          service: 'fastapi-health'
-          type: 'healthcheck'
+  # 7. FastAPI Health checks (DISABLED - returns JSON, not Prometheus metrics)
+  # - job_name: 'fastapi-health'
+  #   metrics_path: '/health'
+  #   static_configs:
+  #     - targets: ['bizcard-backend:8000']
+  #       labels:
+  #         service: 'fastapi-health'
+  #         type: 'healthcheck'
 
-  # 8. Celery Worker (если экспортирует метрики)
-  - job_name: 'celery'
-    static_configs:
-      - targets: ['celery-worker:9808']
-        labels:
-          service: 'celery'
-          type: 'application'
-          component: 'worker'
+  # 8. Celery Worker (DISABLED - no Prometheus exporter configured on :9808)
+  # - job_name: 'celery'
+  #   static_configs:
+  #     - targets: ['bizcard-celery-worker:9808']
+  #       labels:
+  #         service: 'celery'
+  #         type: 'application'
+  #         component: 'worker'
