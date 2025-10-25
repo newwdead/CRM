@@ -34,11 +34,11 @@
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
       "targets": [{
-        "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+        "expr": "histogram_quantile(0.95, rate(http_request_duration_highr_seconds_bucket[5m]))",
         "legendFormat": "p95",
         "refId": "A"
       }, {
-        "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+        "expr": "histogram_quantile(0.50, rate(http_request_duration_highr_seconds_bucket[5m]))",
         "legendFormat": "p50",
         "refId": "B"
       }],
@@ -50,34 +50,10 @@
       }
     },
     {
-      "id": 3,
-      "title": "Active HTTP Requests",
-      "type": "stat",
-      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
-      "targets": [{
-        "expr": "http_requests_in_progress",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {"mode": "thresholds"},
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"value": 0, "color": "green"},
-              {"value": 50, "color": "yellow"},
-              {"value": 100, "color": "red"}
-            ]
-          }
-        }
-      }
-    },
-    {
       "id": 4,
       "title": "HTTP Error Rate",
       "type": "stat",
-      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 8},
       "targets": [{
         "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
         "refId": "A"
@@ -99,12 +75,12 @@
     },
     {
       "id": 5,
-      "title": "OCR Upload Tasks",
+      "title": "OCR Processing Tasks",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "targets": [{
-        "expr": "rate(ocr_upload_total[5m])",
-        "legendFormat": "OCR Uploads",
+        "expr": "rate(ocr_processing_total[5m])",
+        "legendFormat": "OCR Processing",
         "refId": "A"
       }],
       "fieldConfig": {
@@ -118,7 +94,7 @@
       "id": 6,
       "title": "Duplicate Detection",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
       "targets": [{
         "expr": "rate(duplicates_found_total[5m])",
         "legendFormat": "Duplicates Found",
@@ -139,7 +115,7 @@
       "id": 7,
       "title": "Contact Operations",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
       "targets": [{
         "expr": "rate(contacts_created_total[5m])",
         "legendFormat": "Created",
