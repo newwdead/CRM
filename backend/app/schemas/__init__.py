@@ -26,7 +26,6 @@ from .contact import (
     GroupResponse,
 )
 from .audit import AuditLogResponse
-from .duplicate import DuplicateContactResponse
 
 __all__ = [
     # User schemas
@@ -55,6 +54,4 @@ __all__ = [
     'GroupResponse',
     # Audit schemas
     'AuditLogResponse',
-    # Duplicate schemas
-    'DuplicateContactResponse',
 ]

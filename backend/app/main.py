@@ -174,7 +174,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="BizCard CRM API",
-    description="Business Card Management with OCR, Duplicate Detection, and CRM features",
+    description="Business Card Management with OCR and CRM features",
     version="5.0.2",  # Resizable table columns + Language sync improvements
     docs_url="/docs",
     redoc_url="/redoc",

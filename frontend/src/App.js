@@ -33,7 +33,6 @@ const OCREditorPage = React.lazy(() => import('./components/pages/OCREditorPage'
 const UploadCard = React.lazy(() => import('./components/UploadCard'));
 const BatchUpload = React.lazy(() => import('./components/BatchUpload'));
 const Companies = React.lazy(() => import('./components/Companies'));
-const DuplicatesSimple = React.lazy(() => import('./components/DuplicatesSimple'));
 const ImportExport = React.lazy(() => import('./components/ImportExport'));
 const Settings = React.lazy(() => import('./components/Settings'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
@@ -206,9 +205,6 @@ function App() {
 
                       {/* Organizations */}
                       <Route path="/companies" element={<Companies lang={lang} />} />
-
-                      {/* Duplicates */}
-                      <Route path="/duplicates" element={<DuplicatesSimple lang={lang} />} />
 
                       {/* Upload */}
                       <Route path="/upload" element={<UploadCard t={t} lang={lang} />} />

@@ -4,7 +4,6 @@ import ContactCard from './ContactCard';
 import { ContactListSkeleton } from './SkeletonLoader';
 import TableSettings from './TableSettings';
 import OCREditor from './OCREditor';
-import DuplicateMergeModal from './DuplicateMergeModal';
 import { Tooltip } from 'react-tooltip';
 import toast from 'react-hot-toast';
 
@@ -22,11 +21,6 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
   
   // Contact Card Modal State
   const [viewingContact, setViewingContact] = useState(null);
-  
-  // Duplicates State
-  const [duplicates, setDuplicates] = useState([]);
-  const [duplicateMap, setDuplicateMap] = useState({});  // Map: contactId -> count of duplicates
-  const [mergingContact, setMergingContact] = useState(null);  // Contact for which we're showing merge modal
   
   // Pagination States
   const [page, setPage] = useState(1);
@@ -217,35 +211,8 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
     }
   };
 
-  const loadDuplicates = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/duplicates?status=pending&limit=1000', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setDuplicates(data.duplicates || []);
-        
-        // Build a map of contact IDs to duplicate counts
-        const map = {};
-        (data.duplicates || []).forEach(dup => {
-          map[dup.contact_id_1] = (map[dup.contact_id_1] || 0) + 1;
-          map[dup.contact_id_2] = (map[dup.contact_id_2] || 0) + 1;
-        });
-        setDuplicateMap(map);
-      }
-    } catch (error) {
-      console.error('Error loading duplicates:', error);
-    }
-  };
-
   useEffect(() => {
     load();
-    loadDuplicates();
   }, [search, companyFilter, positionFilter, sortBy, sortOrder, page]);
   
   // Reset to page 1 when filters change
@@ -1039,22 +1006,7 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
         />
       )}
 
-      {/* Duplicate Merge Modal */}
-      {mergingContact && (
-        <DuplicateMergeModal
-          lang={lang}
-          contact={mergingContact}
-          duplicates={duplicates}
-          onClose={() => setMergingContact(null)}
-          onMerged={() => {
-            load();
-            loadDuplicates();
-          }}
-        />
-      )}
-
       <Tooltip id="ocr-tooltip" place="top" />
-      <Tooltip id="duplicate-tooltip" place="top" />
     </div>
   );
 });

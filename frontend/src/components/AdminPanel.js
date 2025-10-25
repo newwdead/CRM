@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import Documentation from './Documentation';
 import { ServicesPanel } from '../modules/admin/services';
 import SystemSettings from './SystemSettings';
-import DuplicateFinder from './DuplicateFinder';
 import UserManagement from './admin/UserManagement';
 import BackupManagement from './admin/BackupManagement';
 import SystemResources from './admin/SystemResources';
@@ -35,7 +34,6 @@ function AdminPanel({ t, lang }) {
     { id: 'backups', icon: '💾', label: t('adminTabBackups') },
     { id: 'resources', icon: '🔗', label: t('adminTabResources') },
     { id: 'services', icon: '🔧', label: t('adminTabServices') },
-    { id: 'duplicates', icon: '🔍', label: t('adminTabDuplicates') },
     { id: 'documentation', icon: '📚', label: t('adminTabDocs') }
   ];
 
@@ -71,7 +69,6 @@ function AdminPanel({ t, lang }) {
         {activeTab === 'backups' && <BackupManagement lang={lang} />}
         {activeTab === 'resources' && <SystemResources lang={lang} />}
         {activeTab === 'services' && <ServicesPanel language={lang} />}
-        {activeTab === 'duplicates' && <DuplicateFinder lang={lang} />}
         {activeTab === 'documentation' && <Documentation lang={lang} />}
       </div>
     </div>

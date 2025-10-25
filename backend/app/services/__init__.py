@@ -11,14 +11,12 @@ API endpoints and database operations. Services handle:
 
 from .base import BaseService
 from .contact_service import ContactService
-from .duplicate_service import DuplicateService
 from .settings_service import SettingsService
 from .ocr_service import OCRService
 
 __all__ = [
     'BaseService',
     'ContactService',
-    'DuplicateService',
     'SettingsService',
     'OCRService',
 ]
