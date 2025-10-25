@@ -1,4 +1,4 @@
-# 📊 Grafana Dashboards - Fixed & Optimized v4.9.1
+# 📊 Grafana Dashboards - Fixed & Optimized v5.0.3
 
 ## 🎯 ЗАДАЧИ (от пользователя)
 
@@ -367,7 +367,7 @@ monitoring/grafana/dashboards/
 ## 🎉 РЕЛИЗ
 
 ```
-Version: v4.9.1
+Version: v5.0.3
 Date: 2025-10-25
 Type: Промежуточный релиз (Monitoring Fix)
 
