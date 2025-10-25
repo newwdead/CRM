@@ -43,6 +43,10 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
   const [showNewContact, setShowNewContact] = useState(false);
   const [stats, setStats] = useState({ total: 0, withEmail: 0, withPhone: 0 });
   
+  // Duplicate Detection State
+  const [duplicateMap, setDuplicateMap] = useState({});
+  const [mergingContact, setMergingContact] = useState(null);
+  
   // Table Settings State
   const [showTableSettings, setShowTableSettings] = useState(false);
   const [tableColumns, setTableColumns] = useState(() => {
