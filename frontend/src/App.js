@@ -37,6 +37,7 @@ const ImportExport = React.lazy(() => import('./components/ImportExport'));
 const Settings = React.lazy(() => import('./components/Settings'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 const QRViewer = React.lazy(() => import('./components/QRViewer'));
+const DuplicateManager = React.lazy(() => import('./components/DuplicateManager'));
 
 /**
  * Scroll Restoration Component
@@ -214,6 +215,9 @@ function App() {
 
                       {/* Import/Export */}
                       <Route path="/import-export" element={<ImportExport t={t} lang={lang} />} />
+
+                      {/* Duplicate Manager */}
+                      <Route path="/duplicates" element={<DuplicateManager lang={lang} />} />
 
                       {/* Settings */}
                       <Route path="/settings" element={<Settings t={t} lang={lang} />} />

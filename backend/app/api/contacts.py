@@ -526,3 +526,121 @@ def reprocess_contact_ocr(
         logger.error(f"Error reprocessing OCR for contact {contact_id}: {e}")
         raise HTTPException(status_code=500, detail=f'Failed to reprocess OCR: {str(e)}')
 
+
+@router.post('/merge')
+def merge_contacts(
+    payload: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Merge multiple contacts into one master contact.
+    
+    Request body:
+    {
+        "master_id": int,  # ID контакта-мастера (основного)
+        "slave_ids": [int, ...]  # IDs контактов для объединения
+    }
+    """
+    master_id = payload.get('master_id')
+    slave_ids = payload.get('slave_ids', [])
+    
+    if not master_id or not slave_ids:
+        raise HTTPException(status_code=400, detail='master_id and slave_ids are required')
+    
+    # Get master contact
+    master = db.query(Contact).filter(Contact.id == master_id).first()
+    if not master:
+        raise HTTPException(status_code=404, detail='Master contact not found')
+    
+    # Get slave contacts
+    slaves = db.query(Contact).filter(Contact.id.in_(slave_ids)).all()
+    if len(slaves) != len(slave_ids):
+        raise HTTPException(status_code=404, detail='Some slave contacts not found')
+    
+    try:
+        # Merge data from slaves to master
+        for slave in slaves:
+            # Merge fields if master field is empty
+            if not master.full_name and slave.full_name:
+                master.full_name = slave.full_name
+            if not master.first_name and slave.first_name:
+                master.first_name = slave.first_name
+            if not master.last_name and slave.last_name:
+                master.last_name = slave.last_name
+            if not master.middle_name and slave.middle_name:
+                master.middle_name = slave.middle_name
+            if not master.company and slave.company:
+                master.company = slave.company
+            if not master.position and slave.position:
+                master.position = slave.position
+            if not master.email and slave.email:
+                master.email = slave.email
+            if not master.phone and slave.phone:
+                master.phone = slave.phone
+            if not master.phone_mobile and slave.phone_mobile:
+                master.phone_mobile = slave.phone_mobile
+            if not master.phone_work and slave.phone_work:
+                master.phone_work = slave.phone_work
+            if not master.address and slave.address:
+                master.address = slave.address
+            if not master.address_additional and slave.address_additional:
+                master.address_additional = slave.address_additional
+            if not master.website and slave.website:
+                master.website = slave.website
+            if not master.comment and slave.comment:
+                master.comment = slave.comment
+            
+            # Merge tags (add unique tags from slaves)
+            if slave.tags:
+                master_tag_names = {tag.name for tag in master.tags}
+                for tag in slave.tags:
+                    if tag.name not in master_tag_names:
+                        master.tags.append(tag)
+            
+            # Merge groups (add unique groups from slaves)
+            if slave.groups:
+                master_group_names = {group.name for group in master.groups}
+                for group in slave.groups:
+                    if group.name not in master_group_names:
+                        master.groups.append(group)
+            
+            # Use photo from slave if master has none
+            if not master.photo_path and slave.photo_path:
+                master.photo_path = slave.photo_path
+                master.thumbnail_path = slave.thumbnail_path
+        
+        # Delete slave contacts
+        for slave in slaves:
+            db.delete(slave)
+        
+        # Commit changes
+        db.commit()
+        db.refresh(master)
+        
+        # Update contact counter
+        contacts_deleted_counter.inc(len(slave_ids))
+        
+        # Log the merge
+        create_audit_log(
+            db,
+            user_id=current_user.id,
+            action='merge_contacts',
+            details=f'Merged {len(slave_ids)} contacts into contact {master_id}',
+            ip_address=None
+        )
+        
+        logger.info(f"Merged contacts {slave_ids} into {master_id}")
+        
+        return {
+            'success': True,
+            'master_id': master_id,
+            'merged_count': len(slave_ids),
+            'message': f'Successfully merged {len(slave_ids)} contacts into master contact'
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error merging contacts: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to merge contacts: {str(e)}')
+

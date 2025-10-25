@@ -78,6 +78,29 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
       { key: 'actions', label: lang === 'ru' ? 'Действия' : 'Actions', visible: true, order: 13, width: '100' },
     ];
   });
+  
+  // Zoom State
+  const [tableZoom, setTableZoom] = useState(() => {
+    const saved = localStorage.getItem('table_zoom');
+    return saved ? parseFloat(saved) : 1.0;
+  });
+  
+  const zoomIn = () => {
+    const newZoom = Math.min(tableZoom + 0.1, 2.0);
+    setTableZoom(newZoom);
+    localStorage.setItem('table_zoom', newZoom);
+  };
+  
+  const zoomOut = () => {
+    const newZoom = Math.max(tableZoom - 0.1, 0.5);
+    setTableZoom(newZoom);
+    localStorage.setItem('table_zoom', newZoom);
+  };
+  
+  const zoomReset = () => {
+    setTableZoom(1.0);
+    localStorage.setItem('table_zoom', 1.0);
+  };
 
   const t = lang === 'ru' ? {
     contacts: 'Контакты',
@@ -615,6 +638,35 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
         >
           ⚙️ {lang === 'ru' ? 'Таблица' : 'Table'}
         </button>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button 
+            onClick={zoomOut}
+            className="secondary"
+            title={lang === 'ru' ? 'Уменьшить' : 'Zoom Out'}
+            style={{ padding: '8px 12px' }}
+          >
+            🔍−
+          </button>
+          <span style={{ fontSize: '14px', padding: '0 8px', minWidth: '50px', textAlign: 'center' }}>
+            {Math.round(tableZoom * 100)}%
+          </span>
+          <button 
+            onClick={zoomIn}
+            className="secondary"
+            title={lang === 'ru' ? 'Увеличить' : 'Zoom In'}
+            style={{ padding: '8px 12px' }}
+          >
+            🔍+
+          </button>
+          <button 
+            onClick={zoomReset}
+            className="secondary"
+            title={lang === 'ru' ? 'Сбросить' : 'Reset Zoom'}
+            style={{ padding: '8px 12px' }}
+          >
+            ⟲
+          </button>
+        </div>
         <button 
           onClick={() => setShowFilters(!showFilters)}
           className="secondary"
@@ -811,7 +863,12 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
       )}
 
       {/* Contacts Table */}
-      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+      <div style={{ overflowX: 'auto', maxWidth: '100%', overflowY: 'auto' }}>
+        <div style={{ 
+          transform: `scale(${tableZoom})`, 
+          transformOrigin: 'top left',
+          width: `${100 / tableZoom}%`
+        }}>
         <table style={{ tableLayout: 'fixed', width: '100%', minWidth: '800px' }}>
         <thead>
             <tr>
@@ -864,6 +921,7 @@ const ContactList = React.memo(function ContactList({ lang = 'ru', onEdit }) {
             )}
         </tbody>
       </table>
+      </div>
       </div>
       
       {/* Pagination */}

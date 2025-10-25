@@ -56,7 +56,7 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
   };
 
   const isActionsActive = () => {
-    return ['/upload', '/batch-upload', '/import-export'].some(path => 
+    return ['/upload', '/batch-upload', '/import-export', '/duplicates'].some(path => 
       location.pathname.startsWith(path)
     );
   };
@@ -166,6 +166,12 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
                   className={`dropdown-item ${isActive('/import-export') ? 'active' : ''}`}
                 >
                   📊 {t.importExport}
+                </Link>
+                <Link 
+                  to="/duplicates" 
+                  className={`dropdown-item ${isActive('/duplicates') ? 'active' : ''}`}
+                >
+                  🔍 {lang === 'ru' ? 'Дубликаты' : 'Duplicates'}
                 </Link>
               </div>
             )}
