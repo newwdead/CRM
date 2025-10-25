@@ -109,9 +109,9 @@ def get_system_resources():
         'cadvisor': {
             'name': 'cAdvisor',
             'description': 'Мониторинг ресурсов Docker контейнеров',
-            'url': f'http://{domain}:8080' if domain != 'localhost' else None,
+            'url': None,  # Только локальный доступ
             'local_url': 'http://localhost:8080',
-            'status': 'available'
+            'status': 'running'
         },
         'node_exporter': {
             'name': 'Node Exporter',

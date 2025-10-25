@@ -17,7 +17,7 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # Только localhost!
     networks:
       - monitoring
     command:
@@ -31,14 +31,15 @@ services:
     container_name: bizcard-redis-exporter
     restart: unless-stopped
     ports:
-      - "9121:9121"
+      - "127.0.0.1:9121:9121"  # Только localhost!
     environment:
       - REDIS_ADDR=redis:6379
     networks:
       - monitoring
-    depends_on:
-      - redis
+      - fastapi-bizcard-crm-ready_default  # Для доступа к Redis
 
 networks:
   monitoring:
+    external: true
+  fastapi-bizcard-crm-ready_default:
     external: true
