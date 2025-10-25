@@ -12,6 +12,9 @@ import './styles/resizable-table.css';
 // Token management
 import { initTokenManager, clearTokens, getAccessToken } from './utils/tokenManager';
 
+// Translations
+import { translations } from './translations';
+
 // Routing components
 import ProtectedRoute from './components/routing/ProtectedRoute';
 import MainLayout from './components/routing/MainLayout';
@@ -133,6 +136,13 @@ function App() {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
     localStorage.setItem('language', newLang); // For compatibility
+    // Force page reload to apply language change to all components
+    window.location.reload();
+  };
+
+  // Translation function
+  const t = (key) => {
+    return translations[lang]?.[key] || key;
   };
 
   // Show loading while checking authentication
@@ -168,7 +178,7 @@ function App() {
                 <Navigate to="/" replace />
               ) : (
                 <Suspense fallback={<LoadingFallback />}>
-                  <LoginPage onLoginSuccess={handleLoginSuccess} lang={lang} t={{}} />
+                  <LoginPage onLoginSuccess={handleLoginSuccess} lang={lang} t={t} />
                 </Suspense>
               )
             } 
@@ -200,23 +210,23 @@ function App() {
                       <Route path="/duplicates" element={<DuplicatesSimple lang={lang} />} />
 
                       {/* Upload */}
-                      <Route path="/upload" element={<UploadCard t={{}} lang={lang} />} />
+                      <Route path="/upload" element={<UploadCard t={t} lang={lang} />} />
 
                       {/* Batch Upload */}
                       <Route path="/batch-upload" element={<BatchUpload lang={lang} />} />
 
                       {/* Import/Export */}
-                      <Route path="/import-export" element={<ImportExport t={{}} lang={lang} />} />
+                      <Route path="/import-export" element={<ImportExport t={t} lang={lang} />} />
 
                       {/* Settings */}
-                      <Route path="/settings" element={<Settings t={{}} lang={lang} />} />
+                      <Route path="/settings" element={<Settings t={t} lang={lang} />} />
 
                       {/* Admin Panel (Protected) */}
                       <Route 
                         path="/admin/*" 
                         element={
                           <ProtectedRoute requireAdmin={true}>
-                            <AdminPanel t={{}} lang={lang} />
+                            <AdminPanel t={t} lang={lang} />
                           </ProtectedRoute>
                         } 
                       />

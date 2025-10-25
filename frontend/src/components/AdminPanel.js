@@ -30,13 +30,13 @@ function AdminPanel({ t, lang }) {
   };
 
   const tabs = [
-    { id: 'users', icon: '👥', label: 'Users' },
-    { id: 'settings', icon: '🔌', label: 'Integrations' },
-    { id: 'backups', icon: '💾', label: 'Backups' },
-    { id: 'resources', icon: '🔗', label: 'Resources' },
-    { id: 'services', icon: '🔧', label: 'Services' },
-    { id: 'duplicates', icon: '🔍', label: 'Duplicates' },
-    { id: 'documentation', icon: '📚', label: 'Docs' }
+    { id: 'users', icon: '👥', label: t('adminTabUsers') },
+    { id: 'settings', icon: '🔌', label: t('adminTabIntegrations') },
+    { id: 'backups', icon: '💾', label: t('adminTabBackups') },
+    { id: 'resources', icon: '🔗', label: t('adminTabResources') },
+    { id: 'services', icon: '🔧', label: t('adminTabServices') },
+    { id: 'duplicates', icon: '🔍', label: t('adminTabDuplicates') },
+    { id: 'documentation', icon: '📚', label: t('adminTabDocs') }
   ];
 
   return (
@@ -44,10 +44,10 @@ function AdminPanel({ t, lang }) {
       {/* Header */}
       <div className="modern-page-header">
         <h1 className="modern-page-title">
-          ⚙️ Admin Panel
+          ⚙️ {t('adminPanelTitle')}
         </h1>
         <p className="modern-page-subtitle">
-          System administration and configuration
+          {t('adminPanelSubtitle')}
         </p>
       </div>
 
