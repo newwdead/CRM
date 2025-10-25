@@ -36,7 +36,7 @@ scrape_configs:
           type: 'system'
           host: 'ibbase.ru'
 
-  # 3. cAdvisor - Метрики Docker контейнеров (DISABLED - container keeps crashing)
+  # 3. cAdvisor - DISABLED (unstable, causes continuous restarts)
   # - job_name: 'cadvisor'
   #   static_configs:
   #     - targets: ['bizcard-cadvisor:8080']

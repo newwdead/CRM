@@ -33,10 +33,13 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_SERVER_ROOT_URL=https://monitoring.ibbase.ru
       - GF_SERVER_DOMAIN=monitoring.ibbase.ru
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SERVER_ENABLE_GZIP=true
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_INSTALL_PLUGINS=
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_LOG_LEVEL=info
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
