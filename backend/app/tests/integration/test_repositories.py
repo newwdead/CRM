@@ -7,10 +7,9 @@ import pytest
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models import Contact, DuplicateContact, User, OCRCorrection, AppSetting, AuditLog
+from app.models import Contact, User, OCRCorrection, AppSetting, AuditLog
 from app.repositories import (
     ContactRepository,
-    DuplicateRepository,
     UserRepository,
     OCRRepository,
     SettingsRepository,
@@ -100,74 +99,6 @@ class TestContactRepository:
         contacts_list, total_count = repo.filter_by(filters={'company': test_contact.company})
         assert len(contacts_list) >= 1
         assert total_count >= 1
-
-
-class TestDuplicateRepository:
-    """Tests for DuplicateRepository"""
-    
-    def test_create_duplicate(self, db: Session, test_contact: Contact):
-        """Test creating a duplicate record"""
-        repo = DuplicateRepository(db)
-        
-        # Create second contact
-        contact2 = Contact(
-            uid='test-uid-2',
-            first_name='John',
-            last_name='Doe',
-            email='john2@example.com'
-        )
-        db.add(contact2)
-        db.commit()
-        
-        duplicate_data = {
-            'contact_id_1': test_contact.id,
-            'contact_id_2': contact2.id,
-            'similarity_score': 0.85,
-            'status': 'pending'
-        }
-        
-        duplicate = repo.create_duplicate(duplicate_data)
-        repo.commit()
-        
-        assert duplicate.id is not None
-        assert duplicate.similarity_score == 0.85
-    
-    def test_get_duplicates_for_contact(self, db: Session, test_contact: Contact):
-        """Test getting duplicates for a contact"""
-        repo = DuplicateRepository(db)
-        
-        duplicates = repo.get_duplicates_for_contact(test_contact.id)
-        assert isinstance(duplicates, list)
-    
-    def test_get_pending_duplicates(self, db: Session):
-        """Test getting pending duplicates"""
-        repo = DuplicateRepository(db)
-        
-        pending = repo.get_pending_duplicates()
-        assert isinstance(pending, list)
-    
-    def test_mark_as_resolved(self, db: Session, test_contact: Contact):
-        """Test marking duplicate as resolved"""
-        repo = DuplicateRepository(db)
-        
-        # Create duplicate first
-        contact2 = Contact(uid='test-uid-3', first_name='Test')
-        db.add(contact2)
-        db.commit()
-        
-        dup = repo.create_duplicate({
-            'contact_id_1': test_contact.id,
-            'contact_id_2': contact2.id,
-            'similarity_score': 0.9,
-            'status': 'pending'
-        })
-        repo.commit()
-        
-        # Mark as resolved using update method
-        resolved = repo.update_duplicate(dup, {'status': 'reviewed'})
-        repo.commit()
-        
-        assert resolved.status == 'reviewed'
 
 
 class TestUserRepository:

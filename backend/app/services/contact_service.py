@@ -15,8 +15,7 @@ import uuid
 import logging
 
 from .base import BaseService
-from ..models import Contact, User, Tag, Group, DuplicateContact, AuditLog
-from ..core import duplicates as duplicate_utils
+from ..models import Contact, User, Tag, Group, AuditLog
 from ..core.phone import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
 from ..core.metrics import (
@@ -194,16 +193,14 @@ class ContactService(BaseService):
     def create_contact(
         self,
         data: Dict[str, Any],
-        current_user: User,
-        auto_detect_duplicates: bool = True
+        current_user: User
     ) -> Contact:
         """
-        Create a new contact with automatic phone formatting and duplicate detection.
+        Create a new contact with automatic phone formatting.
         
         Args:
             data: Contact data dictionary
             current_user: User creating the contact
-            auto_detect_duplicates: Whether to auto-detect duplicates
         
         Returns:
             Created Contact instance
@@ -238,14 +235,6 @@ class ContactService(BaseService):
         # Update metrics
         contacts_created_counter.inc()
         contacts_total.set(self.db.query(Contact).count())
-        
-        # Auto-detect duplicates if enabled
-        if auto_detect_duplicates:
-            try:
-                self._detect_and_save_duplicates(contact)
-            except Exception as e:
-                # Don't fail contact creation if duplicate detection fails
-                self.logger.error(f"Duplicate detection error: {e}")
         
         return contact
     
@@ -358,80 +347,4 @@ class ContactService(BaseService):
         for field in phone_fields:
             if field in data and data[field]:
                 data[field] = format_phone_number(data[field])
-    
-    def _detect_and_save_duplicates(self, contact: Contact) -> None:
-        """
-        Detect and save potential duplicates for a contact.
-        
-        Args:
-            contact: Contact instance to check for duplicates
-        """
-        # Check if duplicate detection is enabled
-        duplicate_enabled = get_system_setting(self.db, 'duplicate_detection_enabled', 'true')
-        if duplicate_enabled.lower() != 'true':
-            return
-        
-        threshold = float(get_system_setting(self.db, 'duplicate_similarity_threshold', '0.75'))
-        
-        # Get existing contacts for comparison
-        existing_contacts = self.db.query(Contact).filter(Contact.id != contact.id).all()
-        
-        # Convert to dict for comparison
-        contact_dict = self._contact_to_dict(contact)
-        existing_dicts = [self._contact_to_dict(c) for c in existing_contacts]
-        
-        # Find duplicates
-        duplicates = duplicate_utils.find_duplicates_for_new_contact(
-            contact_dict,
-            existing_dicts,
-            threshold
-        )
-        
-        # Save duplicates to database
-        for existing_contact_dict, score, field_scores in duplicates:
-            existing_id = existing_contact_dict['id']
-            id1, id2 = sorted([contact.id, existing_id])
-            
-            # Check if already exists
-            existing_dup = self.db.query(DuplicateContact).filter(
-                (DuplicateContact.contact_id_1 == id1) & (DuplicateContact.contact_id_2 == id2)
-            ).first()
-            
-            if not existing_dup:
-                new_dup = DuplicateContact(
-                    contact_id_1=id1,
-                    contact_id_2=id2,
-                    similarity_score=score,
-                    match_fields=field_scores,
-                    status='pending',
-                    auto_detected=True
-                )
-                self.add(new_dup)
-        
-        self.commit()
-    
-    @staticmethod
-    def _contact_to_dict(contact: Contact) -> Dict[str, Any]:
-        """
-        Convert Contact model to dictionary for duplicate comparison.
-        
-        Args:
-            contact: Contact instance
-        
-        Returns:
-            Dictionary with relevant fields
-        """
-        return {
-            'id': contact.id,
-            'full_name': contact.full_name,
-            'first_name': contact.first_name,
-            'last_name': contact.last_name,
-            'middle_name': contact.middle_name,
-            'email': contact.email,
-            'phone': contact.phone,
-            'phone_mobile': contact.phone_mobile,
-            'phone_work': contact.phone_work,
-            'company': contact.company,
-            'position': contact.position,
-        }
 

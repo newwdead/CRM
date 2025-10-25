@@ -9,11 +9,10 @@ import logging
 import os
 
 from ..database import get_db
-from ..models import Contact, User, DuplicateContact, Tag, Group
+from ..models import Contact, User, Tag, Group
 from ..core.utils import get_setting
 from .. import schemas
 from ..core import auth as auth_utils
-from ..core import duplicates as duplicate_utils
 from ..core.phone import format_phone_number
 from ..core.utils import create_audit_log, get_system_setting
 from ..services.contact_service import ContactService
@@ -143,8 +142,7 @@ def create_contact(
     service = ContactService(db)
     return service.create_contact(
         data=data.dict(),
-        current_user=current_user,
-        auto_detect_duplicates=True
+        current_user=current_user
     )
 
 
@@ -354,165 +352,6 @@ def save_ocr_blocks(
     db.commit()
     
     return {'status': 'success', 'message': 'Blocks saved'}
-
-
-@router.get('/find-duplicates')
-def find_duplicates(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(auth_utils.get_current_active_user)
-):
-    """
-    Простой поиск дубликатов по ФИО, email, телефону, компании
-    """
-    from sqlalchemy import func, or_
-    
-    # Get all contacts for current user
-    contacts = db.query(Contact).filter(
-        Contact.owner_id == current_user.id,
-        Contact.is_deleted == False
-    ).all()
-    
-    # Group by similarity
-    groups = []
-    processed = set()
-    
-    for i, contact in enumerate(contacts):
-        if contact.id in processed:
-            continue
-        
-        duplicates = [contact]
-        match_reasons = []
-        
-        for j, other in enumerate(contacts[i+1:], start=i+1):
-            if other.id in processed:
-                continue
-            
-            # Check for matches
-            matches = []
-            
-            # Full name match
-            if contact.full_name and other.full_name:
-                if contact.full_name.lower().strip() == other.full_name.lower().strip():
-                    matches.append('ФИО')
-            
-            # Email match
-            if contact.email and other.email:
-                if contact.email.lower().strip() == other.email.lower().strip():
-                    matches.append('Email')
-            
-            # Phone match (normalize)
-            if contact.phone and other.phone:
-                phone1 = ''.join(filter(str.isdigit, contact.phone))[-10:]
-                phone2 = ''.join(filter(str.isdigit, other.phone))[-10:]
-                if phone1 and phone2 and phone1 == phone2:
-                    matches.append('Телефон')
-            
-            # Company + name match
-            if contact.company and other.company and contact.last_name and other.last_name:
-                if (contact.company.lower().strip() == other.company.lower().strip() and
-                    contact.last_name.lower().strip() == other.last_name.lower().strip()):
-                    matches.append('Компания + Фамилия')
-            
-            if matches:
-                duplicates.append(other)
-                processed.add(other.id)
-                if not match_reasons:
-                    match_reasons = matches
-        
-        if len(duplicates) > 1:
-            processed.add(contact.id)
-            groups.append({
-                'match_reason': ', '.join(match_reasons),
-                'contacts': [
-                    {
-                        'id': c.id,
-                        'full_name': c.full_name,
-                        'first_name': c.first_name,
-                        'last_name': c.last_name,
-                        'middle_name': c.middle_name,
-                        'company': c.company,
-                        'position': c.position,
-                        'email': c.email,
-                        'phone': c.phone,
-                        'created_at': str(c.created_at) if c.created_at else None
-                    }
-                    for c in duplicates
-                ]
-            })
-    
-    return {'duplicates': groups, 'total_groups': len(groups)}
-
-
-@router.post('/merge-duplicates')
-def merge_duplicates(
-    merge_data: Dict = Body(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(auth_utils.get_current_active_user)
-):
-    """
-    Объединить несколько контактов в один
-    """
-    contact_ids = merge_data.get('contact_ids', [])
-    
-    if len(contact_ids) < 2:
-        raise HTTPException(status_code=400, detail='Need at least 2 contacts to merge')
-    
-    # Get contacts
-    contacts = db.query(Contact).filter(
-        Contact.id.in_(contact_ids),
-        Contact.owner_id == current_user.id
-    ).all()
-    
-    if len(contacts) != len(contact_ids):
-        raise HTTPException(status_code=404, detail='Some contacts not found')
-    
-    # Use first contact as base (usually most complete)
-    base_contact = contacts[0]
-    others = contacts[1:]
-    
-    # Merge data from others into base
-    for other in others:
-        # Merge fields (prefer non-empty values)
-        if not base_contact.first_name and other.first_name:
-            base_contact.first_name = other.first_name
-        if not base_contact.last_name and other.last_name:
-            base_contact.last_name = other.last_name
-        if not base_contact.middle_name and other.middle_name:
-            base_contact.middle_name = other.middle_name
-        if not base_contact.email and other.email:
-            base_contact.email = other.email
-        if not base_contact.phone and other.phone:
-            base_contact.phone = other.phone
-        if not base_contact.company and other.company:
-            base_contact.company = other.company
-        if not base_contact.position and other.position:
-            base_contact.position = other.position
-        if not base_contact.address and other.address:
-            base_contact.address = other.address
-        if not base_contact.website and other.website:
-            base_contact.website = other.website
-        
-        # Mark as deleted (soft delete)
-        other.is_deleted = True
-        
-        # Add note about merge
-        if not other.comment:
-            other.comment = ''
-        other.comment += f'\n[Объединен с контактом ID: {base_contact.id}]'
-    
-    # Update base contact comment
-    if not base_contact.comment:
-        base_contact.comment = ''
-    merged_ids = ', '.join(str(c.id) for c in others)
-    base_contact.comment += f'\n[Объединены контакты: {merged_ids}]'
-    
-    db.commit()
-    
-    return {
-        'status': 'success',
-        'merged_contact_id': base_contact.id,
-        'deleted_ids': [c.id for c in others]
-    }
 
 
 @router.get('/{contact_id}/scan-qr')
