@@ -45,59 +45,94 @@ def get_system_resources():
     services = {
         'backend': {
             'name': 'Backend API',
-            'description': 'FastAPI backend with OCR, CRM, and integrations',
+            'description': 'Серверная часть на FastAPI с OCR, CRM и интеграциями',
             'url': f'{protocol}://{domain}/api' if domain != 'localhost' else None,
             'local_url': 'http://localhost:8000',
             'status': 'running'
         },
         'frontend': {
             'name': 'Frontend (React)',
-            'description': 'React web application for business card management',
+            'description': 'Веб-приложение на React для управления визитками',
             'url': f'{protocol}://{domain}' if domain != 'localhost' else None,
             'local_url': 'http://localhost:3000',
             'status': 'running'
         },
         'postgres': {
             'name': 'PostgreSQL Database',
-            'description': 'Main database for all application data',
+            'description': 'Основная база данных для всех данных приложения',
             'url': None,
             'local_url': 'postgresql://localhost:5432',
             'status': 'running'
         },
         'redis': {
             'name': 'Redis Cache',
-            'description': 'In-memory cache for OCR results and sessions',
+            'description': 'Кеш в памяти для результатов OCR и сессий',
             'url': None,
             'local_url': 'redis://localhost:6379',
             'status': 'running'
         },
-        'prometheus': {
-            'name': 'Prometheus',
-            'description': 'Metrics collection and monitoring',
-            'url': f'{protocol}://{domain}:9090' if domain != 'localhost' else None,
-            'local_url': 'http://localhost:9090',
-            'status': 'available'
-        },
-        'grafana': {
-            'name': 'Grafana',
-            'description': 'Metrics visualization and dashboards',
-            'url': f'{protocol}://{domain}:3001' if domain != 'localhost' else None,
-            'local_url': 'http://localhost:3001',
-            'status': 'available'
-        },
         'celery': {
             'name': 'Celery Workers',
-            'description': 'Asynchronous task processing (OCR, exports, etc)',
+            'description': 'Асинхронная обработка задач (OCR, экспорт и т.д.)',
             'url': None,
             'local_url': 'N/A',
             'status': 'running'
         },
         'whatsapp': {
             'name': 'WhatsApp Integration',
-            'description': 'WhatsApp webhook for message processing',
+            'description': 'Интеграция WhatsApp для обработки сообщений',
             'url': None,
             'local_url': 'N/A',
             'status': 'configured'
+        },
+        'label_studio': {
+            'name': 'Label Studio',
+            'description': 'Инструмент для аннотирования и обучения OCR моделей',
+            'url': f'{protocol}://{domain}:8081' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:8081',
+            'status': 'available'
+        },
+        'prometheus': {
+            'name': 'Prometheus',
+            'description': 'Сбор метрик и мониторинг системы',
+            'url': f'http://{domain}:9090' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:9090',
+            'status': 'available'
+        },
+        'grafana': {
+            'name': 'Grafana',
+            'description': 'Визуализация метрик и дашборды мониторинга',
+            'url': f'http://{domain}:3001' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:3001',
+            'status': 'available'
+        },
+        'cadvisor': {
+            'name': 'cAdvisor',
+            'description': 'Мониторинг ресурсов Docker контейнеров',
+            'url': f'http://{domain}:8080' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:8080',
+            'status': 'available'
+        },
+        'node_exporter': {
+            'name': 'Node Exporter',
+            'description': 'Экспорт метрик сервера для Prometheus',
+            'url': None,
+            'local_url': 'http://localhost:9100',
+            'status': 'running'
+        },
+        'redis_exporter': {
+            'name': 'Redis Exporter',
+            'description': 'Экспорт метрик Redis для Prometheus',
+            'url': None,
+            'local_url': 'http://localhost:9121',
+            'status': 'running'
+        },
+        'postgres_exporter': {
+            'name': 'PostgreSQL Exporter',
+            'description': 'Экспорт метрик PostgreSQL для Prometheus',
+            'url': None,
+            'local_url': 'http://localhost:9187',
+            'status': 'running'
         }
     }
     
