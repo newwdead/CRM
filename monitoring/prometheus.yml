@@ -1,0 +1,90 @@
+# Prometheus Configuration - Comprehensive Monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'bizcard-crm'
+    environment: 'production'
+
+# Alertmanager configuration (опционально)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (для alerts)
+rule_files:
+  # - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # 1. Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          type: 'monitoring'
+
+  # 2. Node Exporter - Метрики сервера (CPU, Memory, Disk, Network)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['bizcard-node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          type: 'system'
+          host: 'ibbase.ru'
+
+  # 3. cAdvisor - Метрики Docker контейнеров
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['bizcard-cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          type: 'docker'
+
+  # 4. PostgreSQL Exporter - Метрики базы данных
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['bizcard-postgres-exporter:9187']
+        labels:
+          service: 'postgres-exporter'
+          type: 'database'
+          db: 'postgresql'
+
+  # 5. Redis Exporter - Метрики Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['bizcard-redis-exporter:9121']
+        labels:
+          service: 'redis-exporter'
+          type: 'database'
+          db: 'redis'
+
+  # 6. FastAPI Backend - Метрики приложения
+  - job_name: 'fastapi-backend'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['backend:8000']
+        labels:
+          service: 'fastapi'
+          type: 'application'
+          component: 'backend'
+
+  # 7. FastAPI - Health checks
+  - job_name: 'fastapi-health'
+    metrics_path: '/health'
+    static_configs:
+      - targets: ['backend:8000']
+        labels:
+          service: 'fastapi-health'
+          type: 'healthcheck'
+
+  # 8. Celery Worker (если экспортирует метрики)
+  - job_name: 'celery'
+    static_configs:
+      - targets: ['celery-worker:9808']
+        labels:
+          service: 'celery'
+          type: 'application'
+          component: 'worker'
