@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from './common';
-import { getAccessToken } from '../utils/tokenManager';
-import { getContacts } from '../modules/contacts/api/contactsApi';
+import { getDuplicatesContacts, mergeDuplicates } from '../modules/duplicates/api/duplicatesApi';
 
 /**
  * Независимый модуль для управления дубликатами контактов
@@ -70,28 +69,31 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     loadError: 'Loading error',
   };
 
-  // Загрузка всех контактов
+  // Загрузка всех контактов - изолированный микросервис
   const loadContacts = async () => {
     try {
-      // Check token
-      const token = getAccessToken() || localStorage.getItem('token');
-      if (!token) {
-        toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
+      // Use isolated duplicates API microservice
+      const data = await getDuplicatesContacts();
+      setContacts(data);
+      
+      if (data.length === 0) {
+        toast.error(lang === 'ru' ? 'Нет контактов для анализа' : 'No contacts to analyze');
+      }
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+      
+      // Handle auth errors
+      if (error.message === 'UNAUTHORIZED') {
+        toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
         setTimeout(() => {
           window.location.href = '/login';
         }, 1500);
         return;
       }
       
-      // Use existing working API from contactsApi module
-      const data = await getContacts({ skip: 0, limit: 10000 });
-      setContacts(data.items || data || []);
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      
-      // Check if it's an auth error
-      if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
-        toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
+      // Handle no token
+      if (error.message === 'No authentication token') {
+        toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
         setTimeout(() => {
           window.location.href = '/login';
         }, 1500);
@@ -263,38 +265,8 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     setMerging(true);
     
     try {
-      // Check both new and old token storage for backward compatibility
-      const token = getAccessToken() || localStorage.getItem('token');
-      if (!token) {
-        toast.error(lang === 'ru' ? 'Необходима авторизация' : 'Authorization required');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 1500);
-        return;
-      }
-      
-      const response = await fetch('/api/contacts/merge', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          master_id: masterId,
-          slave_ids: slaveIds
-        })
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 1500);
-          return;
-        }
-        throw new Error('Failed to merge contacts');
-      }
+      // Use isolated duplicates API microservice
+      await mergeDuplicates(masterId, slaveIds);
       
       toast.success(t.mergeSuccess);
       
@@ -310,6 +282,16 @@ const DuplicateManager = ({ lang = 'ru' }) => {
       
     } catch (error) {
       console.error('Error merging contacts:', error);
+      
+      // Handle auth errors
+      if (error.message === 'UNAUTHORIZED') {
+        toast.error(lang === 'ru' ? 'Сессия истекла. Войдите снова' : 'Session expired. Please login');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
+      }
+      
       toast.error(t.mergeError);
     } finally {
       setMerging(false);
