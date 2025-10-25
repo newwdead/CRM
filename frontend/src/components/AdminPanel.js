@@ -68,8 +68,8 @@ function AdminPanel({ t, lang }) {
       <div className="admin-tab-content">
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'settings' && <SystemSettings lang={lang} />}
-        {activeTab === 'backups' && <BackupManagement />}
-        {activeTab === 'resources' && <SystemResources />}
+        {activeTab === 'backups' && <BackupManagement lang={lang} />}
+        {activeTab === 'resources' && <SystemResources lang={lang} />}
         {activeTab === 'services' && <ServicesPanel language={lang} />}
         {activeTab === 'duplicates' && <DuplicateFinder lang={lang} />}
         {activeTab === 'documentation' && <Documentation lang={lang} />}

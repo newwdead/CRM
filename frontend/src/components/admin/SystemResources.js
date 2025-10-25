@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { translations } from '../../translations';
 
 /**
  * System Resources Component
  * Displays system services, URLs, and environment information with configuration options
  */
-function SystemResources() {
+function SystemResources({ lang = 'ru' }) {
+  const t = translations[lang];
   const [resources, setResources] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editingService, setEditingService] = useState(null);
@@ -34,7 +36,7 @@ function SystemResources() {
       }
     } catch (error) {
       console.error('Error fetching resources:', error);
-      toast.error('Не удалось загрузить ресурсы');
+      toast.error(t.failedLoadResources);
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ function SystemResources() {
     }
     
     setEditingService(null);
-    toast.success('Настройки сохранены');
+    toast.success(t.serviceSaved);
   };
 
   const handleCancelEdit = () => {
@@ -91,11 +93,11 @@ function SystemResources() {
 
   const testServiceConnection = async (serviceKey, url) => {
     if (!url) {
-      toast.error('URL не указан');
+      toast.error(t.urlNotSet);
       return;
     }
     
-    toast.loading('Проверка соединения...');
+    toast.loading(t.checkingConnection);
     try {
       const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
       toast.dismiss();

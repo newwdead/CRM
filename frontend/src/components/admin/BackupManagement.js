@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import toast from 'react-hot-toast';
+import { translations } from '../../translations';
 
 /**
  * Backup Management Component
  * Manages database backups - creation, listing, deletion, and configuration
  * Combined functionality from Admin Panel → Backups + System Settings → Backup
  */
-function BackupManagement() {
+function BackupManagement({ lang = 'ru' }) {
+  const t = translations[lang];
   const [backups, setBackups] = useState({ backups: [], total: 0, total_size_human: '0 MB', backup_dir: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,11 +50,11 @@ function BackupManagement() {
         }
       });
       if (response.ok) {
-        toast.success(backupConfig.enabled ? 'Backup disabled' : 'Backup enabled');
+        toast.success(backupConfig.enabled ? t.backupDisabled : t.backupEnabled);
         fetchBackupConfig();
       }
     } catch (error) {
-      toast.error('Failed to toggle backup');
+      toast.error(t.failedToggle);
       logger.error('Error toggling backup:', error);
     }
   };
@@ -68,14 +70,14 @@ function BackupManagement() {
         body: JSON.stringify({ config: configForm })
       });
       if (response.ok) {
-        toast.success('Configuration saved');
+        toast.success(t.configSaved);
         setEditingConfig(false);
         fetchBackupConfig();
       } else {
-        toast.error('Failed to save configuration');
+        toast.error(t.failedSaveConfig);
       }
     } catch (error) {
-      toast.error('Failed to save configuration');
+      toast.error(t.failedSaveConfig);
       logger.error('Error saving config:', error);
     }
   };
@@ -89,12 +91,12 @@ function BackupManagement() {
         }
       });
       if (response.ok) {
-        toast.success('Backup system test successful');
+        toast.success(t.testSuccessful);
       } else {
-        toast.error('Backup system test failed');
+        toast.error(t.testFailed);
       }
     } catch (error) {
-      toast.error('Failed to test backup');
+      toast.error(t.failedTest);
       logger.error('Error testing backup:', error);
     }
   };
@@ -116,11 +118,11 @@ function BackupManagement() {
         setBackups(data);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        setError(errorData.detail || 'Failed to fetch backups');
+        setError(errorData.detail || t.failedLoadResources);
         logger.error('Failed to fetch backups:', response.status, errorData);
       }
     } catch (error) {
-      setError('Network error: Failed to connect to server');
+      setError(t.failedLoadResources);
       logger.error('Error fetching backups:', error);
     } finally {
       setLoading(false);
@@ -143,15 +145,15 @@ function BackupManagement() {
       });
       if (response.ok) {
         const data = await response.json();
-        setSuccess(data.message || 'Backup created successfully!');
+        setSuccess(data.message || t.backupCreated);
         fetchBackups();
         setTimeout(() => setSuccess(''), 5000);
       } else {
         const data = await response.json();
-        setError(data.detail || 'Failed to create backup');
+        setError(data.detail || t.failedCreateBackup);
       }
     } catch (error) {
-      setError('Network error');
+      setError(t.failedLoadResources);
     } finally {
       setLoading(false);
     }
@@ -175,15 +177,15 @@ function BackupManagement() {
         cache: 'no-store'
       });
       if (response.ok) {
-        setSuccess(`Backup ${filename} deleted successfully!`);
+        setSuccess(`${t.backupDeleted}: ${filename}`);
         fetchBackups();
         setTimeout(() => setSuccess(''), 3000);
       } else {
         const data = await response.json();
-        setError(data.detail || 'Failed to delete backup');
+        setError(data.detail || t.failedDeleteBackup);
       }
     } catch (error) {
-      setError('Network error');
+      setError(t.failedLoadResources);
       logger.error('Error deleting backup:', error);
     }
   };
@@ -192,9 +194,9 @@ function BackupManagement() {
     <div className="backup-management" style={{ padding: '20px', backgroundColor: '#f5f7fa', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: '#333' }}>💾 Backup & Recovery</h2>
+        <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: '#333' }}>💾 {t.backupTitle}</h2>
         <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
-          Manage database backups, configure automatic backup schedule, and recovery options
+          {t.backupSubtitle}
         </p>
       </div>
 
@@ -242,7 +244,7 @@ function BackupManagement() {
                   type="text"
                   value={configForm.schedule || ''}
                   onChange={(e) => setConfigForm({ ...configForm, schedule: e.target.value })}
-                  placeholder="0 2 * * * (daily at 2 AM)"
+                  placeholder="{t.scheduleExample}"
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -385,9 +387,9 @@ function BackupManagement() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#333' }}>📦 Manual Backups</h3>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#333' }}>📦 {t.manualBackups}</h3>
             <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
-              Create backups manually or manage existing backup files
+              {t.manualBackupsDesc}
             </p>
           </div>
           <button 
@@ -405,7 +407,7 @@ function BackupManagement() {
               fontWeight: '600'
             }}
           >
-            {loading ? '⏳ Creating...' : '📦 Create Backup Now'}
+            {loading ? t.creating : t.createBackupNow}
           </button>
         </div>
 
@@ -465,10 +467,10 @@ function BackupManagement() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f6f8fa', borderBottom: '2px solid #e1e4e8' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>Filename</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>Created At</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>Size</th>
-                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#333' }}>Actions</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>{t.filename}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>{t.created}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333' }}>{t.size}</th>
+                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#333' }}>{t.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -521,7 +523,7 @@ function BackupManagement() {
               borderRadius: '6px',
               color: '#856404'
             }}>
-              <p style={{ margin: 0 }}>No backups found. Click "Create Backup Now" to create your first backup.</p>
+              <p style={{ margin: 0 }}>{t.noBackupsFound}</p>
             </div>
           )
         )}
