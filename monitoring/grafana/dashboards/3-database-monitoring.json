@@ -1,347 +1,140 @@
 {
   "title": "3. Database Monitoring - PostgreSQL & Redis",
-  "uid": "database-monitoring",
-  "tags": [
-    "database",
-    "postgresql",
-    "redis"
-  ],
+  "uid": "database-monitoring-v2",
+  "tags": ["database", "postgresql", "redis"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "panels": [
     {
       "id": 1,
-      "title": "PostgreSQL - Database Size",
+      "title": "PostgreSQL Active Connections",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "targets": [
-        {
-          "expr": "pg_database_size_bytes{datname=\"businesscards\"}",
-          "legendFormat": "Database Size"
-        }
-      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "pg_stat_database_numbackends{datname=\"bizcard_crm\"}",
+        "legendFormat": "Active Connections",
+        "refId": "A"
+      }],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "short",
+          "color": {"mode": "palette-classic"}
         }
       }
     },
     {
       "id": 2,
-      "title": "PostgreSQL - Active Connections",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "targets": [
-        {
-          "expr": "pg_stat_database_numbackends{datname=\"businesscards\"}",
-          "legendFormat": "Active Connections"
-        },
-        {
-          "expr": "pg_settings_max_connections",
-          "legendFormat": "Max Connections"
+      "title": "PostgreSQL Database Size",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "pg_database_size_bytes{datname=\"bizcard_crm\"}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1000000000, "color": "yellow"},
+              {"value": 5000000000, "color": "red"}
+            ]
+          }
         }
-      ]
+      }
     },
     {
       "id": 3,
-      "title": "PostgreSQL - Transactions Per Second",
+      "title": "PostgreSQL Transactions Rate",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "targets": [
-        {
-          "expr": "rate(pg_stat_database_xact_commit{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Commits"
-        },
-        {
-          "expr": "rate(pg_stat_database_xact_rollback{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Rollbacks"
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "rate(pg_stat_database_xact_commit{datname=\"bizcard_crm\"}[5m])",
+        "legendFormat": "Commits",
+        "refId": "A"
+      }, {
+        "expr": "rate(pg_stat_database_xact_rollback{datname=\"bizcard_crm\"}[5m])",
+        "legendFormat": "Rollbacks",
+        "refId": "B"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
         }
-      ]
+      }
     },
     {
       "id": 4,
-      "title": "PostgreSQL - Tuples Read/Written",
+      "title": "Redis Memory Usage",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "targets": [
-        {
-          "expr": "rate(pg_stat_database_tup_fetched{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Fetched"
-        },
-        {
-          "expr": "rate(pg_stat_database_tup_inserted{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Inserted"
-        },
-        {
-          "expr": "rate(pg_stat_database_tup_updated{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Updated"
-        },
-        {
-          "expr": "rate(pg_stat_database_tup_deleted{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Deleted"
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "redis_memory_used_bytes",
+        "legendFormat": "Used Memory",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {"mode": "palette-classic"}
         }
-      ]
+      }
     },
     {
       "id": 5,
-      "title": "PostgreSQL - Cache Hit Ratio",
+      "title": "Redis Operations per Second",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "pg_stat_database_blks_hit{datname=\"businesscards\"} / (pg_stat_database_blks_hit{datname=\"businesscards\"} + pg_stat_database_blks_read{datname=\"businesscards\"}) * 100",
-          "legendFormat": "Cache Hit %"
-        }
-      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{
+        "expr": "rate(redis_commands_processed_total[5m])",
+        "legendFormat": "Commands/sec",
+        "refId": "A"
+      }],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "max": 100
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
         }
       }
     },
     {
       "id": 6,
-      "title": "PostgreSQL - Deadlocks",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "rate(pg_stat_database_deadlocks{datname=\"businesscards\"}[5m])",
-          "legendFormat": "Deadlocks"
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "title": "Redis - Connected Clients",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "targets": [
-        {
-          "expr": "redis_connected_clients",
-          "legendFormat": "Clients"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "title": "Redis - Memory Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
-      "targets": [
-        {
-          "expr": "redis_memory_used_bytes",
-          "legendFormat": "Used"
-        },
-        {
-          "expr": "redis_memory_max_bytes",
-          "legendFormat": "Max"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        }
-      }
-    },
-    {
-      "id": 9,
-      "title": "Redis - Commands Per Second",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 32
-      },
-      "targets": [
-        {
-          "expr": "rate(redis_commands_processed_total[5m])",
-          "legendFormat": "Commands/s"
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "title": "Redis - Hit Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 32
-      },
-      "targets": [
-        {
-          "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100",
-          "legendFormat": "Hit Rate %"
-        }
-      ],
+      "title": "Redis Hit Rate",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{
+        "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100",
+        "refId": "A"
+      }],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "max": 100
+          "min": 0,
+          "max": 100,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 50, "color": "yellow"},
+              {"value": 80, "color": "green"}
+            ]
+          }
         }
       }
-    },
-    {
-      "id": 11,
-      "title": "PostgreSQL Status",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "pg_up",
-          "legendFormat": "Status"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Down",
-                  "color": "red"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "1": {
-                  "text": "Up",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": 12,
-      "title": "Redis Status",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "redis_up",
-          "legendFormat": "Status"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Down",
-                  "color": "red"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "1": {
-                  "text": "Up",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": 13,
-      "title": "Total Tables",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "count(pg_stat_user_tables_seq_scan)",
-          "legendFormat": "Tables"
-        }
-      ]
-    },
-    {
-      "id": 14,
-      "title": "Redis Keys",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "sum(redis_db_keys)",
-          "legendFormat": "Keys"
-        }
-      ]
     }
-  ]
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  }
 }

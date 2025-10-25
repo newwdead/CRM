@@ -1,326 +1,171 @@
 {
   "title": "4. Application Monitoring - FastAPI & Celery",
-  "uid": "application-monitoring",
-  "tags": [
-    "application",
-    "fastapi",
-    "celery",
-    "ocr"
-  ],
+  "uid": "application-monitoring-v2",
+  "tags": ["application", "fastapi", "celery"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "panels": [
     {
       "id": 1,
-      "title": "HTTP Requests Per Second",
+      "title": "HTTP Request Rate",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "targets": [
-        {
-          "expr": "rate(http_requests_total[5m])",
-          "legendFormat": "{{method}} {{endpoint}}"
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "rate(http_requests_total[5m])",
+        "legendFormat": "{{method}} {{handler}}",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2
+          }
         }
-      ]
+      }
     },
     {
       "id": 2,
       "title": "HTTP Response Time (p95)",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
-          "legendFormat": "p95"
-        }
-      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+        "legendFormat": "p95",
+        "refId": "A"
+      }, {
+        "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+        "legendFormat": "p50",
+        "refId": "B"
+      }],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": {"mode": "palette-classic"}
         }
       }
     },
     {
       "id": 3,
-      "title": "HTTP Requests by Status Code",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "targets": [
-        {
-          "expr": "sum by (status) (rate(http_requests_total[5m]))",
-          "legendFormat": "{{status}}"
+      "title": "Active HTTP Requests",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "http_requests_in_progress",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 50, "color": "yellow"},
+              {"value": 100, "color": "red"}
+            ]
+          }
         }
-      ]
+      }
     },
     {
       "id": 4,
       "title": "HTTP Error Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
-          "legendFormat": "5xx Error Rate %"
-        }
-      ],
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+      "targets": [{
+        "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+        "refId": "A"
+      }],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          }
         }
       }
     },
     {
       "id": 5,
-      "title": "Active Users",
+      "title": "OCR Upload Tasks",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "user_login_total",
-          "legendFormat": "Active Users"
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "rate(ocr_upload_total[5m])",
+        "legendFormat": "OCR Uploads",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
         }
-      ]
+      }
     },
     {
       "id": 6,
-      "title": "OCR Processing Rate",
+      "title": "Duplicate Detection",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "targets": [
-        {
-          "expr": "rate(ocr_processing_total[5m])",
-          "legendFormat": "OCR/s"
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{
+        "expr": "rate(duplicates_found_total[5m])",
+        "legendFormat": "Duplicates Found",
+        "refId": "A"
+      }, {
+        "expr": "rate(duplicates_merged_total[5m])",
+        "legendFormat": "Duplicates Merged",
+        "refId": "B"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
         }
-      ]
+      }
     },
     {
       "id": 7,
-      "title": "Celery Tasks - Active",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "targets": [
-        {
-          "expr": "celery_tasks_active",
-          "legendFormat": "Active Tasks"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "title": "Celery Tasks - Success/Failure",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
-      "targets": [
-        {
-          "expr": "rate(celery_tasks_success_total[5m])",
-          "legendFormat": "Success"
-        },
-        {
-          "expr": "rate(celery_tasks_failure_total[5m])",
-          "legendFormat": "Failure"
-        }
-      ]
-    },
-    {
-      "id": 9,
       "title": "Contact Operations",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 32
-      },
-      "targets": [
-        {
-          "expr": "rate(contact_created_total[5m])",
-          "legendFormat": "Created"
-        },
-        {
-          "expr": "rate(contact_updated_total[5m])",
-          "legendFormat": "Updated"
-        },
-        {
-          "expr": "rate(contact_deleted_total[5m])",
-          "legendFormat": "Deleted"
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "title": "Duplicate Detection Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 32
-      },
-      "targets": [
-        {
-          "expr": "rate(duplicate_detection_total[5m])",
-          "legendFormat": "Duplicates Found/s"
-        }
-      ]
-    },
-    {
-      "id": 11,
-      "title": "API Status",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "up{job=\"fastapi-backend\"}",
-          "legendFormat": "Status"
-        }
-      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{
+        "expr": "rate(contacts_created_total[5m])",
+        "legendFormat": "Created",
+        "refId": "A"
+      }, {
+        "expr": "rate(contacts_updated_total[5m])",
+        "legendFormat": "Updated",
+        "refId": "B"
+      }, {
+        "expr": "rate(contacts_deleted_total[5m])",
+        "legendFormat": "Deleted",
+        "refId": "C"
+      }],
       "fieldConfig": {
         "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Down",
-                  "color": "red"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "1": {
-                  "text": "Up",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": 12,
-      "title": "Total Requests (24h)",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(http_requests_total[24h]))",
-          "legendFormat": "Requests"
-        }
-      ]
-    },
-    {
-      "id": 13,
-      "title": "Avg Response Time",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])",
-          "legendFormat": "Avg"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        }
-      }
-    },
-    {
-      "id": 14,
-      "title": "Error Rate %",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 40
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
-          "legendFormat": "Errors"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "steps": [
-              {
-                "value": 0,
-                "color": "green"
-              },
-              {
-                "value": 1,
-                "color": "yellow"
-              },
-              {
-                "value": 5,
-                "color": "red"
-              }
-            ]
-          }
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
         }
       }
     }
-  ]
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  }
 }

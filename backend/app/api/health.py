@@ -11,7 +11,7 @@ router = APIRouter()
 def get_version():
     """Get API version"""
     return {
-        'version': '5.0.2',
+        'version': '4.9.1',
         'build': 'production',
         'api_version': 'v1',
         'python': '3.11.14',
