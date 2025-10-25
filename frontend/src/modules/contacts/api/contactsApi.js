@@ -6,21 +6,39 @@
 const API_BASE = '/api';
 
 /**
+ * Get token from localStorage (check both new and old keys)
+ */
+const getToken = () => {
+  return localStorage.getItem('access_token') || localStorage.getItem('token');
+};
+
+/**
  * Получить список контактов с фильтрами и пагинацией
  */
 export const getContacts = async (params = {}) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  
   const queryParams = new URLSearchParams(params).toString();
   const url = queryParams 
     ? `${API_BASE}/contacts?${queryParams}`
     : `${API_BASE}/contacts`;
   
   const response = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
   });
   
   if (!response.ok) {
-    throw new Error('Failed to fetch contacts');
+    if (response.status === 401) {
+      throw new Error('401: Unauthorized');
+    }
+    throw new Error(`Failed to fetch contacts: ${response.status}`);
   }
   
   return await response.json();
@@ -30,7 +48,7 @@ export const getContacts = async (params = {}) => {
  * Обновить контакт
  */
 export const updateContact = async (contactId, data) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const response = await fetch(`${API_BASE}/contacts/${contactId}`, {
     method: 'PUT',
     headers: {
@@ -51,7 +69,7 @@ export const updateContact = async (contactId, data) => {
  * Удалить контакт
  */
 export const deleteContact = async (contactId) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const response = await fetch(`${API_BASE}/contacts/${contactId}`, {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
@@ -68,7 +86,7 @@ export const deleteContact = async (contactId) => {
  * Массовое обновление контактов
  */
 export const bulkUpdateContacts = async (contactIds, data) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const response = await fetch(`${API_BASE}/contacts/bulk-update`, {
     method: 'PUT',
     headers: {
@@ -89,7 +107,7 @@ export const bulkUpdateContacts = async (contactIds, data) => {
  * Массовое удаление контактов
  */
 export const bulkDeleteContacts = async (contactIds) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const response = await fetch(`${API_BASE}/contacts/bulk-delete`, {
     method: 'DELETE',
     headers: {
@@ -110,7 +128,7 @@ export const bulkDeleteContacts = async (contactIds) => {
  * Экспорт контактов
  */
 export const exportContacts = async (format = 'csv', filters = {}) => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const queryParams = new URLSearchParams({ ...filters, format }).toString();
   const url = `${API_BASE}/contacts/export?${queryParams}`;
   
