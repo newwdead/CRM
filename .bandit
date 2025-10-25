@@ -1,0 +1,27 @@
+[bandit]
+# Bandit configuration for FastAPI Business Card CRM
+# https://bandit.readthedocs.io/en/latest/config.html
+
+# Exclude paths
+exclude_dirs = 
+    /tests/
+    /venv/
+    /node_modules/
+    /__pycache__/
+
+# Skip specific tests
+# B301: Pickle usage (safe in cache.py for internal data only)
+# B324: MD5 usage (safe for cache keys, not for security)
+# B603: subprocess without shell=True (safe usage)
+skips = 
+
+# Test levels
+# HIGH: Only high severity issues
+# MEDIUM: Medium and high severity
+# LOW: All issues
+tests = 
+
+# Confidence levels
+# HIGH: High confidence issues
+# MEDIUM: Medium and high confidence
+# LOW: All issues
