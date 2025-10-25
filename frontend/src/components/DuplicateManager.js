@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from './common';
+import { getAccessToken } from '../utils/tokenManager';
 
 /**
  * Независимый модуль для управления дубликатами контактов
@@ -71,7 +72,18 @@ const DuplicateManager = ({ lang = 'ru' }) => {
   // Загрузка всех контактов
   const loadContacts = async () => {
     try {
-      const response = await fetch('/api/contacts/?skip=0&limit=10000');
+      const token = getAccessToken();
+      if (!token) {
+        throw new Error('No access token');
+      }
+      
+      const response = await fetch('/api/contacts/?skip=0&limit=10000', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
       if (!response.ok) throw new Error('Failed to load contacts');
       const data = await response.json();
       setContacts(data.items || []);
@@ -242,9 +254,15 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     setMerging(true);
     
     try {
+      const token = getAccessToken();
+      if (!token) {
+        throw new Error('No access token');
+      }
+      
       const response = await fetch('/api/contacts/merge', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
