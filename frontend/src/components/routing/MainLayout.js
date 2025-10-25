@@ -17,7 +17,6 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
   const [user, setUser] = useState(null);
   const [ver, setVer] = useState({ version: '', commit: '', message: '' });
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
 
   const t = translations[lang];
 
@@ -43,7 +42,6 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
     const handleClick = (e) => {
       if (!e.target.closest('.dropdown')) {
         setActionsOpen(false);
-        setAdminOpen(false);
       }
     };
     document.addEventListener('click', handleClick);
@@ -144,7 +142,6 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
               onClick={(e) => {
                 e.stopPropagation();
                 setActionsOpen(!actionsOpen);
-                setAdminOpen(false);
               }}
               title={lang === 'ru' ? 'Действия с визитками' : 'Business card actions'}
             >
@@ -190,69 +187,15 @@ const MainLayout = ({ children, lang, toggleLanguage, onLogout }) => {
             👤 {lang === 'ru' ? 'Настройки' : 'Preferences'}
           </Link>
 
-          {/* Admin Dropdown */}
+          {/* Admin Panel */}
           {user?.is_admin && (
-            <div className="dropdown">
-              <button
-                className={`nav-btn dropdown-trigger ${isActive('/admin') ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setAdminOpen(!adminOpen);
-                  setActionsOpen(false);
-                }}
-                title={lang === 'ru' ? 'Административная панель' : 'Admin panel'}
-              >
-                🛡️ {t.adminPanel} ▾
-              </button>
-              {adminOpen && (
-                <div className="dropdown-menu" onClick={() => setAdminOpen(false)}>
-                  <Link 
-                    to="/admin" 
-                    className="dropdown-item"
-                  >
-                    📊 {lang === 'ru' ? 'Обзор' : 'Overview'}
-                  </Link>
-                  <div className="dropdown-divider"></div>
-                  <div className="dropdown-header">
-                    {lang === 'ru' ? 'Управление' : 'Management'}
-                  </div>
-                  <Link 
-                    to="/admin?tab=users" 
-                    className="dropdown-item"
-                  >
-                    👥 {lang === 'ru' ? 'Пользователи' : 'Users'}
-                  </Link>
-                  <Link 
-                    to="/admin?tab=backups" 
-                    className="dropdown-item"
-                  >
-                    💾 {lang === 'ru' ? 'Резервные копии' : 'Backups'}
-                  </Link>
-                  <div className="dropdown-divider"></div>
-                  <div className="dropdown-header">
-                    {lang === 'ru' ? 'Система' : 'System'}
-                  </div>
-                  <Link 
-                    to="/admin?tab=settings" 
-                    className="dropdown-item"
-                  >
-                    🔌 {lang === 'ru' ? 'Интеграции' : 'Integrations'}
-                  </Link>
-                  <Link 
-                    to="/admin?tab=services" 
-                    className="dropdown-item"
-                  >
-                    🎛️ {lang === 'ru' ? 'Сервисы' : 'Services'}
-                  </Link>
-                  <Link 
-                    to="/admin?tab=resources" 
-                    className="dropdown-item"
-                  >
-                    🖥️ {lang === 'ru' ? 'Ресурсы' : 'Resources'}
-                  </Link>
-                </div>
-              )}
-            </div>
+            <Link 
+              to="/admin" 
+              className={`nav-btn ${isActive('/admin') ? 'active' : ''}`}
+              title={lang === 'ru' ? 'Административная панель' : 'Admin panel'}
+            >
+              🛡️ {t.adminPanel}
+            </Link>
           )}
         </nav>
       </header>
