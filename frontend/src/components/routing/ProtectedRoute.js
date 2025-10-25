@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { getAccessToken } from '../../utils/tokenManager';
 
 /**
  * Protected Route Component
@@ -8,7 +9,7 @@ import { Navigate, useLocation } from 'react-router-dom';
  */
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const location = useLocation();
-  const token = localStorage.getItem('token');
+  const token = getAccessToken(); // Use tokenManager instead of direct localStorage
   const userStr = localStorage.getItem('user');
 
   // Not authenticated - redirect to login

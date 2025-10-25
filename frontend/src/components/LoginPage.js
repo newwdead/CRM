@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../index.css';
+import { setTokens } from '../utils/tokenManager';
 
 function LoginPage({ onLoginSuccess }) {
   const [showRegister, setShowRegister] = useState(false);
@@ -53,7 +54,12 @@ function LoginPage({ onLoginSuccess }) {
         return;
       }
 
-      // Save token and user info
+      // Save tokens using tokenManager
+      const refreshToken = data.refresh_token || data.access_token; // Fallback if no refresh token
+      const expiresIn = data.expires_in || 3600; // Default 1 hour
+      setTokens(data.access_token, refreshToken, expiresIn);
+      
+      // Also save to old 'token' key for backward compatibility
       localStorage.setItem('token', data.access_token);
       
       // Fetch user info
