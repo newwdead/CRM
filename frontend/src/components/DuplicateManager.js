@@ -83,7 +83,7 @@ const DuplicateManager = ({ lang = 'ru' }) => {
         return;
       }
       
-      const response = await fetch('/api/contacts/?skip=0&limit=10000', {
+      const response = await fetch('/api/contacts?skip=0&limit=10000', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
