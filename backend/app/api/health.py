@@ -92,13 +92,6 @@ def get_system_resources():
             'local_url': 'N/A',
             'status': 'running'
         },
-        'telegram': {
-            'name': 'Telegram Bot',
-            'description': 'Telegram integration for business card scanning',
-            'url': None,
-            'local_url': 'N/A',
-            'status': 'configured'
-        },
         'whatsapp': {
             'name': 'WhatsApp Integration',
             'description': 'WhatsApp webhook for message processing',

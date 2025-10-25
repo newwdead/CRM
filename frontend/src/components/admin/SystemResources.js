@@ -101,21 +101,21 @@ function SystemResources({ lang = 'ru' }) {
     try {
       const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
       toast.dismiss();
-      toast.success(`${serviceKey}: Соединение установлено`);
+      toast.success(`${serviceKey}: ${t.connectionOk}`);
     } catch (error) {
       toast.dismiss();
-      toast.error(`${serviceKey}: Не удалось подключиться`);
+      toast.error(`${serviceKey}: ${t.connectionFailed}`);
     }
   };
 
   return (
     <div className="system-resources">
-      <h3>🔗 System Resources & Links</h3>
+      <h3>🔗 {t.resourcesTitle}</h3>
       <p style={{ marginBottom: '20px', color: '#666' }}>
-        Quick access to all deployed services and monitoring dashboards
+        {t.resourcesSubtitle}
       </p>
 
-      {loading && <p>Loading resources...</p>}
+      {loading && <p>{t.loading}</p>}
 
       {resources && resources.services ? (
         <div className="resources-grid" style={{ 
@@ -196,14 +196,17 @@ function SystemResources({ lang = 'ru' }) {
                   </p>
                 )}
                 
-                {service.url || isEditing ? (
+                {/* Global URL */}
+                {(service.url || isEditing) && (
                   <div style={{ marginBottom: '10px' }}>
-                    <strong style={{ fontSize: '0.85em', color: '#666' }}>Production URL:</strong>
+                    <strong style={{ fontSize: '0.85em', color: '#666', display: 'block', marginBottom: '5px' }}>
+                      🌐 {t.serviceUrl}:
+                    </strong>
                     {isEditing ? (
-                      <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                      <div style={{ display: 'flex', gap: '5px' }}>
                         <input
                           type="text"
-                          value={currentConfig.url}
+                          value={currentConfig.url || ''}
                           onChange={(e) => handleConfigChange(key, 'url', e.target.value)}
                           placeholder="https://example.com"
                           style={{
@@ -214,70 +217,69 @@ function SystemResources({ lang = 'ru' }) {
                             fontSize: '0.85em'
                           }}
                         />
-                        <button
-                          onClick={() => testServiceConnection(key, currentConfig.url)}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            backgroundColor: '#FF9800',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                          title="Проверить соединение"
-                        >
-                          🔍
-                        </button>
+                        {currentConfig.url && (
+                          <button
+                            onClick={() => testServiceConnection(key, currentConfig.url)}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              backgroundColor: '#FF9800',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                            title={t.testService}
+                          >
+                            🔍
+                          </button>
+                        )}
                       </div>
                     ) : service.url ? (
-                      <div>
-                        <a 
-                          href={service.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          style={{ 
-                            marginTop: '5px',
-                            display: 'inline-block',
-                            padding: '6px 12px',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '4px',
-                            fontSize: '0.85em'
-                          }}
-                        >
-                          🌐 Open {service.name}
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ 
-                      display: 'inline-block',
-                      padding: '4px 8px',
-                      backgroundColor: '#999',
-                      color: 'white',
-                      borderRadius: '4px',
-                      fontSize: '0.8em'
-                    }}>
-                      Internal Only
-                    </span>
+                      <a 
+                        href={service.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          backgroundColor: '#4CAF50',
+                          color: 'white',
+                          textDecoration: 'none',
+                          borderRadius: '4px',
+                          fontSize: '0.85em'
+                        }}
+                      >
+                        🌐 {service.url}
+                      </a>
+                    ) : (
+                      <span style={{ 
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        backgroundColor: '#999',
+                        color: 'white',
+                        borderRadius: '4px',
+                        fontSize: '0.8em'
+                      }}>
+                        {t.notSet || 'Не указан'}
+                      </span>
+                    )}
                   </div>
                 )}
 
-                <div>
-                  <strong style={{ fontSize: '0.85em', color: '#666' }}>Local URL:</strong>
+                {/* Local URL */}
+                <div style={{ marginBottom: '10px' }}>
+                  <strong style={{ fontSize: '0.85em', color: '#666', display: 'block', marginBottom: '5px' }}>
+                    🏠 {t.serviceLocalUrl}:
+                  </strong>
                   {isEditing ? (
                     <input
                       type="text"
-                      value={currentConfig.local_url}
+                      value={currentConfig.local_url || ''}
                       onChange={(e) => handleConfigChange(key, 'local_url', e.target.value)}
                       placeholder="http://localhost:8000"
                       style={{
                         width: '100%',
-                        marginTop: '5px',
                         padding: '8px',
                         border: '1px solid #ddd',
                         borderRadius: '4px',
