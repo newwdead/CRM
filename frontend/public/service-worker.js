@@ -1,8 +1,8 @@
-// ibbase Service Worker
-// Version 5.1.0 - Fixed Mixed Content & URL issues
+// ibbase Service Worker  
+// Version 5.2.0 - Microarchitecture + Force Cache Clear
 
-const CACHE_NAME = 'ibbase-v5.1.0';
-const RUNTIME_CACHE = 'ibbase-runtime-v5.1.0';
+const CACHE_NAME = 'ibbase-v5.2.0';
+const RUNTIME_CACHE = 'ibbase-runtime-v5.2.0';
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
@@ -240,3 +240,4 @@ async function syncContacts() {
 
 console.log('[SW] Service Worker loaded');
 
+// Build: 1761463000
