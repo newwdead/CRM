@@ -23,7 +23,8 @@ export const getDuplicatesContacts = async () => {
   // IMPORTANT: Backend uses 'page' not 'skip'! Max limit is 100, so we need to fetch multiple pages
   // For now, fetch a large enough page (limit=100 is max, so page=1&limit=100 gets first 100)
   // TODO: Implement proper pagination if needed
-  const response = await fetch(`/api/contacts?page=1&limit=100&v=${version}&_=${timestamp}`, {
+  // CRITICAL: Trailing slash required by FastAPI to avoid 307 redirect
+  const response = await fetch(`/api/contacts/?page=1&limit=100&v=${version}&_=${timestamp}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
