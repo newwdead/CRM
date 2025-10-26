@@ -53,10 +53,16 @@ services:
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:?WHATSAPP_VERIFY_TOKEN must be set in .env file}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123456}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
       - ./backups:/app/backups
+      - ./training_data:/app/training_data
+      - ./models:/app/models
       - ./scripts:/home/ubuntu/fastapi-bizcard-crm-ready/scripts:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - .:/home/ubuntu/fastapi-bizcard-crm-ready:ro
@@ -86,9 +92,15 @@ services:
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID:-}
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
       - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:?WHATSAPP_VERIFY_TOKEN must be set in .env file}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123456}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
     volumes:
       - ./backend/app:/app/app
       - ./uploads:/app/uploads
+      - ./training_data:/app/training_data
+      - ./models:/app/models
     depends_on:
       - db
       - redis
@@ -120,7 +132,27 @@ services:
     restart: unless-stopped
     command: label-studio start --init
 
+  minio:
+    image: minio/minio:latest
+    container_name: bizcard-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123456}
+    volumes:
+      - minio_data:/data
+    ports:
+      - '127.0.0.1:9000:9000'  # API
+      - '127.0.0.1:9001:9001'  # Console
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
 volumes:
   postgres_data:
   redis_data:
   label_studio_data:
+  minio_data:

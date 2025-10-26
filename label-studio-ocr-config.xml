@@ -1,0 +1,32 @@
+<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  
+  <Header value="Business Card Field Classification"/>
+  
+  <Rectangle name="bbox" toName="image" strokeWidth="3" smart="true"/>
+  
+  <Labels name="label" toName="image">
+    <Label value="NAME" background="#FF0000" hotkey="n"/>
+    <Label value="POSITION" background="#0000FF" hotkey="p"/>
+    <Label value="COMPANY" background="#00FF00" hotkey="c"/>
+    <Label value="EMAIL" background="#9400D3" hotkey="e"/>
+    <Label value="PHONE" background="#FF8C00" hotkey="t"/>
+    <Label value="ADDRESS" background="#FFD700" hotkey="a"/>
+    <Label value="WEBSITE" background="#00FFFF" hotkey="w"/>
+    <Label value="OTHER" background="#808080" hotkey="o"/>
+  </Labels>
+  
+  <TextArea name="transcription" toName="image" 
+            editable="true" 
+            perRegion="true"
+            required="true"
+            maxSubmissions="1"
+            placeholder="Enter the text from this region"/>
+  
+  <Header value="Instructions"/>
+  <Text value="1. Draw a rectangle around each text field on the business card"/>
+  <Text value="2. Select the appropriate label (NAME, POSITION, etc.)"/>
+  <Text value="3. Type the text content in the transcription field"/>
+  <Text value="4. Use hotkeys (n, p, c, e, t, a, w, o) for faster labeling"/>
+</View>
+

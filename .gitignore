@@ -54,6 +54,16 @@ backups/
 *.sqlite3
 *.log
 
+# ML Training Data & Models
+training_data/datasets/*.json
+training_data/annotations/*.json
+models/layoutlmv3/
+models/checkpoints/
+*.pth
+*.pt
+*.onnx
+*.h5
+
 # Sensitive directories
 secrets/
 credentials/
