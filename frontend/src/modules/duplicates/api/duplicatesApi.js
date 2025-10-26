@@ -18,7 +18,7 @@ export const getDuplicatesContacts = async () => {
   
   // CRITICAL: Add cache-busting version parameter to bypass Service Worker cache
   const timestamp = Date.now();
-  const version = '5.2.1';
+  const version = '5.2.2';
   
   // IMPORTANT: Backend uses 'page' not 'skip'! Max limit is 100, so we need to fetch multiple pages
   // For now, fetch a large enough page (limit=100 is max, so page=1&limit=100 gets first 100)
@@ -61,7 +61,7 @@ export const mergeDuplicates = async (masterId, slaveIds) => {
   // CRITICAL: Add cache-busting params
   // IMPORTANT: NO trailing slash for this endpoint (backend defined without slash)
   const timestamp = Date.now();
-  const version = '5.2.1';
+  const version = '5.2.2';
   
   const response = await fetch(`/api/contacts/merge?v=${version}&_=${timestamp}`, {
     method: 'POST',

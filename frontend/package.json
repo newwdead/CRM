@@ -1,6 +1,6 @@
 {
   "name": "ibbase-frontend",
-  "version": "5.2.1",
+  "version": "5.2.2",
   "private": true,
   "dependencies": {
     "react": "^18.3.1",
