@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libopenjp2-7 \
     libtiff-dev \
     libwebp-dev \
+    libgl1 \
+    libglib2.0-0 \
     pkg-config \
     gcc \
     postgresql-client \
@@ -40,13 +42,7 @@ WORKDIR /app
 # Install Python dependencies
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt \
-    && rm -rf /root/.cache/pip \
-    && find /usr/local/lib/python3.10 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.10 -name "*.pyc" -delete \
-    && find /usr/local/lib/python3.10 -name "*.pyo" -delete \
-    && find /usr/local/lib/python3.10 -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.10 -type d -name "test" -exec rm -rf {} + 2>/dev/null || true \
-    && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/* /var/log/*
+    && rm -rf /root/.cache/pip
 
 # Copy application
 COPY ./app /app/app
@@ -58,7 +54,6 @@ ENV PYTHONUNBUFFERED=1 \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run with Gunicorn
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", \
-     "-b", "0.0.0.0:8000", "--workers", "2", "--worker-connections", "1000"]
+# Run with Uvicorn  
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 

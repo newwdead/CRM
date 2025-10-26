@@ -75,7 +75,7 @@ services:
   celery-worker:
     build: ./backend
     container_name: bizcard-celery-worker
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    command: python -m celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
       - TZ=Europe/Berlin
       - C_FORCE_ROOT=true

@@ -19,12 +19,39 @@ from urllib.parse import urlparse
 # Import caching utilities  
 from ...cache import get_cache_key, get_from_cache, set_to_cache
 
-# Import base provider and new providers
-from .providers.base import OCRProvider
-from .providers.paddle_provider import PaddleOCRProvider
-
 # Настройка логирования
 logger = logging.getLogger(__name__)
+
+
+class OCRProvider(ABC):
+    """Базовый класс для OCR провайдеров"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.enabled = True
+        self.priority = 0  # Чем ниже, тем выше приоритет
+    
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Проверка доступности провайдера"""
+        pass
+    
+    @abstractmethod
+    def recognize(self, image_data: bytes, filename: str = None) -> Dict[str, Any]:
+        """Распознавание текста с изображения"""
+        pass
+    
+    def normalize_result(self, raw_data: Any) -> Dict[str, Optional[str]]:
+        """Нормализация результата в стандартный формат"""
+        return {
+            "full_name": None,
+            "company": None,
+            "position": None,
+            "email": None,
+            "phone": None,
+            "address": None,
+            "website": None,
+        }
 
 
 class TesseractProvider(OCRProvider):
@@ -433,10 +460,9 @@ class OCRManager:
         """Инициализация всех доступных провайдеров"""
         # Создаем все провайдеры
         all_providers = [
-            PaddleOCRProvider(),        # Priority 0 - Highest (NEW)
-            ParsioProvider(),           # Priority 1
-            GoogleVisionProvider(),     # Priority 2
-            TesseractProvider(),        # Priority 3
+            TesseractProvider(),
+            ParsioProvider(),
+            GoogleVisionProvider(),
         ]
         
         # Фильтруем только доступные
