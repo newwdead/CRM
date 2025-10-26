@@ -13,7 +13,7 @@ const DuplicateManager = ({ lang = 'ru' }) => {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [threshold, setThreshold] = useState(0.7); // Порог схожести 70%
+  const [matchingFields, setMatchingFields] = useState(1); // Количество совпадающих полей (начинаем с 1)
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [mergeSelection, setMergeSelection] = useState({});
   
@@ -162,55 +162,50 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     return phone.replace(/[^\d]/g, '');
   };
 
-  // Вычисление схожести двух контактов
-  const calculateSimilarity = (contact1, contact2) => {
-    const weights = {
-      email: 0.4,    // Email - самый важный
-      phone: 0.3,    // Телефон
-      name: 0.2,     // Имя
-      company: 0.1   // Компания
-    };
+  // Подсчет количества совпадающих полей (новая логика)
+  const countMatchingFields = (contact1, contact2) => {
+    let matchCount = 0;
     
-    let totalScore = 0;
-    let totalWeight = 0;
+    // Поля для сравнения (точное совпадение)
+    const exactMatchFields = [
+      'email',
+      'phone',
+      'phone_mobile', 
+      'phone_work',
+      'company',
+      'website'
+    ];
     
-    // Email
-    if (contact1.email && contact2.email) {
-      if (contact1.email.toLowerCase() === contact2.email.toLowerCase()) {
-        totalScore += weights.email;
+    // Точные совпадения
+    exactMatchFields.forEach(field => {
+      const val1 = contact1[field]?.toLowerCase().trim();
+      const val2 = contact2[field]?.toLowerCase().trim();
+      if (val1 && val2 && val1 === val2) {
+        matchCount++;
       }
-      totalWeight += weights.email;
+    });
+    
+    // Телефоны (нормализованное сравнение)
+    const phone1 = normalizePhone(contact1.phone);
+    const phone2 = normalizePhone(contact2.phone);
+    if (phone1 && phone2 && phone1.length >= 7 && phone2.length >= 7) {
+      if (phone1.includes(phone2) || phone2.includes(phone1)) {
+        matchCount++; // Дополнительное совпадение для телефона
+      }
     }
     
-    // Phone
-    if (contact1.phone && contact2.phone) {
-      const phone1 = normalizePhone(contact1.phone);
-      const phone2 = normalizePhone(contact2.phone);
-      if (phone1 && phone2) {
-        const phoneSimilarity = phone1.includes(phone2) || phone2.includes(phone1) ? 1.0 : 0.0;
-        totalScore += phoneSimilarity * weights.phone;
-        totalWeight += weights.phone;
-      }
-    }
-    
-    // Name
+    // Имя (высокая схожесть > 0.8)
     if (contact1.full_name && contact2.full_name) {
-      const nameSimilarity = stringSimilarity(contact1.full_name, contact2.full_name);
-      totalScore += nameSimilarity * weights.name;
-      totalWeight += weights.name;
+      const similarity = stringSimilarity(contact1.full_name, contact2.full_name);
+      if (similarity > 0.8) {
+        matchCount++;
+      }
     }
     
-    // Company
-    if (contact1.company && contact2.company) {
-      const companySimilarity = stringSimilarity(contact1.company, contact2.company);
-      totalScore += companySimilarity * weights.company;
-      totalWeight += weights.company;
-    }
-    
-    return totalWeight > 0 ? totalScore / totalWeight : 0;
+    return matchCount;
   };
 
-  // Анализ дубликатов
+  // Анализ дубликатов (новая логика - по количеству полей)
   const analyzeDuplicates = () => {
     setAnalyzing(true);
     
@@ -222,16 +217,17 @@ const DuplicateManager = ({ lang = 'ru' }) => {
         if (processed.has(contacts[i].id)) continue;
         
         const group = [contacts[i]];
-        const similarities = [1.0];
+        const matchCounts = [matchingFields]; // Первый контакт считается как имеющий все совпадения
         
         for (let j = i + 1; j < contacts.length; j++) {
           if (processed.has(contacts[j].id)) continue;
           
-          const similarity = calculateSimilarity(contacts[i], contacts[j]);
+          const matchCount = countMatchingFields(contacts[i], contacts[j]);
           
-          if (similarity >= threshold) {
+          // Если количество совпадающих полей >= порога
+          if (matchCount >= matchingFields) {
             group.push(contacts[j]);
-            similarities.push(similarity);
+            matchCounts.push(matchCount);
             processed.add(contacts[j].id);
           }
         }
@@ -239,15 +235,15 @@ const DuplicateManager = ({ lang = 'ru' }) => {
         if (group.length > 1) {
           groups.push({
             contacts: group,
-            similarities: similarities,
-            avgSimilarity: similarities.reduce((a, b) => a + b, 0) / similarities.length
+            matchCounts: matchCounts,
+            avgMatchCount: Math.round(matchCounts.reduce((a, b) => a + b, 0) / matchCounts.length)
           });
           processed.add(contacts[i].id);
         }
       }
       
-      // Сортируем по убыванию схожести
-      groups.sort((a, b) => b.avgSimilarity - a.avgSimilarity);
+      // Сортируем по убыванию количества совпадений
+      groups.sort((a, b) => b.avgMatchCount - a.avgMatchCount);
       
       setDuplicateGroups(groups);
       setAnalyzing(false);
@@ -413,20 +409,20 @@ const DuplicateManager = ({ lang = 'ru' }) => {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'end', flexWrap: 'wrap' }}>
           <div style={{ flex: '1', minWidth: '200px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              {t.threshold}: {Math.round(threshold * 100)}%
+              {lang === 'ru' ? 'Минимум совпадающих полей' : 'Minimum matching fields'}: {matchingFields}
             </label>
             <input
               type="range"
-              min="0.5"
-              max="1.0"
-              step="0.05"
-              value={threshold}
-              onChange={(e) => setThreshold(parseFloat(e.target.value))}
+              min="1"
+              max="5"
+              step="1"
+              value={matchingFields}
+              onChange={(e) => setMatchingFields(parseInt(e.target.value))}
               style={{ width: '100%' }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              <span>50%</span>
-              <span>100%</span>
+              <span>{lang === 'ru' ? '1 поле' : '1 field'}</span>
+              <span>{lang === 'ru' ? '5 полей' : '5 fields'}</span>
             </div>
           </div>
           
@@ -467,7 +463,7 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                     Группа #{groupIndex + 1}
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#666' }}>
-                    {group.contacts.length} {t.contacts} • {t.similarity}: {Math.round(group.avgSimilarity * 100)}%
+                    {group.contacts.length} {t.contacts} • {lang === 'ru' ? 'Совпадает' : 'Matches'}: ~{group.avgMatchCount} {lang === 'ru' ? 'полей' : 'fields'}
                   </p>
                 </div>
                 <button
