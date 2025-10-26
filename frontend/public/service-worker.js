@@ -1,8 +1,8 @@
 // ibbase Service Worker  
-// Version 5.2.2 - Critical fixes + Field-based duplicate detection
+// Version 5.3.0 - Global Optimization Complete
 
-const CACHE_NAME = 'ibbase-v5.2.2';
-const RUNTIME_CACHE = 'ibbase-runtime-v5.2.2';
+const CACHE_NAME = 'ibbase-v5.3.0';
+const RUNTIME_CACHE = 'ibbase-runtime-v5.3.0';
 
 // Listen for SKIP_WAITING message from force-update page
 self.addEventListener('message', (event) => {
