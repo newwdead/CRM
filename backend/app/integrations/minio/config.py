@@ -42,6 +42,14 @@ class MinIOConfig:
 # Default config instance
 DEFAULT_CONFIG = MinIOConfig()
 
+# Bucket names for easy access
+BUCKET_NAMES = {
+    'images': 'business-cards',
+    'ocr_results': 'ocr-results',
+    'training_data': 'training-data',
+    'models': 'models'
+}
+
 
 # Bucket policies
 PUBLIC_READ_POLICY = {
