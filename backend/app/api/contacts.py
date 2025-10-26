@@ -624,10 +624,11 @@ def merge_contacts(
         # Log the merge
         create_audit_log(
             db,
-            user_id=current_user.id,
+            contact_id=master_id,
+            user=current_user,
             action='merge_contacts',
-            details=f'Merged {len(slave_ids)} contacts into contact {master_id}',
-            ip_address=None
+            entity_type='contact',
+            changes={'merged_contacts': slave_ids, 'master_id': master_id}
         )
         
         logger.info(f"Merged contacts {slave_ids} into {master_id}")
