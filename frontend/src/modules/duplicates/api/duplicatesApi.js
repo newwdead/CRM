@@ -59,11 +59,11 @@ export const mergeDuplicates = async (masterId, slaveIds) => {
   }
   
   // CRITICAL: Add cache-busting params
-  // CRITICAL: Trailing slash required by FastAPI to avoid 307 redirect
+  // IMPORTANT: NO trailing slash for this endpoint (backend defined without slash)
   const timestamp = Date.now();
   const version = '5.2.1';
   
-  const response = await fetch(`/api/contacts/merge/?v=${version}&_=${timestamp}`, {
+  const response = await fetch(`/api/contacts/merge?v=${version}&_=${timestamp}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
