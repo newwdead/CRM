@@ -157,7 +157,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("=" * 60)
     logger.info("🚀 FastAPI Business Card CRM starting...")
-    logger.info(f"📦 Version: 5.2.0")
+    logger.info(f"📦 Version: 5.2.1")
     logger.info(f"🔧 Environment: {os.getenv('ENV', 'development')}")
     logger.info(f"🗄️  Database: {os.getenv('DATABASE_URL', 'sqlite')[:30]}...")
     logger.info("=" * 60)
@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BizCard CRM API",
     description="Business Card Management with OCR and CRM features",
-    version="5.2.0",  # Microarchitecture + Nginx cache fix + Isolated duplicates API
+    version="5.2.1",  # Cleanup + Structure optimization + Best practices
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan  # Use lifespan context manager instead of on_event
@@ -250,7 +250,7 @@ async def root():
     """API root endpoint"""
     return {
         "name": "BizCard CRM API",
-        "version": "5.2.0",
+        "version": "5.2.1",
         "python": "3.11",
         "fastapi": "0.115.0",
         "status": "running",
