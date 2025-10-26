@@ -173,7 +173,7 @@
 <body>
     <div class="container">
         <h1>🔄 Принудительное обновление</h1>
-        <p class="subtitle">Очистка кеша и обновление приложения до версии 5.3.0</p>
+        <p class="subtitle">Очистка кеша и обновление приложения до версии 6.0.0</p>
         
         <div class="status">
             <div class="status-item">
@@ -264,8 +264,8 @@
                 const response = await fetch('/api/version?_=' + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
                 const version = data.version || 'Unknown';
-                updateStatus('version-status', version, version === '5.3.0' ? 'success' : 'error');
-                log(`📦 Версия API: ${version}`, version === '5.3.0' ? 'success' : 'warning');
+                updateStatus('version-status', version, version === '6.0.0' ? 'success' : 'error');
+                log(`📦 Версия API: ${version}`, version === '6.0.0' ? 'success' : 'warning');
             } catch (error) {
                 updateStatus('version-status', 'Ошибка', 'error');
                 log(`❌ Ошибка проверки версии: ${error.message}`, 'error');

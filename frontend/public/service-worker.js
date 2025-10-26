@@ -1,8 +1,8 @@
 // ibbase Service Worker  
-// Version 5.3.0 - Global Optimization Complete
+// Version 6.0.0 - OCR v2.0 (PaddleOCR + LayoutLMv3 + MinIO)
 
-const CACHE_NAME = 'ibbase-v5.3.0';
-const RUNTIME_CACHE = 'ibbase-runtime-v5.3.0';
+const CACHE_NAME = 'ibbase-v6.0.0';
+const RUNTIME_CACHE = 'ibbase-runtime-v6.0.0';
 
 // Listen for SKIP_WAITING message from force-update page
 self.addEventListener('message', (event) => {
