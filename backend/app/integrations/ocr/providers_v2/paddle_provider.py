@@ -147,6 +147,7 @@ class PaddleOCRProvider(OCRProviderV2):
                 "confidence": avg_confidence,
                 "image_size": image_size,
                 "block_count": block_count,
+                "image_data": image_data,  # For LayoutLMv3 (Phase 2)
             }
             
         except Exception as e:
