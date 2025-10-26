@@ -566,15 +566,20 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                           minWidth: '80px',
                           textAlign: 'center'
                         }}
-                        onClick={() => setMergeSelection({ 
-                          master: contact.id,
-                          slavesToDelete: mergeSelection.slavesToDelete || []
-                        })}
+                        onClick={() => {
+                          // CRITICAL: Remove new master from slaves list if it's there
+                          const currentSlaves = mergeSelection.slavesToDelete || [];
+                          const cleanedSlaves = currentSlaves.filter(id => id !== contact.id);
+                          setMergeSelection({ 
+                            master: contact.id,
+                            slavesToDelete: cleanedSlaves
+                          });
+                        }}
                       >
                         {isMaster ? '✅ Master' : '👆 Master'}
                       </div>
                       
-                      {/* Delete checkbox */}
+                      {/* Delete checkbox - ONLY if not master */}
                       {!isMaster && (
                         <div 
                           style={{ 
@@ -590,9 +595,10 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                           }}
                           onClick={() => {
                             const currentSlaves = mergeSelection.slavesToDelete || [];
+                            // CRITICAL: Never allow master ID in slaves list!
                             const newSlaves = isSelectedForDeletion
                               ? currentSlaves.filter(id => id !== contact.id)
-                              : [...currentSlaves, contact.id];
+                              : [...currentSlaves, contact.id].filter(id => id !== mergeSelection.master);
                             setMergeSelection({
                               ...mergeSelection,
                               slavesToDelete: newSlaves

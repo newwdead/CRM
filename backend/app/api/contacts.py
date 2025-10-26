@@ -551,6 +551,14 @@ def merge_contacts(
     if not master_id or not slave_ids:
         raise HTTPException(status_code=400, detail='master_id and slave_ids are required')
     
+    # CRITICAL VALIDATION: Master ID must NOT be in slave_ids!
+    if master_id in slave_ids:
+        logger.error(f"CRITICAL ERROR: master_id={master_id} is in slave_ids! This would delete the master contact!")
+        raise HTTPException(
+            status_code=400, 
+            detail=f'Master contact (ID: {master_id}) cannot be in the list of contacts to delete! This is a critical error.'
+        )
+    
     # Get master contact
     master = db.query(Contact).filter(Contact.id == master_id).first()
     if not master:
