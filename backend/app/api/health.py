@@ -44,8 +44,8 @@ def get_system_resources():
     
     services = {
         'backend': {
-            'name': 'Backend API',
-            'description': 'Серверная часть на FastAPI с OCR, CRM и интеграциями',
+            'name': 'Backend API v6.0',
+            'description': '🚀 FastAPI + OCR v2.0 (PaddleOCR + LayoutLMv3 + Validator)',
             'url': f'{protocol}://{domain}/api' if domain != 'localhost' else None,
             'local_url': 'http://localhost:8000',
             'status': 'running'
@@ -73,7 +73,7 @@ def get_system_resources():
         },
         'celery': {
             'name': 'Celery Workers',
-            'description': 'Асинхронная обработка задач (OCR, экспорт и т.д.)',
+            'description': '⚡ Асинхронная обработка: OCR v2.0 + Batch + Export + Validation',
             'url': None,
             'local_url': 'N/A',
             'status': 'running'
@@ -87,10 +87,24 @@ def get_system_resources():
         },
         'label_studio': {
             'name': 'Label Studio',
-            'description': 'Инструмент для аннотирования и обучения OCR моделей',
+            'description': '🏷️ Инструмент для аннотирования визиток (OCR v2.0 training)',
             'url': f'{protocol}://{domain}:8081' if domain != 'localhost' else None,
             'local_url': 'http://localhost:8081',
             'status': 'available'
+        },
+        'minio': {
+            'name': 'MinIO Storage',
+            'description': '📦 S3-совместимое хранилище для изображений и OCR результатов',
+            'url': f'{protocol}://{domain}:9000' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:9000',
+            'status': 'running'
+        },
+        'minio_console': {
+            'name': 'MinIO Console',
+            'description': '🖥️ Веб-интерфейс для управления MinIO (S3 browser)',
+            'url': f'{protocol}://{domain}:9001' if domain != 'localhost' else None,
+            'local_url': 'http://localhost:9001',
+            'status': 'running'
         },
         'prometheus': {
             'name': 'Prometheus',

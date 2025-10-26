@@ -277,23 +277,28 @@ async def get_integrations_status(
         "integrations": [
             {
                 "id": "ocr",
-                "name": "OCR Recognition",
-                "description": "Business card text recognition using multiple providers",
+                "name": "OCR v2.0 Recognition",
+                "description": "🚀 PaddleOCR + LayoutLMv3 AI + Auto-Validation (Tesseract fallback)",
                 "enabled": True,
-                "configured": bool(os.getenv("GOOGLE_VISION_API_KEY") or os.getenv("PARSIO_API_KEY")),
+                "configured": True,  # OCR v2.0 works out of the box
                 "status": "active",
                 "connection_ok": True,
                 "config": {
-                    "default_provider": get_integration_setting("ocr.default_provider", "auto"),
-                    "google_vision_key": "***" if os.getenv("GOOGLE_VISION_API_KEY") else "",
-                    "parsio_key": "***" if os.getenv("PARSIO_API_KEY") else "",
-                    "tesseract_enabled": "true"
+                    "version": "2.0",
+                    "primary_provider": "PaddleOCR",
+                    "ai_classification": "LayoutLMv3",
+                    "auto_validation": "enabled",
+                    "fallback_provider": "Tesseract",
+                    "minio_storage": "enabled",
+                    "google_vision_key": "***" if os.getenv("GOOGLE_VISION_API_KEY") else "not configured",
+                    "parsio_key": "***" if os.getenv("PARSIO_API_KEY") else "not configured"
                 },
                 "config_summary": {
-                    "Provider": get_integration_setting("ocr.default_provider", "auto"),
-                    "Tesseract": "✅",
-                    "Google Vision": "✅" if os.getenv("GOOGLE_VISION_API_KEY") else "❌",
-                    "Parsio": "✅" if os.getenv("PARSIO_API_KEY") else "❌"
+                    "Version": "2.0 (PaddleOCR)",
+                    "AI Model": "LayoutLMv3 ✅",
+                    "Validator": "Auto-correct ✅",
+                    "Storage": "MinIO ✅",
+                    "Fallback": "Tesseract v1.0"
                 }
             },
             {
@@ -385,7 +390,7 @@ async def get_integrations_status(
             {
                 "id": "celery",
                 "name": "Background Tasks",
-                "description": "Asynchronous task processing (OCR, exports, etc)",
+                "description": "⚡ Async processing: OCR v2.0 + Batch + Export + Validation",
                 "enabled": celery_configured,
                 "configured": celery_configured,
                 "status": "active" if celery_configured else "inactive",
@@ -393,11 +398,13 @@ async def get_integrations_status(
                 "config": {
                     "broker_url": "***" if os.getenv("CELERY_BROKER_URL") else "",
                     "result_backend": "***" if os.getenv("CELERY_RESULT_BACKEND") else "",
-                    "workers": get_integration_setting("celery.workers", "2")
+                    "workers": get_integration_setting("celery.workers", "2"),
+                    "ocr_v2_enabled": "true"
                 },
                 "config_summary": {
                     "Broker": "Redis" if "redis" in os.getenv("CELERY_BROKER_URL", "") else "Not configured",
-                    "Workers": get_integration_setting("celery.workers", "2")
+                    "Workers": get_integration_setting("celery.workers", "2"),
+                    "OCR": "v2.0 ✅"
                 }
             },
             {

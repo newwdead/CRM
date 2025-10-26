@@ -44,7 +44,7 @@ const SystemSettings = () => {
         redis: 'Cache & Queue'
       },
       descriptions: {
-        ocr: 'Business card text recognition using multiple providers',
+        ocr: 'OCR v2.0: PaddleOCR + LayoutLMv3 AI + Auto-Validation (Tesseract fallback)',
         telegram: 'Receive business cards via Telegram bot',
         whatsapp: 'Receive business cards via WhatsApp Business',
         auth: 'User authentication and authorization settings',
@@ -86,7 +86,7 @@ const SystemSettings = () => {
         redis: 'Кеш и очередь'
       },
       descriptions: {
-        ocr: 'Распознавание текста с визиток через несколько провайдеров',
+        ocr: 'OCR v2.0: PaddleOCR + LayoutLMv3 AI + Авто-валидация (Tesseract fallback)',
         telegram: 'Получение визиток через Telegram бота',
         whatsapp: 'Получение визиток через WhatsApp Business',
         auth: 'Настройки аутентификации и авторизации пользователей',

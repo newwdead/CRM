@@ -17,18 +17,27 @@ from sqlalchemy.orm import Session
 from .celery_app import celery_app
 from .database import SessionLocal
 from .models import Contact
-from .integrations.ocr.providers import OCRManager
+from .integrations.ocr.providers import OCRManager  # Old OCR v1.0
+from .integrations.ocr.providers_v2 import OCRManagerV2  # NEW OCR v2.0
 from .integrations.ocr.utils import enhance_ocr_result
 from .core import qr as qr_utils
 from .integrations.ocr.image_utils import downscale_image_bytes, create_thumbnail
 from .services.layoutlm_service import get_layoutlm_service
+from .services.validator_service import ValidatorService
+from .services.storage_service import StorageService
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-# Initialize OCR manager and LayoutLMv3 service
-ocr_manager = OCRManager()
+# Initialize OCR managers (v1.0 fallback + v2.0 primary)
+ocr_manager_v1 = OCRManager()  # Old Tesseract-based (fallback)
+ocr_manager_v2 = OCRManagerV2(enable_layoutlm=True)  # NEW PaddleOCR + LayoutLMv3
 layoutlm_service = get_layoutlm_service()
+
+# Use v2.0 by default
+ocr_manager = ocr_manager_v2  # PRIMARY: Use OCR v2.0 for all new cards
+
+logger.info("🚀 OCR v2.0 initialized: PaddleOCR + LayoutLMv3 + Validator ready")
 
 
 def _process_card_sync(
@@ -75,27 +84,72 @@ def _process_card_sync(
             }, ensure_ascii=False)
             logger.info(f"QR code extracted from {filename}")
         else:
-            # Fallback to OCR
+            # Use OCR v2.0 (PaddleOCR + LayoutLMv3)
             ocr_input = downscale_image_bytes(image_data, max_side=2000)
             
-            preferred = None if provider == 'auto' else provider
-            ocr_result = ocr_manager.recognize(
-                ocr_input,
-                filename=filename,
-                preferred_provider=preferred
-            )
+            # Determine provider
+            provider_name = None if provider == 'auto' else provider
             
-            data = ocr_result['data']
-            recognition_method = ocr_result['provider']
-            raw_json = json.dumps({
-                'method': 'ocr',
-                'provider': ocr_result['provider'],
-                'confidence': ocr_result.get('confidence', 0),
-                'raw_data': ocr_result.get('raw_data'),
-                'raw_text': ocr_result.get('raw_text'),
-            }, ensure_ascii=False)
-            
-            logger.info(f"OCR completed for {filename} with {recognition_method}")
+            # Run OCR v2.0 with LayoutLMv3 classification
+            try:
+                ocr_result = ocr_manager.recognize(
+                    image_data=ocr_input,
+                    provider_name=provider_name,
+                    use_layout=True,  # Enable LayoutLMv3 AI classification
+                    filename=filename
+                )
+                
+                # Validate and auto-correct with ValidatorService
+                validator = ValidatorService(_db)
+                ocr_result = validator.validate_ocr_result(
+                    ocr_result, 
+                    auto_correct=True
+                )
+                
+                data = ocr_result['data']
+                recognition_method = f"{ocr_result['provider']} v2.0"
+                
+                # Check if LayoutLMv3 was used
+                if ocr_result.get('layoutlm_used'):
+                    recognition_method += " + LayoutLMv3"
+                
+                raw_json = json.dumps({
+                    'method': 'ocr_v2',
+                    'provider': ocr_result['provider'],
+                    'confidence': ocr_result.get('confidence', 0),
+                    'raw_text': ocr_result.get('text', ''),
+                    'block_count': ocr_result.get('block_count', 0),
+                    'layoutlm_used': ocr_result.get('layoutlm_used', False),
+                    'layoutlm_confidence': ocr_result.get('layoutlm_confidence'),
+                    'validation': ocr_result.get('validation', {}),
+                }, ensure_ascii=False)
+                
+                logger.info(
+                    f"✅ OCR v2.0 completed for {filename}: "
+                    f"{recognition_method}, confidence: {ocr_result.get('confidence', 0):.2f}"
+                )
+                
+            except Exception as ocr_v2_error:
+                # Fallback to OCR v1.0 if v2.0 fails
+                logger.warning(f"⚠️ OCR v2.0 failed, falling back to v1.0: {ocr_v2_error}")
+                
+                preferred = None if provider == 'auto' else provider
+                ocr_result = ocr_manager_v1.recognize(
+                    ocr_input,
+                    filename=filename,
+                    preferred_provider=preferred
+                )
+                
+                data = ocr_result['data']
+                recognition_method = f"{ocr_result['provider']} v1.0 (fallback)"
+                raw_json = json.dumps({
+                    'method': 'ocr_v1_fallback',
+                    'provider': ocr_result['provider'],
+                    'confidence': ocr_result.get('confidence', 0),
+                    'raw_text': ocr_result.get('raw_text'),
+                }, ensure_ascii=False)
+                
+                logger.info(f"OCR v1.0 fallback completed for {filename}")
         
         # Validate results
         if not data or not any(data.values()):
