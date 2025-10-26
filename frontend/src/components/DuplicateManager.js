@@ -260,6 +260,85 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     }, 500);
   };
 
+  // Вычисление превью изменений
+  const calculateMergePreview = (masterId, slaveIds) => {
+    const master = selectedGroup.contacts.find(c => c.id === masterId);
+    const slaves = selectedGroup.contacts.filter(c => slaveIds.includes(c.id));
+    
+    if (!master) return [];
+    
+    const fields = [
+      { key: 'full_name', label: t.name },
+      { key: 'company', label: t.company },
+      { key: 'position', label: t.position },
+      { key: 'email', label: t.email },
+      { key: 'phone', label: t.phone },
+      { key: 'address', label: t.address },
+      { key: 'website', label: t.website }
+    ];
+    
+    const changes = [];
+    
+    fields.forEach(field => {
+      const masterValue = master[field.key] || '';
+      
+      // Проверяем каждый slave контакт
+      slaves.forEach(slave => {
+        const slaveValue = slave[field.key] || '';
+        
+        // Если у master пусто, а у slave есть значение (ДОБАВЛЕНИЕ - ЗЕЛЕНЫЙ)
+        if (!masterValue && slaveValue) {
+          changes.push({
+            field: field.label,
+            type: 'add',
+            from: '',
+            to: slaveValue,
+            color: '#4caf50',
+            icon: '➕',
+            description: lang === 'ru' ? 'Добавится' : 'Will add'
+          });
+        }
+        // Если у master есть, а у slave тоже есть но РАЗНОЕ (КОНФЛИКТ - СИНИЙ)
+        // Master сохранит свое значение, slave значение будет потеряно
+        else if (masterValue && slaveValue && masterValue !== slaveValue) {
+          changes.push({
+            field: field.label,
+            type: 'conflict',
+            masterValue: masterValue,
+            slaveValue: slaveValue,
+            color: '#2196f3',
+            icon: '🔄',
+            description: lang === 'ru' ? 'Конфликт (master сохранит свое)' : 'Conflict (master will keep its value)'
+          });
+        }
+        // Если у master есть, а у slave пусто (ПОТЕРЯ - КРАСНЫЙ)
+        // Slave контакт потеряет это поле
+        else if (masterValue && !slaveValue) {
+          changes.push({
+            field: field.label,
+            type: 'loss',
+            masterValue: masterValue,
+            slaveValue: '',
+            color: '#f44336',
+            icon: '⚠️',
+            description: lang === 'ru' ? 'У удаляемого контакта пусто' : 'Deleted contact has no value'
+          });
+        }
+      });
+    });
+    
+    // Убираем дубликаты
+    const uniqueChanges = changes.filter((change, index, self) =>
+      index === self.findIndex(c => 
+        c.field === change.field && 
+        c.type === change.type && 
+        (c.to === change.to || (c.masterValue === change.masterValue && c.slaveValue === change.slaveValue))
+      )
+    );
+    
+    return uniqueChanges;
+  };
+
   // Объединение контактов
   const mergeContacts = async (masterId, slaveIds) => {
     setMerging(true);
@@ -465,6 +544,174 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                 </div>
               ))}
             </div>
+            
+            {/* Merge Preview */}
+            {mergeSelection.master && (
+              <div style={{ marginTop: '24px' }}>
+                <h4 style={{ marginBottom: '16px', color: '#333' }}>
+                  📋 {lang === 'ru' ? 'Превью изменений' : 'Changes Preview'}
+                </h4>
+                
+                {(() => {
+                  const slaveIds = selectedGroup.contacts
+                    .filter(c => c.id !== mergeSelection.master)
+                    .map(c => c.id);
+                  const preview = calculateMergePreview(mergeSelection.master, slaveIds);
+                  
+                  if (preview.length === 0) {
+                    return (
+                      <div style={{ 
+                        padding: '16px', 
+                        backgroundColor: '#f5f5f5', 
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        color: '#666'
+                      }}>
+                        {lang === 'ru' ? 'Нет изменений для отображения' : 'No changes to display'}
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div style={{ 
+                      maxHeight: '300px', 
+                      overflowY: 'auto',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      backgroundColor: '#fafafa'
+                    }}>
+                      {preview.map((change, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '12px 16px',
+                            borderBottom: idx < preview.length - 1 ? '1px solid #e0e0e0' : 'none',
+                            display: 'flex',
+                            alignItems: 'start',
+                            gap: '12px',
+                            backgroundColor: change.type === 'add' ? '#f0f8f0' : 
+                                           change.type === 'conflict' ? '#e3f2fd' : 
+                                           change.type === 'loss' ? '#ffebee' : '#fff'
+                          }}
+                        >
+                          {/* Icon */}
+                          <div style={{ fontSize: '20px', marginTop: '2px' }}>
+                            {change.icon}
+                          </div>
+                          
+                          {/* Content */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ 
+                              fontWeight: '500', 
+                              marginBottom: '6px',
+                              fontSize: '14px',
+                              color: '#333'
+                            }}>
+                              {change.field}
+                            </div>
+                            
+                            {/* ДОБАВЛЕНИЕ (зеленый) */}
+                            {change.type === 'add' && (
+                              <div>
+                                <div style={{ 
+                                  color: change.color,
+                                  fontWeight: '500',
+                                  fontSize: '13px',
+                                  marginBottom: '2px'
+                                }}>
+                                  {change.description}:
+                                </div>
+                                <div style={{ 
+                                  fontSize: '13px',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#fff',
+                                  borderRadius: '4px',
+                                  border: `1px solid ${change.color}`
+                                }}>
+                                  "{change.to}"
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* КОНФЛИКТ (синий) */}
+                            {change.type === 'conflict' && (
+                              <div>
+                                <div style={{ 
+                                  color: change.color,
+                                  fontWeight: '500',
+                                  fontSize: '13px',
+                                  marginBottom: '4px'
+                                }}>
+                                  {change.description}
+                                </div>
+                                <div style={{ fontSize: '13px' }}>
+                                  <div style={{ 
+                                    padding: '4px 8px',
+                                    backgroundColor: '#fff',
+                                    borderRadius: '4px',
+                                    border: '1px solid #f44336',
+                                    marginBottom: '4px',
+                                    textDecoration: 'line-through',
+                                    color: '#666'
+                                  }}>
+                                    {lang === 'ru' ? 'Удалится' : 'Will be lost'}: "{change.slaveValue}"
+                                  </div>
+                                  <div style={{ 
+                                    padding: '4px 8px',
+                                    backgroundColor: '#fff',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${change.color}`,
+                                    fontWeight: '500'
+                                  }}>
+                                    {lang === 'ru' ? 'Сохранится' : 'Will keep'}: "{change.masterValue}"
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* ПОТЕРЯ (красный) */}
+                            {change.type === 'loss' && (
+                              <div>
+                                <div style={{ 
+                                  color: change.color,
+                                  fontWeight: '500',
+                                  fontSize: '13px',
+                                  marginBottom: '2px'
+                                }}>
+                                  {change.description}
+                                </div>
+                                <div style={{ 
+                                  fontSize: '13px',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#fff',
+                                  borderRadius: '4px',
+                                  border: `1px solid ${change.color}`
+                                }}>
+                                  {lang === 'ru' ? 'Сохранится master' : 'Master will keep'}: "{change.masterValue}"
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '12px', 
+                  backgroundColor: '#e3f2fd', 
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  color: '#1976d2'
+                }}>
+                  <strong>ℹ️ {lang === 'ru' ? 'Важно' : 'Important'}:</strong> {lang === 'ru' 
+                    ? 'Основной контакт сохранит все свои данные. Пустые поля будут заполнены из удаляемых контактов.' 
+                    : 'Master contact will keep all its data. Empty fields will be filled from deleted contacts.'}
+                </div>
+              </div>
+            )}
             
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
               <button
