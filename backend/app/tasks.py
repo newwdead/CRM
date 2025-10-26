@@ -21,11 +21,14 @@ from .integrations.ocr.providers import OCRManager
 from .integrations.ocr.utils import enhance_ocr_result
 from .core import qr as qr_utils
 from .integrations.ocr.image_utils import downscale_image_bytes, create_thumbnail
+from .services.layoutlm_service import get_layoutlm_service
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-# Initialize OCR manager
+# Initialize OCR manager and LayoutLMv3 service
 ocr_manager = OCRManager()
+layoutlm_service = get_layoutlm_service()
 
 
 def _process_card_sync(

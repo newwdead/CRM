@@ -73,3 +73,12 @@ pyclamd==0.4.0
 
 # Object Storage (OCR v2.0)
 minio==7.2.7
+
+# Machine Learning (OCR v2.0 - LayoutLMv3)
+transformers==4.35.2
+torch==2.1.1  # CPU version (use torch+cu118 for GPU)
+torchvision==0.16.1
+datasets==2.15.0  # For training pipeline
+accelerate==0.25.0  # For distributed training
+sentencepiece==0.1.99  # For tokenization
+protobuf==4.25.1
