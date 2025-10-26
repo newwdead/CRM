@@ -20,8 +20,10 @@ export const getDuplicatesContacts = async () => {
   const timestamp = Date.now();
   const version = '5.2.1';
   
-  // Direct relative URL with cache-busting params
-  const response = await fetch(`/api/contacts?skip=0&limit=10000&v=${version}&_=${timestamp}`, {
+  // IMPORTANT: Backend uses 'page' not 'skip'! Max limit is 100, so we need to fetch multiple pages
+  // For now, fetch a large enough page (limit=100 is max, so page=1&limit=100 gets first 100)
+  // TODO: Implement proper pagination if needed
+  const response = await fetch(`/api/contacts?page=1&limit=100&v=${version}&_=${timestamp}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
