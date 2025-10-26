@@ -267,14 +267,30 @@ const DuplicateManager = ({ lang = 'ru' }) => {
     
     if (!master) return [];
     
+    // ВСЕ поля Contact для сравнения
     const fields = [
       { key: 'full_name', label: t.name },
+      { key: 'first_name', label: lang === 'ru' ? 'Имя' : 'First Name' },
+      { key: 'last_name', label: lang === 'ru' ? 'Фамилия' : 'Last Name' },
+      { key: 'middle_name', label: lang === 'ru' ? 'Отчество' : 'Middle Name' },
       { key: 'company', label: t.company },
       { key: 'position', label: t.position },
+      { key: 'department', label: lang === 'ru' ? 'Отдел' : 'Department' },
       { key: 'email', label: t.email },
       { key: 'phone', label: t.phone },
+      { key: 'phone_mobile', label: lang === 'ru' ? 'Мобильный' : 'Mobile Phone' },
+      { key: 'phone_work', label: lang === 'ru' ? 'Рабочий тел.' : 'Work Phone' },
+      { key: 'phone_additional', label: lang === 'ru' ? 'Доп. телефон' : 'Additional Phone' },
+      { key: 'fax', label: lang === 'ru' ? 'Факс' : 'Fax' },
       { key: 'address', label: t.address },
-      { key: 'website', label: t.website }
+      { key: 'address_additional', label: lang === 'ru' ? 'Доп. адрес' : 'Additional Address' },
+      { key: 'website', label: t.website },
+      { key: 'birthday', label: lang === 'ru' ? 'День рождения' : 'Birthday' },
+      { key: 'source', label: lang === 'ru' ? 'Источник' : 'Source' },
+      { key: 'status', label: lang === 'ru' ? 'Статус' : 'Status' },
+      { key: 'priority', label: lang === 'ru' ? 'Приоритет' : 'Priority' },
+      { key: 'comment', label: lang === 'ru' ? 'Комментарий' : 'Comment' },
+      { key: 'qr_data', label: lang === 'ru' ? 'QR данные' : 'QR Data' }
     ];
     
     const changes = [];
@@ -507,55 +523,115 @@ const DuplicateManager = ({ lang = 'ru' }) => {
       {/* Merge Modal */}
       {selectedGroup && (
         <div className="modal-overlay" onClick={() => setSelectedGroup(null)}>
-          <div className="modal modern-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+          <div className="modal modern-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '90%' }}>
             <h3>🔗 {t.merge}</h3>
-            <p style={{ marginBottom: '20px', color: '#666' }}>{t.selectMaster}</p>
+            <p style={{ marginBottom: '20px', color: '#666' }}>
+              {lang === 'ru' 
+                ? '1️⃣ Выберите основной контакт (зеленым), 2️⃣ Отметьте какие контакты удалить (красным)' 
+                : '1️⃣ Select master contact (green), 2️⃣ Check which contacts to delete (red)'}
+            </p>
             
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {selectedGroup.contacts.map((contact) => (
-                <div
-                  key={contact.id}
-                  onClick={() => setMergeSelection({ master: contact.id })}
-                  style={{
-                    padding: '16px',
-                    border: `2px solid ${mergeSelection.master === contact.id ? '#4caf50' : '#ddd'}`,
-                    borderRadius: '8px',
-                    marginBottom: '12px',
-                    cursor: 'pointer',
-                    backgroundColor: mergeSelection.master === contact.id ? '#f0f8f0' : '#fff',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', marginBottom: '8px', fontSize: '16px' }}>
-                        {mergeSelection.master === contact.id && '✅ '} {contact.full_name || '—'}
+              {selectedGroup.contacts.map((contact) => {
+                const isMaster = mergeSelection.master === contact.id;
+                const isSelectedForDeletion = mergeSelection.slavesToDelete?.includes(contact.id);
+                
+                return (
+                  <div
+                    key={contact.id}
+                    style={{
+                      padding: '16px',
+                      border: `2px solid ${
+                        isMaster ? '#4caf50' : 
+                        isSelectedForDeletion ? '#f44336' : 
+                        '#ddd'
+                      }`,
+                      borderRadius: '8px',
+                      marginBottom: '12px',
+                      backgroundColor: isMaster ? '#f0f8f0' : isSelectedForDeletion ? '#ffebee' : '#fff',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                      {/* Master selection */}
+                      <div 
+                        style={{ 
+                          cursor: 'pointer',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          backgroundColor: isMaster ? '#4caf50' : '#e0e0e0',
+                          color: isMaster ? '#fff' : '#666',
+                          fontWeight: '500',
+                          fontSize: '14px',
+                          minWidth: '80px',
+                          textAlign: 'center'
+                        }}
+                        onClick={() => setMergeSelection({ 
+                          master: contact.id,
+                          slavesToDelete: mergeSelection.slavesToDelete || []
+                        })}
+                      >
+                        {isMaster ? '✅ Master' : '👆 Master'}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '14px', color: '#666' }}>
-                        {contact.company && <div>🏢 {contact.company}</div>}
-                        {contact.position && <div>💼 {contact.position}</div>}
-                        {contact.email && <div>📧 {contact.email}</div>}
-                        {contact.phone && <div>📱 {contact.phone}</div>}
-                        {contact.address && <div>📍 {contact.address}</div>}
-                        {contact.website && <div>🔗 {contact.website}</div>}
+                      
+                      {/* Delete checkbox */}
+                      {!isMaster && (
+                        <div 
+                          style={{ 
+                            cursor: 'pointer',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            backgroundColor: isSelectedForDeletion ? '#f44336' : '#e0e0e0',
+                            color: isSelectedForDeletion ? '#fff' : '#666',
+                            fontWeight: '500',
+                            fontSize: '14px',
+                            minWidth: '80px',
+                            textAlign: 'center'
+                          }}
+                          onClick={() => {
+                            const currentSlaves = mergeSelection.slavesToDelete || [];
+                            const newSlaves = isSelectedForDeletion
+                              ? currentSlaves.filter(id => id !== contact.id)
+                              : [...currentSlaves, contact.id];
+                            setMergeSelection({
+                              ...mergeSelection,
+                              slavesToDelete: newSlaves
+                            });
+                          }}
+                        >
+                          {isSelectedForDeletion ? '🗑️ Удалить' : '☐ Удалить'}
+                        </div>
+                      )}
+                      
+                      {/* Contact info */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500', marginBottom: '8px', fontSize: '16px' }}>
+                          {contact.full_name || '—'}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '14px', color: '#666' }}>
+                          {contact.company && <div>🏢 {contact.company}</div>}
+                          {contact.position && <div>💼 {contact.position}</div>}
+                          {contact.email && <div>📧 {contact.email}</div>}
+                          {contact.phone && <div>📱 {contact.phone}</div>}
+                          {contact.address && <div>📍 {contact.address}</div>}
+                          {contact.website && <div>🔗 {contact.website}</div>}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Merge Preview */}
-            {mergeSelection.master && (
+            {mergeSelection.master && mergeSelection.slavesToDelete && mergeSelection.slavesToDelete.length > 0 && (
               <div style={{ marginTop: '24px' }}>
                 <h4 style={{ marginBottom: '16px', color: '#333' }}>
-                  📋 {lang === 'ru' ? 'Превью изменений' : 'Changes Preview'}
+                  📋 {lang === 'ru' ? `Превью изменений (удаляется: ${mergeSelection.slavesToDelete.length})` : `Changes Preview (deleting: ${mergeSelection.slavesToDelete.length})`}
                 </h4>
                 
                 {(() => {
-                  const slaveIds = selectedGroup.contacts
-                    .filter(c => c.id !== mergeSelection.master)
-                    .map(c => c.id);
+                  const slaveIds = mergeSelection.slavesToDelete || [];
                   const preview = calculateMergePreview(mergeSelection.master, slaveIds);
                   
                   if (preview.length === 0) {
@@ -707,8 +783,8 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                   color: '#1976d2'
                 }}>
                   <strong>ℹ️ {lang === 'ru' ? 'Важно' : 'Important'}:</strong> {lang === 'ru' 
-                    ? 'Основной контакт сохранит все свои данные. Пустые поля будут заполнены из удаляемых контактов.' 
-                    : 'Master contact will keep all its data. Empty fields will be filled from deleted contacts.'}
+                    ? `Основной контакт сохранит все свои данные. Пустые поля будут заполнены из ${mergeSelection.slavesToDelete.length} удаляемых контактов. Не выбранные контакты (${selectedGroup.contacts.length - 1 - mergeSelection.slavesToDelete.length}) ОСТАНУТСЯ без изменений.` 
+                    : `Master contact will keep all its data. Empty fields will be filled from ${mergeSelection.slavesToDelete.length} deleted contacts. Unselected contacts (${selectedGroup.contacts.length - 1 - mergeSelection.slavesToDelete.length}) will REMAIN unchanged.`}
                 </div>
               </div>
             )}
@@ -728,17 +804,20 @@ const DuplicateManager = ({ lang = 'ru' }) => {
                     return;
                   }
                   
-                  const slaveIds = selectedGroup.contacts
-                    .filter(c => c.id !== mergeSelection.master)
-                    .map(c => c.id);
+                  if (!mergeSelection.slavesToDelete || mergeSelection.slavesToDelete.length === 0) {
+                    toast.error(lang === 'ru' ? 'Выберите контакты для удаления' : 'Select contacts to delete');
+                    return;
+                  }
+                  
+                  const slaveIds = mergeSelection.slavesToDelete;
                   
                   mergeContacts(mergeSelection.master, slaveIds);
                 }}
-                disabled={!mergeSelection.master || merging}
+                disabled={!mergeSelection.master || !mergeSelection.slavesToDelete || mergeSelection.slavesToDelete.length === 0 || merging}
                 className="modern-btn modern-btn-success"
                 style={{ flex: 1 }}
               >
-                {merging ? '⏳ ' + t.analyzing : '🔗 ' + t.mergeSelected}
+                {merging ? '⏳ ' + t.analyzing : `🔗 ${lang === 'ru' ? 'Объединить' : 'Merge'} (${mergeSelection.slavesToDelete?.length || 0})`}
               </button>
             </div>
           </div>
