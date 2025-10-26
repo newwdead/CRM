@@ -545,6 +545,9 @@ def merge_contacts(
     master_id = payload.get('master_id')
     slave_ids = payload.get('slave_ids', [])
     
+    # Log merge request for debugging
+    logger.info(f"Merge request: master_id={master_id}, slave_ids={slave_ids} (count: {len(slave_ids)})")
+    
     if not master_id or not slave_ids:
         raise HTTPException(status_code=400, detail='master_id and slave_ids are required')
     
@@ -559,9 +562,10 @@ def merge_contacts(
         raise HTTPException(status_code=404, detail='Some slave contacts not found')
     
     try:
-        # Merge data from slaves to master
+        # Merge data from slaves to master - ALL fields
         for slave in slaves:
             # Merge fields if master field is empty
+            # Name fields
             if not master.full_name and slave.full_name:
                 master.full_name = slave.full_name
             if not master.first_name and slave.first_name:
@@ -570,10 +574,16 @@ def merge_contacts(
                 master.last_name = slave.last_name
             if not master.middle_name and slave.middle_name:
                 master.middle_name = slave.middle_name
+            
+            # Company fields
             if not master.company and slave.company:
                 master.company = slave.company
             if not master.position and slave.position:
                 master.position = slave.position
+            if not master.department and slave.department:
+                master.department = slave.department
+            
+            # Contact fields
             if not master.email and slave.email:
                 master.email = slave.email
             if not master.phone and slave.phone:
@@ -582,14 +592,33 @@ def merge_contacts(
                 master.phone_mobile = slave.phone_mobile
             if not master.phone_work and slave.phone_work:
                 master.phone_work = slave.phone_work
+            if not master.phone_additional and slave.phone_additional:
+                master.phone_additional = slave.phone_additional
+            if not master.fax and slave.fax:
+                master.fax = slave.fax
+            
+            # Address fields
             if not master.address and slave.address:
                 master.address = slave.address
             if not master.address_additional and slave.address_additional:
                 master.address_additional = slave.address_additional
+            
+            # Other fields
             if not master.website and slave.website:
                 master.website = slave.website
+            if not master.birthday and slave.birthday:
+                master.birthday = slave.birthday
+            if not master.source and slave.source:
+                master.source = slave.source
+            if not master.status and slave.status:
+                master.status = slave.status
+            if not master.priority and slave.priority:
+                master.priority = slave.priority
             if not master.comment and slave.comment:
                 master.comment = slave.comment
+            if not master.qr_data and slave.qr_data:
+                master.qr_data = slave.qr_data
+                master.has_qr_code = slave.has_qr_code
             
             # Merge tags (add unique tags from slaves)
             if slave.tags:
