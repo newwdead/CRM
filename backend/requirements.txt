@@ -22,6 +22,11 @@ Pillow==11.0.0
 opencv-python-headless==4.10.0.84
 pyzbar==0.1.9
 
+# PaddleOCR (OCR v2.0)
+paddlepaddle==2.6.1  # CPU version (use paddlepaddle-gpu for GPU)
+paddleocr==2.7.3
+shapely==2.0.6  # Required by PaddleOCR
+
 # File Handling
 python-multipart==0.0.12
 email-validator==2.2.0
