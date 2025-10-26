@@ -1,0 +1,52 @@
+<!--
+Label Studio Configuration for Business Card Annotation
+Used for creating training data for LayoutLMv3 fine-tuning
+-->
+<View>
+  <Header value="Business Card Annotation"/>
+  <Text name="card_info" value="Annotate text blocks on the business card image. Select the field type for each text block."/>
+  
+  <!-- Image display -->
+  <Image name="image" value="$image" zoom="true" zoomControl="true" rotateControl="true"/>
+  
+  <!-- Rectangle tool for bounding boxes -->
+  <RectangleLabels name="bbox" toName="image">
+    <!-- Business card fields -->
+    <Label value="NAME" background="#FF6B6B"/>
+    <Label value="COMPANY" background="#4ECDC4"/>
+    <Label value="POSITION" background="#45B7D1"/>
+    <Label value="EMAIL" background="#FFA07A"/>
+    <Label value="PHONE" background="#98D8C8"/>
+    <Label value="PHONE_MOBILE" background="#87CEEB"/>
+    <Label value="PHONE_WORK" background="#7EC0EE"/>
+    <Label value="ADDRESS" background="#F7B801"/>
+    <Label value="WEBSITE" background="#6A4C93"/>
+    <Label value="FAX" background="#B0B0B0"/>
+    <Label value="OTHER" background="#E0E0E0"/>
+  </RectangleLabels>
+  
+  <!-- Text input for manual text correction -->
+  <TextArea name="transcription" toName="image" 
+            editable="true"
+            perRegion="true"
+            required="false"
+            maxSubmissions="1"
+            rows="2"
+            placeholder="Correct OCR text if needed"/>
+  
+  <!-- Additional metadata -->
+  <Choices name="quality" toName="image" choice="single">
+    <Choice value="high_quality"/>
+    <Choice value="medium_quality"/>
+    <Choice value="low_quality"/>
+  </Choices>
+  
+  <Choices name="issues" toName="image" choice="multiple" showInline="true">
+    <Choice value="blurry"/>
+    <Choice value="rotated"/>
+    <Choice value="poor_lighting"/>
+    <Choice value="ocr_errors"/>
+    <Choice value="multiple_cards"/>
+  </Choices>
+</View>
+
