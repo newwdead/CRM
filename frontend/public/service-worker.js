@@ -1,8 +1,16 @@
 // ibbase Service Worker  
-// Version 5.2.1 - Cleanup + Structure optimization + Best practices
+// Version 5.2.1 - Cleanup + Cache busting for duplicates
 
 const CACHE_NAME = 'ibbase-v5.2.1';
 const RUNTIME_CACHE = 'ibbase-runtime-v5.2.1';
+
+// Listen for SKIP_WAITING message from force-update page
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Received SKIP_WAITING message');
+    self.skipWaiting();
+  }
+});
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
@@ -68,13 +76,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // CRITICAL: Skip caching for requests with cache-busting parameters (v= or _=)
+  // This allows duplicates page to always get fresh data
+  const hasCacheBusting = url.searchParams.has('v') || url.searchParams.has('_');
+  
   // Skip API calls (except for offline fallback)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone and cache successful API responses for offline access
-          if (response && response.status === 200) {
+          // Clone and cache successful API responses ONLY if no cache-busting params
+          if (response && response.status === 200 && !hasCacheBusting) {
             const responseClone = response.clone();
             caches.open(RUNTIME_CACHE).then((cache) => {
               cache.put(request, responseClone);
@@ -83,7 +95,22 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Return cached API response if offline
+          // Return cached API response if offline (only for non-cache-busting requests)
+          if (hasCacheBusting) {
+            // Don't use cache for cache-busting requests
+            return new Response(
+              JSON.stringify({ 
+                error: 'Offline', 
+                message: 'You are offline and this request requires a live connection.' 
+              }),
+              {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'application/json' }
+              }
+            );
+          }
+          
           return caches.match(request)
             .then((cachedResponse) => {
               if (cachedResponse) {

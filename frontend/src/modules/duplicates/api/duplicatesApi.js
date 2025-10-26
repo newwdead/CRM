@@ -16,15 +16,22 @@ export const getDuplicatesContacts = async () => {
     throw new Error('No authentication token');
   }
   
-  // Direct relative URL - no absolute paths, no protocol
-  const response = await fetch('/api/contacts?skip=0&limit=10000', {
+  // CRITICAL: Add cache-busting version parameter to bypass Service Worker cache
+  const timestamp = Date.now();
+  const version = '5.2.1';
+  
+  // Direct relative URL with cache-busting params
+  const response = await fetch(`/api/contacts?skip=0&limit=10000&v=${version}&_=${timestamp}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     },
-    credentials: 'same-origin'
+    credentials: 'same-origin',
+    cache: 'no-store'  // Force no caching at fetch level
   });
   
   if (!response.ok) {
@@ -48,14 +55,21 @@ export const mergeDuplicates = async (masterId, slaveIds) => {
     throw new Error('No authentication token');
   }
   
-  const response = await fetch('/api/contacts/merge', {
+  // CRITICAL: Add cache-busting params
+  const timestamp = Date.now();
+  const version = '5.2.1';
+  
+  const response = await fetch(`/api/contacts/merge?v=${version}&_=${timestamp}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     },
     credentials: 'same-origin',
+    cache: 'no-store',
     body: JSON.stringify({
       master_id: masterId,
       slave_ids: slaveIds
