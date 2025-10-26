@@ -1,168 +1,175 @@
-/**
- * Hook для управления OCR блоками
- * Изолированная логика работы с блоками распознавания
- */
-
-import { useState, useEffect, useCallback } from 'react';
-import { getOCRBlocks, reprocessOCR, updateContactFromOCR } from '../api/ocrApi';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
-export const useOCRBlocks = (contact, language = 'ru') => {
-  const [blocks, setBlocks] = useState(null);
+/**
+ * Custom hook for managing OCR blocks state and operations
+ * 
+ * Handles:
+ * - Loading OCR blocks from API
+ * - Reprocessing OCR with updated blocks
+ * - Loading state management
+ * 
+ * @param {number} contactId - Contact ID
+ * @param {function} calculateImageScale - Callback to calculate image scale after load
+ * @param {array} editableFields - List of editable field names
+ * @param {function} setEditedData - Setter for edited data
+ * @param {object} translations - Translation object
+ * @returns {object} OCR blocks state and operations
+ */
+export const useOCRBlocks = (contactId, calculateImageScale, editableFields, setEditedData, translations) => {
+  const [ocrBlocks, setOcrBlocks] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
-  const [imageScale, setImageScale] = useState(1);
-  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
 
-  const translations = {
-    en: {
-      loadError: 'Failed to load OCR blocks',
-      reprocessSuccess: 'OCR re-processed successfully',
-      reprocessError: 'Failed to re-process OCR',
-      blockAdded: 'Block added',
-      blockDeleted: 'Block deleted',
-      textSaved: 'Text saved',
-      blockSplit: 'Block split into two'
-    },
-    ru: {
-      loadError: 'Ошибка загрузки блоков OCR',
-      reprocessSuccess: 'OCR успешно перезапущен',
-      reprocessError: 'Ошибка при повторной обработке',
-      blockAdded: 'Блок добавлен',
-      blockDeleted: 'Блок удален',
-      textSaved: 'Текст сохранен',
-      blockSplit: 'Блок разбит на два'
-    }
-  };
-
-  const t = translations[language];
-
-  // Загрузка блоков
-  const loadBlocks = useCallback(async () => {
-    if (!contact?.id) return;
-    
+  /**
+   * Load OCR blocks from API
+   */
+  const loadOCRBlocks = async () => {
     try {
       setLoading(true);
-      const data = await getOCRBlocks(contact.id);
-      setBlocks(data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/contacts/${contactId}/ocr-blocks`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to load OCR blocks');
+
+      const data = await response.json();
+      setOcrBlocks(data);
+      
+      // Calculate image scale to fit container
+      if (calculateImageScale && data.image_width && data.image_height) {
+        calculateImageScale(data.image_width, data.image_height);
+      }
+      
     } catch (error) {
       console.error('Error loading OCR blocks:', error);
-      toast.error(t.loadError);
-      setBlocks({ lines: [], image_width: 800, image_height: 600 });
+      if (translations && translations.messages) {
+        toast.error(translations.messages.loadError || 'Failed to load OCR blocks');
+      } else {
+        toast.error('Failed to load OCR blocks');
+      }
     } finally {
       setLoading(false);
     }
-  }, [contact?.id, t.loadError]);
+  };
 
-  useEffect(() => {
-    loadBlocks();
-  }, [loadBlocks]);
+  /**
+   * Reprocess OCR with current blocks
+   */
+  const reprocessOCR = async () => {
+    if (!ocrBlocks || !ocrBlocks.lines) {
+      toast.error('No OCR blocks to reprocess');
+      return;
+    }
 
-  // Обновить блок
-  const updateBlock = useCallback((blockIndex, updates) => {
-    setBlocks(prev => ({
-      ...prev,
-      lines: prev.lines.map((block, idx) => 
-        idx === blockIndex ? { ...block, ...updates } : block
-      )
-    }));
-  }, []);
-
-  // Удалить блок
-  const deleteBlock = useCallback((blockIndex) => {
-    setBlocks(prev => ({
-      ...prev,
-      lines: prev.lines.filter((_, idx) => idx !== blockIndex)
-    }));
-    toast.success(t.blockDeleted);
-  }, [t.blockDeleted]);
-
-  // Добавить блок
-  const addBlock = useCallback((newBlock) => {
-    setBlocks(prev => ({
-      ...prev,
-      lines: [...prev.lines, newBlock]
-    }));
-    toast.success(t.blockAdded);
-  }, [t.blockAdded]);
-
-  // Обновить текст блока
-  const updateBlockText = useCallback((blockIndex, newText) => {
-    updateBlock(blockIndex, { text: newText });
-    toast.success(t.textSaved);
-  }, [updateBlock, t.textSaved]);
-
-  // Разбить блок на два
-  const splitBlock = useCallback((blockIndex) => {
-    const block = blocks.lines[blockIndex];
-    const midY = block.box.y + block.box.height / 2;
-    const midText = Math.floor(block.text.length / 2);
-    
-    const block1 = {
-      ...block,
-      box: { ...block.box, height: block.box.height / 2 },
-      text: block.text.substring(0, midText)
-    };
-    
-    const block2 = {
-      ...block,
-      box: { ...block.box, y: midY, height: block.box.height / 2 },
-      text: block.text.substring(midText)
-    };
-    
-    setBlocks(prev => ({
-      ...prev,
-      lines: [
-        ...prev.lines.slice(0, blockIndex),
-        block1,
-        block2,
-        ...prev.lines.slice(blockIndex + 1)
-      ]
-    }));
-    
-    toast.success(t.blockSplit);
-  }, [blocks, t.blockSplit]);
-
-  // Повторная обработка OCR
-  const handleReprocess = useCallback(async (onSuccess) => {
-    if (!blocks || !contact?.id) return;
-    
+    setReprocessing(true);
     try {
-      setReprocessing(true);
-      const result = await reprocessOCR(contact.id, blocks.lines);
+      const token = localStorage.getItem('token');
       
-      toast.success(t.reprocessSuccess);
+      // Send updated blocks to backend
+      const response = await fetch(`/api/contacts/${contactId}/reprocess-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          blocks: ocrBlocks.lines.map(line => ({
+            text: line.text,
+            box: line.box,
+            confidence: line.confidence
+          }))
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to reprocess OCR');
+
+      const data = await response.json();
       
-      if (onSuccess) {
-        onSuccess(result);
+      // Update contact data with new OCR results
+      if (editableFields && setEditedData) {
+        Object.keys(data).forEach(key => {
+          if (editableFields.includes(key)) {
+            setEditedData(prev => ({
+              ...prev,
+              [key]: data[key] || prev[key]
+            }));
+          }
+        });
       }
       
-      return result;
+      if (translations && translations.reprocessSuccess) {
+        toast.success(translations.reprocessSuccess);
+      } else {
+        toast.success('OCR reprocessed successfully');
+      }
+      
+      // Reload OCR blocks
+      await loadOCRBlocks();
+      
     } catch (error) {
       console.error('Error reprocessing OCR:', error);
-      toast.error(t.reprocessError);
-      throw error;
+      if (translations && translations.reprocessError) {
+        toast.error(translations.reprocessError);
+      } else {
+        toast.error('Failed to reprocess OCR');
+      }
     } finally {
       setReprocessing(false);
     }
-  }, [blocks, contact?.id, t.reprocessSuccess, t.reprocessError]);
+  };
+
+  /**
+   * Save OCR corrections for training
+   * This is used when a user assigns a block to a field
+   */
+  const saveOCRCorrections = async (blocks, correctedText, correctedField) => {
+    if (!blocks || blocks.length === 0) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      for (const block of blocks) {
+        await fetch(`/api/contacts/${contactId}/ocr-corrections`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            original_text: block.text,
+            original_box: block.box,
+            original_confidence: Math.round(block.confidence),
+            corrected_text: correctedText,
+            corrected_field: correctedField,
+            ocr_provider: 'tesseract',
+            language: 'rus+eng'
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save correction:', error);
+      // Don't show error to user, this is background training data
+    }
+  };
+
+  // Load OCR blocks on mount
+  useEffect(() => {
+    if (contactId) {
+      loadOCRBlocks();
+    }
+  }, [contactId]);
 
   return {
-    blocks,
-    setBlocks,
+    ocrBlocks,
+    setOcrBlocks,
     loading,
     reprocessing,
-    imageScale,
-    imageOffset,
-    setImageScale,
-    setImageOffset,
-    updateBlock,
-    deleteBlock,
-    addBlock,
-    updateBlockText,
-    splitBlock,
-    handleReprocess,
-    reload: loadBlocks
+    loadOCRBlocks,
+    reprocessOCR,
+    saveOCRCorrections
   };
 };
-
