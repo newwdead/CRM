@@ -1,418 +1,400 @@
-/**
- * OCREditorContainer Component
- * Главный контейнер OCR Editor - объединяет все компоненты и хуки
- * 
- * Было: 1 файл × 1150 строк (монолит)
- * Стало: Модульная архитектура с изолированной логикой
- */
+import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
-import React, { useState, useRef } from 'react';
+// Hooks
 import { useOCRBlocks } from '../hooks/useOCRBlocks';
-import { useBlockDrag } from '../hooks/useBlockDrag';
-import { useBlockResize } from '../hooks/useBlockResize';
-import { ImageViewer } from './ImageViewer';
-import { BlockCanvas } from './BlockCanvas';
-import { BlockToolbar } from './BlockToolbar';
-import { BlocksList } from './BlocksList';
-import { FieldMapperCompact } from './FieldMapperCompact';
+import { useBlockSelection } from '../hooks/useBlockSelection';
+import { useImageControls } from '../hooks/useImageControls';
+import { useFieldAssignment } from '../hooks/useFieldAssignment';
+import { useBlockManipulation } from '../hooks/useBlockManipulation';
 
-export const OCREditorContainer = ({ contact, onSave, onClose }) => {
+// Components
+import OCRToolbar from './OCRToolbar';
+import ImageCanvas from './ImageCanvas';
+import FieldsSidebar from './FieldsSidebar';
+import BlockTextEditor from './BlockTextEditor';
+import AssignmentPanel from './AssignmentPanel';
+
+// Constants & Utils
+import { getOCRTranslations } from '../constants/translations';
+import { editableFields } from '../constants/fieldConfig';
+
+/**
+ * OCR Editor Container (Refactored)
+ * 
+ * Main container component that composes all OCR editing functionality
+ * Replaces the monolithic OCREditorWithBlocks component
+ * 
+ * @param {object} props - Component props
+ * @param {object} props.contact - Contact object with photo_path and fields
+ * @param {function} props.onSave - Save handler (editedData) => Promise
+ * @param {function} props.onClose - Close handler () => void
+ */
+const OCREditorContainer = ({ contact, onSave, onClose }) => {
+  // Language and translations
+  const [language, setLanguage] = useState(localStorage.getItem('language') || 'ru');
+  const translations = getOCRTranslations(language);
+
+  // Local state for edited data
   const [editedData, setEditedData] = useState({});
-  const [selectedBlocks, setSelectedBlocks] = useState([]);
-  const [assigningToField, setAssigningToField] = useState(null);
-  const [editBlockMode, setEditBlockMode] = useState(false);
-  const [editingBlockText, setEditingBlockText] = useState(null);
-  const [isAddingBlock, setIsAddingBlock] = useState(false);
-  const [newBlockStart, setNewBlockStart] = useState(null);
-  
-  const imageRef = useRef(null);
-  const language = localStorage.getItem('language') || 'ru';
+  const [saving, setSaving] = useState(false);
 
-  // Используем хуки
+  // Image controls hook
+  const { imageRef, imageScale, calculateImageScale } = useImageControls();
+
+  // OCR blocks hook
   const {
-    blocks,
-    setBlocks,
+    ocrBlocks,
+    setOcrBlocks,
     loading,
     reprocessing,
-    imageScale,
-    setImageScale,
-    updateBlock,
-    deleteBlock,
-    addBlock,
-    updateBlockText,
-    splitBlock,
-    handleReprocess
-  } = useOCRBlocks(contact, language);
+    reprocessOCR,
+    saveOCRCorrections
+  } = useOCRBlocks(
+    contact.id,
+    calculateImageScale,
+    editableFields,
+    setEditedData,
+    translations
+  );
 
+  // Block selection hook
   const {
+    selectedBlocks,
+    handleBlockClick,
+    clearSelection
+  } = useBlockSelection();
+
+  // Field assignment hook
+  const {
+    assigningToField,
+    setAssigningToField,
+    assignToField
+  } = useFieldAssignment(
+    selectedBlocks,
+    clearSelection,
+    setEditedData,
+    saveOCRCorrections,
+    translations
+  );
+
+  // Block manipulation hook
+  const {
+    editBlockMode,
+    setEditBlockMode,
     draggingBlock,
-    handleDragStart,
-    handleDrag,
-    handleDragEnd
-  } = useBlockDrag(blocks, updateBlock, imageScale);
+    isAddingBlock,
+    editingBlockText,
+    startBlockDrag,
+    handleBlockDrag,
+    endBlockDrag,
+    deleteBlock,
+    startAddingBlock,
+    handleNewBlockMouseDown,
+    handleNewBlockMouseUp,
+    startEditBlockText,
+    saveBlockText,
+    cancelEditBlockText,
+    splitBlock
+  } = useBlockManipulation(
+    ocrBlocks,
+    setOcrBlocks,
+    imageRef,
+    imageScale,
+    language
+  );
 
-  const {
-    resizingBlock,
-    handleResizeStart,
-    handleResize,
-    handleResizeEnd
-  } = useBlockResize(blocks, updateBlock, imageScale);
-
-  // Обработчики событий мыши для canvas
-  React.useEffect(() => {
-    if (editBlockMode) {
-      const handleMouseMove = (e) => {
-        handleDrag(e);
-        handleResize(e);
-      };
-
-      const handleMouseUp = () => {
-        handleDragEnd();
-        handleResizeEnd();
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [editBlockMode, handleDrag, handleResize, handleDragEnd, handleResizeEnd]);
-
-  // Обработчики для toolbar
-  const handleToggleEditMode = () => {
-    setEditBlockMode(!editBlockMode);
-    setSelectedBlocks([]);
-  };
-
-  const handleAddBlockClick = () => {
-    setIsAddingBlock(true);
-  };
-
-  const handleDeleteBlock = () => {
-    if (selectedBlocks.length > 0) {
-      selectedBlocks.sort((a, b) => b - a).forEach(index => {
-        deleteBlock(index);
-      });
-      setSelectedBlocks([]);
-    }
-  };
-
-  const handleEditText = () => {
-    if (selectedBlocks.length > 0) {
-      setEditingBlockText(selectedBlocks[0]);
-    }
-  };
-
-  const handleSplitBlock = () => {
-    if (selectedBlocks.length > 0) {
-      splitBlock(selectedBlocks[0]);
-      setSelectedBlocks([]);
-    }
-  };
-
-  const handleReprocessClick = async () => {
-    await handleReprocess((result) => {
-      // Обновляем данные контакта после reprocess
-      setEditedData(prev => ({
-        ...prev,
-        ...result
-      }));
+  // Initialize edited data from contact
+  useEffect(() => {
+    const initial = {};
+    editableFields.forEach(field => {
+      initial[field] = contact[field] || '';
     });
-  };
+    setEditedData(initial);
+  }, [contact]);
 
-  // Обработчики для image viewer (добавление блока)
-  const handleImageMouseDown = (event) => {
-    if (!isAddingBlock) return;
-    
-    // Get container element
-    const container = event.currentTarget;
-    const rect = container.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    console.log('[OCR] Add block - mouse down at:', { x, y });
-    setNewBlockStart({ x, y });
-  };
+  // Handle dragging
+  useEffect(() => {
+    if (!draggingBlock || !editBlockMode) return;
 
-  const handleImageMouseUp = (event) => {
-    if (!isAddingBlock || !newBlockStart) return;
-    
-    // Get container element
-    const container = event.currentTarget;
-    const rect = container.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    const width = Math.abs(x - newBlockStart.x);
-    const height = Math.abs(y - newBlockStart.y);
-    
-    console.log('[OCR] Add block - mouse up at:', { x, y, width, height });
-    
-    if (width < 20 || height < 10) {
-      toast.info(language === 'ru' ? 'Блок слишком маленький' : 'Block too small');
-      setIsAddingBlock(false);
-      setNewBlockStart(null);
+    const handleMouseMove = (e) => handleBlockDrag(e);
+    const handleMouseUp = () => endBlockDrag();
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingBlock, editBlockMode, handleBlockDrag, endBlockDrag]);
+
+  // Handle save
+  const handleSave = async () => {
+    // Check for changes
+    const hasChanges = editableFields.some(
+      field => editedData[field] !== (contact[field] || '')
+    );
+
+    if (!hasChanges) {
+      toast.info(translations.messages?.noChanges || 'No changes to save');
       return;
     }
-    
-    const newBlock = {
-      text: language === 'ru' ? 'Новый блок (кликните для редактирования)' : 'New block (click to edit)',
-      box: {
-        x: Math.min(newBlockStart.x, x),
-        y: Math.min(newBlockStart.y, y),
-        width: width,
-        height: height
-      },
-      confidence: 100
-    };
-    
-    console.log('[OCR] Creating new block:', newBlock);
-    addBlock(newBlock);
-    toast.success(language === 'ru' ? 'Блок добавлен!' : 'Block added!');
-    setIsAddingBlock(false);
-    setNewBlockStart(null);
-  };
 
-  // Обработчики для блоков
-  const handleBlockClick = (index) => {
-    if (editBlockMode) {
-      setSelectedBlocks([index]);
-    } else {
-      // Toggle selection
-      setSelectedBlocks(prev =>
-        prev.includes(index)
-          ? prev.filter(i => i !== index)
-          : [...prev, index]
-      );
+    setSaving(true);
+    try {
+      await onSave(editedData);
+      // Success handled by parent
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error(translations.messages?.error || 'Failed to save');
+      setSaving(false);
     }
   };
 
-  const handleBlockSelect = (index) => {
-    handleBlockClick(index);
+  // Handle field change
+  const handleFieldChange = (field, value) => {
+    setEditedData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const handleAssignToField = (field, text) => {
-    if (field && text) {
-      setEditedData(prev => ({
-        ...prev,
-        [field]: text
-      }));
-      setAssigningToField(null);
-    } else {
-      setAssigningToField(field);
-    }
-  };
+  // Image URL
+  const imageUrl = contact.photo_path 
+    ? `/api/files/${contact.photo_path}`
+    : null;
 
-  // Сохранение изменений
-  const handleSave = () => {
-    if (onSave) {
-      onSave(editedData);
-    }
-  };
-
-  // Translations
-  const translations = {
-    en: {
-      title: 'OCR Editor with Blocks',
-      loading: 'Loading OCR data...',
-      save: 'Save',
-      cancel: 'Cancel'
-    },
-    ru: {
-      title: 'Редактор OCR с блоками',
-      loading: 'Загрузка данных OCR...',
-      save: 'Сохранить',
-      cancel: 'Отмена'
-    }
-  };
-
-  const t = translations[language];
-
+  // Loading state
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>{t.loading}</p>
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000
+      }}>
+        <div style={{
+          backgroundColor: '#fff',
+          padding: '40px',
+          borderRadius: '16px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', color: '#333', marginBottom: '15px' }}>
+            {translations.loadingBlocks || 'Loading OCR blocks...'}
+          </div>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #e2e8f0',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }} />
+        </div>
       </div>
     );
   }
 
-  // Contact model uses photo_path, not image_url or card_image
-  // photo_path is relative to uploads/ directory, backend mounts it at /files/
-  const imageUrl = contact.photo_path 
-    ? `/files/${contact.photo_path}` 
-    : contact.thumbnail_path 
-    ? `/files/${contact.thumbnail_path}` 
-    : null;
-
+  // Main UI
   return (
     <div style={{
-      padding: '20px',
-      maxWidth: '100%',
-      width: '100%',
-      margin: '0 auto'
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+      zIndex: 10000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
     }}>
-      <h2>{t.title}</h2>
-
-      {/* Toolbar */}
-      <BlockToolbar
-        editMode={editBlockMode}
-        onToggleEditMode={handleToggleEditMode}
-        onAddBlock={handleAddBlockClick}
-        onDeleteBlock={handleDeleteBlock}
-        onEditText={handleEditText}
-        onSplitBlock={handleSplitBlock}
-        onReprocess={handleReprocessClick}
-        selectedBlocks={selectedBlocks}
-        reprocessing={reprocessing}
-        language={language}
-      />
-
-      {/* Image with blocks */}
-      <ImageViewer
-        imageUrl={imageUrl}
-        imageScale={imageScale}
-        onScaleChange={setImageScale}
-        onMouseDown={handleImageMouseDown}
-        onMouseUp={handleImageMouseUp}
-      >
-        <BlockCanvas
-          blocks={blocks}
-          imageScale={imageScale}
-          selectedBlocks={selectedBlocks}
-          editMode={editBlockMode}
-          draggingBlock={draggingBlock}
-          resizingBlock={resizingBlock}
-          onBlockClick={handleBlockClick}
-          onBlockDragStart={handleDragStart}
-          onBlockResizeStart={handleResizeStart}
-        />
-      </ImageViewer>
-
-      {/* Field Mapper - Compact Version */}
-      <FieldMapperCompact
-        blocks={blocks}
-        onBlocksUpdate={(updatedBlocks) => {
-          setBlocks(updatedBlocks);
-        }}
-        contactId={contact.id}
-        language={language}
-      />
-
-      {/* Edit block text modal */}
-      {editingBlockText !== null && (
+      <div style={{
+        backgroundColor: '#1a1a1a',
+        borderRadius: '16px',
+        width: '100%',
+        maxWidth: '1400px',
+        height: '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+      }}>
+        {/* Header */}
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          padding: '20px 30px',
+          borderBottom: '1px solid #333',
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            minWidth: '400px'
-          }}>
-            <h3>{language === 'ru' ? 'Редактировать текст' : 'Edit Text'}</h3>
-            <textarea
-              defaultValue={blocks?.lines[editingBlockText]?.text || ''}
-              style={{
-                width: '100%',
-                minHeight: '100px',
-                padding: '10px',
-                fontSize: '14px',
-                border: '1px solid #ddd',
-                borderRadius: '4px'
-              }}
-              ref={(el) => {
-                if (el) {
-                  el.focus();
-                  el.select();
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setEditingBlockText(null);
-                }
-              }}
-            />
-            <div style={{ marginTop: '15px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setEditingBlockText(null)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#ccc',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                {language === 'ru' ? 'Отмена' : 'Cancel'}
-              </button>
-              <button
-                onClick={(e) => {
-                  const textarea = e.target.parentElement.previousElementSibling;
-                  updateBlockText(editingBlockText, textarea.value);
-                  setEditingBlockText(null);
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#2196f3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                {language === 'ru' ? 'Сохранить' : 'Save'}
-              </button>
-            </div>
+          <div>
+            <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>
+              {translations.title || 'OCR Editor'}
+            </h2>
+            <p style={{ margin: '5px 0 0 0', color: '#999', fontSize: '13px' }}>
+              {translations.subtitle || 'Edit OCR results'}
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#999',
+              fontSize: '32px',
+              cursor: 'pointer',
+              padding: '0',
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
         </div>
+
+        {/* Main content */}
+        <div style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          gap: '20px',
+          padding: '20px'
+        }}>
+          {/* Left panel - Image and blocks */}
+          <div style={{
+            flex: '1 1 60%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '15px'
+          }}>
+            {/* Toolbar */}
+            <OCRToolbar
+              editBlockMode={editBlockMode}
+              onToggleEditMode={() => setEditBlockMode(!editBlockMode)}
+              reprocessing={reprocessing}
+              onReprocess={reprocessOCR}
+              isAddingBlock={isAddingBlock}
+              onAddBlock={startAddingBlock}
+              selectedBlocks={selectedBlocks}
+              onEditBlockText={startEditBlockText}
+              onSplitBlock={splitBlock}
+              onDeleteBlock={deleteBlock}
+              translations={translations}
+            />
+
+            {/* Image Canvas */}
+            <ImageCanvas
+              imageUrl={imageUrl}
+              imageRef={imageRef}
+              imageScale={imageScale}
+              ocrBlocks={ocrBlocks}
+              selectedBlocks={selectedBlocks}
+              editMode={editBlockMode}
+              isAddingBlock={isAddingBlock}
+              onBlockClick={handleBlockClick}
+              onBlockDragStart={startBlockDrag}
+              onMouseDown={handleNewBlockMouseDown}
+              onMouseUp={handleNewBlockMouseUp}
+              translations={translations}
+            />
+
+            {/* Selected blocks info */}
+            {selectedBlocks.length > 0 && !assigningToField && (
+              <div style={{
+                padding: '15px',
+                backgroundColor: '#2a2a2a',
+                borderRadius: '8px',
+                border: '2px solid #fbbf24'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#999' }}>
+                    {translations.selectedBlocks || 'Selected blocks'}: {selectedBlocks.length}
+                  </div>
+                  <button
+                    onClick={() => setAssigningToField(true)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      backgroundColor: '#3b82f6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    {translations.assignTo || 'Assign to field'} →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right panel - Fields */}
+          <FieldsSidebar
+            editedData={editedData}
+            selectedBlocks={selectedBlocks}
+            onFieldChange={handleFieldChange}
+            onAssignToField={assignToField}
+            onSave={handleSave}
+            onCancel={onClose}
+            onReset={() => {
+              const initial = {};
+              editableFields.forEach(field => {
+                initial[field] = contact[field] || '';
+              });
+              setEditedData(initial);
+            }}
+            saving={saving}
+            translations={translations}
+          />
+        </div>
+      </div>
+
+      {/* Block Text Editor Modal */}
+      {editingBlockText && (
+        <BlockTextEditor
+          block={editingBlockText}
+          onSave={saveBlockText}
+          onCancel={cancelEditBlockText}
+          translations={translations}
+        />
       )}
 
-      {/* Action buttons */}
-      <div style={{
-        marginTop: '20px',
-        display: 'flex',
-        gap: '10px',
-        justifyContent: 'flex-end'
-      }}>
-        <button
-          onClick={onClose}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#ccc',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {t.cancel}
-        </button>
-        <button
-          onClick={handleSave}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#4caf50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {t.save}
-        </button>
-      </div>
+      {/* Assignment Panel */}
+      {assigningToField && selectedBlocks.length > 0 && (
+        <AssignmentPanel
+          selectedBlocks={selectedBlocks}
+          onAssign={assignToField}
+          onCancel={() => setAssigningToField(false)}
+          onClearSelection={clearSelection}
+          translations={translations}
+        />
+      )}
+
+      {/* Global styles for animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
+
+export default OCREditorContainer;
 
