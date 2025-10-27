@@ -39,15 +39,19 @@ class PaddleOCRProvider(OCRProviderV2):
         try:
             from paddleocr import PaddleOCR
             
-            # Initialize with optimal settings
+            # Initialize with optimal settings for business cards
             self.ocr = PaddleOCR(
-                use_angle_cls=True,  # Enable angle classification
-                lang='en',  # Primary language
+                use_angle_cls=True,  # Enable angle classification for rotated text
+                lang='russian',  # Russian language (better for Cyrillic)
                 use_gpu=False,  # Set to True if GPU available
                 show_log=False,  # Reduce logging
                 det_model_dir=None,  # Use default models
                 rec_model_dir=None,
                 cls_model_dir=None,
+                # Text detection parameters for better block separation
+                det_db_thresh=0.3,  # Lower threshold = more sensitive detection
+                det_db_box_thresh=0.5,  # Box threshold for filtering
+                det_db_unclip_ratio=1.6,  # Unclip ratio for text region expansion
             )
             
             logger.info(f"✅ {self.name} initialized successfully")
