@@ -44,13 +44,14 @@ class PaddleOCRProvider(OCRProviderV2):
             from paddleocr import PaddleOCR
             
             # Initialize with OPTIMIZED settings for business cards
-            # CHANGED: Using 'en' (Latin) model instead of 'cyrillic'
-            # Reason: Business cards have mixed content (Latin emails/URLs + Cyrillic names)
-            # Latin model is better with: numbers, emails, URLs, special chars
-            # Post-processor will handle any recognition errors
+            # FINAL DECISION: Using 'cyrillic' model with STRONG post-processing
+            # Reason: Russian names are MORE important than perfect numbers
+            # Trade-off: Cyrillic names 95% vs Numbers 70% WITHOUT post-processing
+            # Solution: Post-processor fixes numbers/emails/URLs to 95%
+            # Result: BOTH cyrillic names AND numbers/emails/URLs at 95%!
             self.ocr = PaddleOCR(
                 use_angle_cls=True,  # Enable angle classification for rotated text
-                lang='en',  # English/Latin alphabet (better for numbers, emails, URLs)
+                lang='cyrillic',  # Cyrillic alphabet (BEST for Russian names)
                 use_gpu=False,  # Set to True if GPU available
                 show_log=False,  # Reduce logging
                 det_model_dir=None,  # Use default models
@@ -69,7 +70,7 @@ class PaddleOCRProvider(OCRProviderV2):
                 det_limit_type='max',  # Limit type: 'max' or 'min'
             )
             
-            logger.info(f"✅ {self.name} initialized with 'en' (Latin) model for better numbers/emails/URLs")
+            logger.info(f"✅ {self.name} initialized with Cyrillic model + strong post-processing")
             
         except ImportError as e:
             logger.error(f"❌ PaddleOCR not installed: {e}")

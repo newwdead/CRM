@@ -24,24 +24,35 @@ class FieldExtractor:
     """
     
     def __init__(self):
-        # Position keywords (Russian)
+        # Position keywords (Russian + English) - EXPANDED
         self.position_keywords = [
-            # Generic titles
+            # Generic titles (Russian)
             r'директор', r'генеральный', r'исполнительный', r'коммерческий',
-            r'технический', r'финансовый', r'операционный',
-            # Specific roles
+            r'технический', r'финансовый', r'операционный', r'исполняющий',
+            # Specific roles (Russian)
             r'менеджер', r'специалист', r'консультант', r'координатор',
             r'руководитель', r'начальник', r'заведующий', r'управляющий',
-            r'главный', r'ведущий', r'старший', r'младший',
-            # Departments
-            r'отдел', r'департамент', r'служба', r'управление',
-            # Professions
+            r'главный', r'ведущий', r'старший', r'младший', r'помощник',
+            r'ассистент', r'советник', r'представитель', r'агент',
+            # Departments (Russian)
+            r'отдел', r'департамент', r'служба', r'управление', r'сектор',
+            # Professions (Russian)
             r'инженер', r'архитектор', r'дизайнер', r'разработчик',
             r'программист', r'аналитик', r'бухгалтер', r'юрист',
-            r'экономист', r'маркетолог', r'логист',
-            # English
-            r'director', r'manager', r'ceo', r'cto', r'cfo', r'coo',
+            r'экономист', r'маркетолог', r'логист', r'врач', r'психолог',
+            r'преподаватель', r'учитель', r'тренер', r'коуч', r'эксперт',
+            r'администратор', r'секретарь', r'ресепшионист', r'оператор',
+            # Sales/Marketing (Russian)
+            r'продажи', r'продаж', r'маркетинг', r'рекламы', r'pr',
+            # English titles
+            r'director', r'manager', r'ceo', r'cto', r'cfo', r'coo', r'cmo',
             r'president', r'vice', r'head', r'chief', r'lead', r'senior',
+            r'founder', r'owner', r'partner', r'consultant', r'advisor',
+            r'executive', r'officer', r'administrator', r'coordinator',
+            r'specialist', r'expert', r'analyst', r'developer', r'engineer',
+            # Standalone titles (will match exactly)
+            r'^ceo$', r'^cto$', r'^cfo$', r'^coo$', r'^cmo$',
+            r'^директор$', r'^менеджер$', r'^специалист$',
         ]
         
         # Company indicators
@@ -232,16 +243,61 @@ class FieldExtractor:
         return None
     
     def _extract_position(self, text: str, blocks: List) -> Optional[str]:
-        """Extract position/title using keywords"""
-        # Look for position keywords
+        """
+        Extract position/title using keywords and heuristics
+        
+        Strategy:
+        1. First, try keyword-based search in ALL blocks
+        2. Then, try positional heuristic (top 40% of image, after name)
+        3. Filter out non-position blocks (email, phone, company, etc.)
+        """
+        # Strategy 1: Keyword-based search (most reliable)
         for block in blocks:
-            block_lower = block.text.lower()
+            block_text = block.text.strip()
+            block_lower = block_text.lower()
+            
+            # Skip empty or very short blocks
+            if len(block_text) < 3:
+                continue
             
             # Check if block contains position keywords
             for keyword in self.position_keywords:
                 if re.search(keyword, block_lower, re.IGNORECASE):
-                    # This block likely contains position
-                    return block.text.strip()
+                    # Found position keyword!
+                    logger.debug(f"💼 Position found by keyword '{keyword}': {block_text}")
+                    return block_text
+        
+        # Strategy 2: Positional heuristic (for positions without keywords like "CEO", "Директор")
+        # Position is usually in top 40% of card, after name, before company
+        top_blocks = [b for b in blocks if hasattr(b, 'bbox') and b.bbox.y < blocks[0].bbox.y + (blocks[-1].bbox.y - blocks[0].bbox.y) * 0.4]
+        
+        for block in top_blocks:
+            block_text = block.text.strip()
+            block_lower = block_text.lower()
+            
+            # Skip if too short or too long
+            if len(block_text) < 3 or len(block_text) > 60:
+                continue
+            
+            # Skip if contains non-position patterns
+            if any([
+                '@' in block_text,  # Email
+                'http' in block_lower,  # URL
+                'www' in block_lower,  # URL
+                '+' in block_text and len(block_text) > 8,  # Phone
+                re.search(r'\d{3,}', block_text),  # Long numbers (phone, address)
+                any(ind in block_text for ind in ['ООО', 'ОАО', 'ЗАО', 'ИП', 'LLC', 'Inc']),  # Company
+            ]):
+                continue
+            
+            # Check if looks like a position (short, capitalized, professional)
+            # Common patterns: "Директор", "CEO", "Менеджер по продажам"
+            words = block_text.split()
+            if 1 <= len(words) <= 5:  # Position is usually 1-5 words
+                # Additional checks: starts with capital, no excessive punctuation
+                if block_text[0].isupper() and block_text.count('.') < 2:
+                    logger.debug(f"💼 Position found by heuristic (top area): {block_text}")
+                    return block_text
         
         return None
     
