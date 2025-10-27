@@ -27,6 +27,8 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const imageRef = useRef(null);
   const [imageScale, setImageScale] = useState(1);
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const [realImageSize, setRealImageSize] = useState(null); // Real image dimensions
+  const [blockScaleFactor, setBlockScaleFactor] = useState(1); // Scale factor for blocks
 
   const translations = {
     en: {
@@ -240,6 +242,35 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     setImageScale(scale);
   };
 
+  // Handle image load to get real dimensions
+  const handleImageLoad = () => {
+    if (!imageRef.current || !ocrBlocks) return;
+    
+    const img = imageRef.current;
+    const realWidth = img.naturalWidth;
+    const realHeight = img.naturalHeight;
+    
+    setRealImageSize({ width: realWidth, height: realHeight });
+    
+    // Calculate block scale factor
+    // If OCR was done on resized image, we need to scale block coordinates
+    const scaleX = realWidth / ocrBlocks.image_width;
+    const scaleY = realHeight / ocrBlocks.image_height;
+    
+    // Use average scale factor (should be same for both axes if properly resized)
+    const scaleFactor = (scaleX + scaleY) / 2;
+    setBlockScaleFactor(scaleFactor);
+    
+    // Recalculate display scale based on real image size
+    calculateImageScale(realWidth, realHeight);
+    
+    console.log('📸 Image loaded:', {
+      realSize: `${realWidth}x${realHeight}`,
+      dbSize: `${ocrBlocks.image_width}x${ocrBlocks.image_height}`,
+      scaleFactor: scaleFactor.toFixed(3)
+    });
+  };
+
   const handleBlockClick = (block, event) => {
     // Multi-select with Ctrl/Cmd key
     if (event && (event.ctrlKey || event.metaKey)) {
@@ -367,12 +398,16 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     const rect = container.getBoundingClientRect();
     
     // Calculate offset from mouse to block's top-left corner
+    // Account for both imageScale and blockScaleFactor
     const mouseX = (event.clientX - rect.left) / imageScale;
     const mouseY = (event.clientY - rect.top) / imageScale;
     
+    const scaledBlockX = block.box.x * blockScaleFactor;
+    const scaledBlockY = block.box.y * blockScaleFactor;
+    
     setDragOffset({
-      x: mouseX - block.box.x,
-      y: mouseY - block.box.y
+      x: mouseX - scaledBlockX,
+      y: mouseY - scaledBlockY
     });
     
     setDraggingBlock(block);
@@ -390,25 +425,35 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     const mouseX = (event.clientX - rect.left) / imageScale;
     const mouseY = (event.clientY - rect.top) / imageScale;
     
-    const newX = mouseX - dragOffset.x;
-    const newY = mouseY - dragOffset.y;
+    const newScaledX = mouseX - dragOffset.x;
+    const newScaledY = mouseY - dragOffset.y;
+    
+    // Convert back to original coordinate space (undo blockScaleFactor)
+    const newX = newScaledX / blockScaleFactor;
+    const newY = newScaledY / blockScaleFactor;
     
     // Update block position (keeping width and height)
-    setOcrBlocks(prev => ({
-      ...prev,
-      lines: prev.lines.map(line => 
-        line === draggingBlock
-          ? { 
-              ...line, 
-              box: { 
-                ...line.box, 
-                x: Math.max(0, Math.min(newX, prev.image_width - line.box.width)),
-                y: Math.max(0, Math.min(newY, prev.image_height - line.box.height))
-              } 
-            }
-          : line
-      )
-    }));
+    setOcrBlocks(prev => {
+      // Use real image size if available, otherwise use DB size
+      const maxWidth = realImageSize ? (realImageSize.width / blockScaleFactor) : prev.image_width;
+      const maxHeight = realImageSize ? (realImageSize.height / blockScaleFactor) : prev.image_height;
+      
+      return {
+        ...prev,
+        lines: prev.lines.map(line => 
+          line === draggingBlock
+            ? { 
+                ...line, 
+                box: { 
+                  ...line.box, 
+                  x: Math.max(0, Math.min(newX, maxWidth - line.box.width)),
+                  y: Math.max(0, Math.min(newY, maxHeight - line.box.height))
+                } 
+              }
+            : line
+        )
+      };
+    });
   };
 
   const handleBlockDragEnd = () => {
@@ -870,10 +915,11 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                   ref={imageRef}
                   src={imageUrl}
                   alt="Business Card"
+                  onLoad={handleImageLoad}
                   style={{
                     display: 'block',
-                    width: `${ocrBlocks.image_width * imageScale}px`,
-                    height: `${ocrBlocks.image_height * imageScale}px`,
+                    width: realImageSize ? `${realImageSize.width * imageScale}px` : `${ocrBlocks.image_width * imageScale}px`,
+                    height: realImageSize ? `${realImageSize.height * imageScale}px` : `${ocrBlocks.image_height * imageScale}px`,
                     maxWidth: '100%',
                     maxHeight: '100%'
                   }}
@@ -892,8 +938,8 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    width: `${ocrBlocks.image_width * imageScale}px`,
-                    height: `${ocrBlocks.image_height * imageScale}px`,
+                    width: realImageSize ? `${realImageSize.width * imageScale}px` : `${ocrBlocks.image_width * imageScale}px`,
+                    height: realImageSize ? `${realImageSize.height * imageScale}px` : `${ocrBlocks.image_height * imageScale}px`,
                     pointerEvents: 'auto',
                     cursor: isAddingBlock ? 'crosshair' : draggingBlock ? 'move' : 'default'
                   }}
@@ -903,13 +949,19 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                     const isSelected = selectedBlocks.includes(line);
                     const selectionIndex = selectedBlocks.indexOf(line);
                     
+                    // Apply block scale factor to coordinates
+                    const scaledX = box.x * blockScaleFactor;
+                    const scaledY = box.y * blockScaleFactor;
+                    const scaledWidth = box.width * blockScaleFactor;
+                    const scaledHeight = box.height * blockScaleFactor;
+                    
                     return (
                       <g key={idx}>
                         <rect
-                          x={box.x * imageScale}
-                          y={box.y * imageScale}
-                          width={box.width * imageScale}
-                          height={box.height * imageScale}
+                          x={scaledX * imageScale}
+                          y={scaledY * imageScale}
+                          width={scaledWidth * imageScale}
+                          height={scaledHeight * imageScale}
                           fill={isSelected ? 'rgba(251, 191, 36, 0.3)' : editBlockMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)'}
                           stroke={isSelected ? '#fbbf24' : editBlockMode ? '#10b981' : '#3b82f6'}
                           strokeWidth={isSelected ? 3 : editBlockMode ? 2 : 1}
@@ -921,8 +973,8 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                           onMouseDown={(e) => editBlockMode && handleBlockDragStart(line, e)}
                         />
                         <text
-                          x={box.x * imageScale + 5}
-                          y={box.y * imageScale + 15}
+                          x={scaledX * imageScale + 5}
+                          y={scaledY * imageScale + 15}
                           fill="#fff"
                           fontSize="12"
                           fontWeight="bold"
