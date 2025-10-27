@@ -52,6 +52,9 @@ class PaddleOCRProvider(OCRProviderV2):
                 det_db_thresh=0.3,  # Lower threshold = more sensitive detection
                 det_db_box_thresh=0.5,  # Box threshold for filtering
                 det_db_unclip_ratio=1.6,  # Unclip ratio for text region expansion
+                # Image size limits - prevent auto-resize for high-res business cards
+                det_limit_side_len=6000,  # Max side length (default: 960)
+                det_limit_type='max',  # Limit type: 'max' or 'min'
             )
             
             logger.info(f"✅ {self.name} initialized successfully")
