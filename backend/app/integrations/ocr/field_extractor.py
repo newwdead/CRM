@@ -330,5 +330,77 @@ class FieldExtractor:
         # Sort by confidence and length, pick best candidate
         candidate_blocks.sort(key=lambda b: (b.confidence, len(b.text)), reverse=True)
         
-        return candidate_blocks[0].text.strip()
+        name = candidate_blocks[0].text.strip()
+        
+        # Normalize name order (fix "Last First" → "First Last" if needed)
+        name = self._normalize_name_order(name)
+        
+        return name
+    
+    def _normalize_name_order(self, name: str) -> str:
+        """
+        Normalize name order to "First Last" format
+        
+        Russian names can be in different orders:
+        - "Иван Иванов" (First Last) ✓
+        - "Иванов Иван" (Last First) → needs fixing
+        - "Иванов Иван Петрович" (Last First Middle) → needs fixing
+        
+        Strategy:
+        1. If name has 2+ words and ALL CAPS → likely "LAST FIRST" format
+        2. If first word ends with common last name suffixes (-ов, -ев, -ин, -ский, -ая)
+           and second word doesn't → likely "Last First", swap them
+        3. Otherwise keep as is
+        """
+        if not name or ' ' not in name:
+            return name
+        
+        words = name.split()
+        if len(words) < 2:
+            return name
+        
+        # Check if all caps (common for "LAST FIRST" format)
+        if name.isupper():
+            # ALL CAPS format, likely "LAST FIRST"
+            # Swap to "FIRST LAST"
+            logger.debug(f"👤 Name in ALL CAPS, swapping: '{name}' → '{words[1]} {words[0]}'")
+            return f"{words[1]} {words[0]}"
+        
+        first_word = words[0]
+        second_word = words[1] if len(words) > 1 else ""
+        
+        # Russian last name suffixes
+        last_name_suffixes = [
+            'ов', 'ова', 'ев', 'ева', 'ин', 'ина',
+            'ский', 'ская', 'цкий', 'цкая', 'ной', 'ная',
+            'ых', 'их', 'ко', 'юк', 'ук', 'як', 'ак'
+        ]
+        
+        # Check if first word looks like a last name
+        first_is_lastname = any(
+            first_word.lower().endswith(suffix)
+            for suffix in last_name_suffixes
+        )
+        
+        # Check if second word looks like a last name
+        second_is_lastname = any(
+            second_word.lower().endswith(suffix)
+            for suffix in last_name_suffixes
+        ) if second_word else False
+        
+        # If first is last name and second is NOT last name, swap them
+        if first_is_lastname and not second_is_lastname:
+            # Swap "Last First" → "First Last"
+            if len(words) == 2:
+                swapped = f"{words[1]} {words[0]}"
+                logger.debug(f"👤 Name order fixed: '{name}' → '{swapped}'")
+                return swapped
+            elif len(words) == 3:
+                # "Last First Middle" → "First Middle Last"
+                swapped = f"{words[1]} {words[2]} {words[0]}"
+                logger.debug(f"👤 Name order fixed (3 words): '{name}' → '{swapped}'")
+                return swapped
+        
+        # Otherwise, keep original order
+        return name
 
