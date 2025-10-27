@@ -533,6 +533,165 @@ def reprocess_contact_ocr(
         raise HTTPException(status_code=500, detail=f'Failed to reprocess OCR: {str(e)}')
 
 
+@router.post('/{contact_id}/rerun-ocr')
+def rerun_contact_ocr(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_admin_user)
+):
+    """
+    Completely rerun OCR for a contact from scratch.
+    Re-processes the image with current OCR v2.0 settings and saves new blocks.
+    Requires admin privileges.
+    """
+    import json
+    import os
+    from datetime import datetime
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    if not contact.photo_path:
+        raise HTTPException(status_code=400, detail='Contact has no image')
+    
+    # Read image file
+    image_path = os.path.join('uploads', contact.photo_path)
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail='Image file not found')
+    
+    try:
+        logger.info(f"🔄 Rerunning OCR for contact {contact_id}...")
+        
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+        
+        # Import OCR managers
+        from ..integrations.ocr.providers import OCRManager
+        from ..integrations.ocr.providers_v2 import OCRManagerV2
+        from ..services.validator_service import ValidatorService
+        from ..integrations.ocr.image_utils import downscale_image_bytes
+        from ..core.utils import get_setting
+        
+        # Check OCR version setting
+        ocr_version = get_setting(db, "ocr_version", "v2.0")
+        
+        # Prepare image
+        ocr_input = downscale_image_bytes(image_bytes, max_side=2000)
+        
+        # Run OCR based on version
+        if ocr_version == "v2.0":
+            logger.info("🚀 Using OCR v2.0 (PaddleOCR + LayoutLMv3)...")
+            ocr_manager_v2 = OCRManagerV2(enable_layoutlm=True)
+            
+            try:
+                ocr_result = ocr_manager_v2.recognize(
+                    image_data=ocr_input,
+                    provider_name=None,
+                    use_layout=True,
+                    filename=contact.photo_path
+                )
+                logger.info(f"✅ OCR v2.0 successful")
+                
+                # Validate and auto-correct
+                validator = ValidatorService(db)
+                ocr_result_validated = validator.validate_ocr_result(
+                    ocr_result, 
+                    auto_correct=True
+                )
+                if ocr_result_validated:
+                    ocr_result = ocr_result_validated
+                    
+            except Exception as v2_error:
+                logger.warning(f"⚠️ OCR v2.0 failed: {v2_error}, falling back to v1.0...")
+                ocr_manager_v1 = OCRManager()
+                ocr_result = ocr_manager_v1.recognize(
+                    ocr_input,
+                    filename=contact.photo_path,
+                    preferred_provider=None
+                )
+                logger.info("✅ OCR v1.0 (Tesseract) fallback successful")
+        else:
+            logger.info("🔧 Using OCR v1.0 (Tesseract)...")
+            ocr_manager_v1 = OCRManager()
+            ocr_result = ocr_manager_v1.recognize(
+                ocr_input,
+                filename=contact.photo_path,
+                preferred_provider=None
+            )
+        
+        # Extract data
+        data = ocr_result.get('data', {})
+        
+        # Convert blocks to dict if they exist
+        blocks_data = []
+        if 'blocks' in ocr_result and ocr_result['blocks']:
+            for block in ocr_result['blocks']:
+                if hasattr(block, 'to_dict'):
+                    blocks_data.append(block.to_dict())
+                elif isinstance(block, dict):
+                    blocks_data.append(block)
+        
+        # Get image dimensions
+        image_size = ocr_result.get('image_size', (0, 0))
+        
+        # Update contact fields
+        for field, value in data.items():
+            if value and hasattr(contact, field):
+                setattr(contact, field, value)
+        
+        # Save OCR raw data with blocks
+        ocr_raw_data = {
+            'method': f'ocr_{ocr_version}',
+            'provider': ocr_result.get('provider', 'unknown'),
+            'confidence': ocr_result.get('confidence', 0),
+            'raw_text': ocr_result.get('raw_text', ''),
+            'block_count': len(blocks_data),
+            'layoutlm_used': ocr_result.get('layoutlm_used', False),
+            'layoutlm_confidence': ocr_result.get('layoutlm_confidence', 0),
+            'validation_applied': ocr_result.get('validation', {}).get('applied', False),
+            'blocks': blocks_data,
+            'image_width': image_size[0],
+            'image_height': image_size[1],
+            'reprocessed_at': str(datetime.now()),
+        }
+        
+        contact.ocr_raw = json.dumps(ocr_raw_data, ensure_ascii=False)
+        
+        db.commit()
+        db.refresh(contact)
+        
+        logger.info(f"✅ OCR rerun complete for contact {contact_id}: {len(blocks_data)} blocks saved")
+        
+        return {
+            'success': True,
+            'message': f'OCR rerun successful: {len(blocks_data)} blocks detected',
+            'blocks_count': len(blocks_data),
+            'provider': ocr_result.get('provider'),
+            'confidence': ocr_result.get('confidence', 0),
+            'ocr_version': ocr_version,
+            'contact': {
+                'id': contact.id,
+                'first_name': contact.first_name,
+                'last_name': contact.last_name,
+                'middle_name': contact.middle_name,
+                'company': contact.company,
+                'position': contact.position,
+                'email': contact.email,
+                'phone': contact.phone,
+                'phone_mobile': contact.phone_mobile,
+                'phone_work': contact.phone_work,
+                'website': contact.website,
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error rerunning OCR for contact {contact_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f'Failed to rerun OCR: {str(e)}')
+
+
 @router.post('/merge')
 def merge_contacts(
     payload: Dict = Body(...),
