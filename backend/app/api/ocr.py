@@ -235,7 +235,7 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
             storage_service = StorageService(db)
             ocr_result_path = storage_service.save_ocr_result(
                 contact_id=contact.id,
-                result_data=json.loads(raw_json)
+                ocr_data=json.loads(raw_json)
             )
             if ocr_result_path:
                 logger.info(f"✅ OCR result saved to MinIO: {ocr_result_path}")
