@@ -5,10 +5,11 @@ High-performance OCR with bounding boxes
 import io
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from PIL import Image
+from PIL import Image, ImageEnhance
 import numpy as np
 
 from .base import OCRProviderV2, TextBlock, BoundingBox
+from ..field_extractor import FieldExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class PaddleOCRProvider(OCRProviderV2):
         self.supports_layout = False  # True when LayoutLMv3 integrated
         
         self.ocr = None
+        self.field_extractor = FieldExtractor()  # Enhanced field extraction
         self._initialize_ocr()
     
     def _initialize_ocr(self):
@@ -39,7 +41,7 @@ class PaddleOCRProvider(OCRProviderV2):
         try:
             from paddleocr import PaddleOCR
             
-            # Initialize with optimal settings for business cards
+            # Initialize with OPTIMIZED settings for business cards
             self.ocr = PaddleOCR(
                 use_angle_cls=True,  # Enable angle classification for rotated text
                 lang='cyrillic',  # Cyrillic alphabet (Russian + other Cyrillic languages)
@@ -48,12 +50,16 @@ class PaddleOCRProvider(OCRProviderV2):
                 det_model_dir=None,  # Use default models
                 rec_model_dir=None,
                 cls_model_dir=None,
-                # Text detection parameters for better block separation
-                det_db_thresh=0.3,  # Lower threshold = more sensitive detection
-                det_db_box_thresh=0.5,  # Box threshold for filtering
-                det_db_unclip_ratio=1.6,  # Unclip ratio for text region expansion
-                # Image size limits - prevent auto-resize for high-res business cards
-                det_limit_side_len=6000,  # Max side length (default: 960)
+                # IMPROVED: Text detection parameters for MAXIMUM sensitivity
+                det_db_thresh=0.2,  # Lower = more sensitive (was 0.3, now 0.2)
+                det_db_box_thresh=0.4,  # Lower = catch more boxes (was 0.5, now 0.4)
+                det_db_unclip_ratio=1.8,  # Higher = larger text regions (was 1.6, now 1.8)
+                det_db_score_mode='slow',  # 'slow' is more accurate than 'fast'
+                # IMPROVED: Recognition parameters
+                rec_batch_num=6,  # Process more blocks at once
+                drop_score=0.3,  # Lower threshold to keep low-confidence text (was 0.5)
+                # Image size limits - prevent auto-resize
+                det_limit_side_len=6000,  # Max side length (no downscaling)
                 det_limit_type='max',  # Limit type: 'max' or 'min'
             )
             
@@ -69,6 +75,46 @@ class PaddleOCRProvider(OCRProviderV2):
     def is_available(self) -> bool:
         """Check if PaddleOCR is available"""
         return self.ocr is not None
+    
+    def _preprocess_image(self, img: Image.Image) -> Image.Image:
+        """
+        Preprocess image for better OCR results
+        
+        Enhancements:
+        - Contrast enhancement
+        - Sharpness enhancement
+        - Convert to RGB
+        """
+        try:
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Enhance contrast slightly (helps with faded text)
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.2)  # 20% more contrast
+            
+            # Enhance sharpness slightly (helps with slightly blurry images)
+            enhancer = ImageEnhance.Sharpness(img)
+            img = enhancer.enhance(1.3)  # 30% more sharpness
+            
+            # Enhance brightness if image is too dark
+            enhancer = ImageEnhance.Brightness(img)
+            # Calculate average brightness
+            img_array = np.array(img)
+            avg_brightness = np.mean(img_array)
+            
+            # If too dark (< 100), brighten it
+            if avg_brightness < 100:
+                brightness_factor = 1.3
+                img = enhancer.enhance(brightness_factor)
+                logger.debug(f"🔆 Brightened dark image (avg: {avg_brightness:.1f})")
+            
+            return img
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Image preprocessing failed: {e}, using original")
+            return img
     
     def recognize(
         self, 
@@ -86,8 +132,10 @@ class PaddleOCRProvider(OCRProviderV2):
         try:
             # Load image
             img = Image.open(io.BytesIO(image_data))
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+            original_size = (img.width, img.height)
+            
+            # IMPROVED: Preprocess image for better OCR
+            img = self._preprocess_image(img)
             
             # Convert to numpy array
             img_array = np.array(img)
@@ -138,8 +186,12 @@ class PaddleOCRProvider(OCRProviderV2):
             # Combine text
             raw_text = "\n".join(all_text)
             
-            # Normalize to structured fields
-            data = self.normalize_result(blocks, image_size)
+            # IMPROVED: Use enhanced field extractor
+            data = self.field_extractor.extract_fields(
+                blocks=blocks,
+                image_size=image_size,
+                combined_text=raw_text
+            )
             
             logger.info(
                 f"✅ {self.name} recognized {block_count} blocks, "
