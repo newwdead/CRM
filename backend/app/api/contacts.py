@@ -576,8 +576,8 @@ def rerun_contact_ocr(
         # Check OCR version setting
         ocr_version = get_setting(db, "ocr_version", "v2.0")
         
-        # Prepare image
-        ocr_input = downscale_image_bytes(image_bytes, max_side=2000)
+        # Prepare image (increased limit for high-res business cards)
+        ocr_input = downscale_image_bytes(image_bytes, max_side=6000)
         
         # Run OCR based on version
         if ocr_version == "v2.0":

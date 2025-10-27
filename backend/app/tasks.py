@@ -88,7 +88,8 @@ def _process_card_sync(
             from .core.utils import get_setting
             ocr_version = get_setting(_db, "ocr_version", "v2.0")
             
-            ocr_input = downscale_image_bytes(image_data, max_size=2000)
+            # Increased limit for high-res business cards
+            ocr_input = downscale_image_bytes(image_data, max_size=6000)
             
             # Determine provider
             provider_name = None if provider == 'auto' else provider
@@ -293,7 +294,8 @@ def process_single_card(
             from .core.utils import get_setting
             ocr_version = get_setting(_db, "ocr_version", "v2.0")
             
-            ocr_input = downscale_image_bytes(image_data, max_side=2000)
+            # Increased limit for high-res business cards
+            ocr_input = downscale_image_bytes(image_data, max_side=6000)
             preferred = None if provider == 'auto' else provider
             
             # Run OCR based on version setting

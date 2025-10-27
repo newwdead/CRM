@@ -91,8 +91,8 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
             qr_scan_counter.labels(status='not_found').inc()
             logger.info("No QR code found, falling back to OCR...")
             
-            # Prepare for OCR
-            ocr_input = downscale_image_bytes(card_bytes, max_side=2000)
+            # Prepare for OCR (increased limit for high-res business cards)
+            ocr_input = downscale_image_bytes(card_bytes, max_side=6000)
             preferred = None if provider == 'auto' else provider
             
             try:
