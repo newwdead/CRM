@@ -94,8 +94,8 @@ class OCRManagerV2:
         
         # Select providers to try
         if provider_name:
-            # Use specific provider
-            providers_to_try = [p for p in self.providers if p.name == provider_name]
+            # Use specific provider (case-insensitive)
+            providers_to_try = [p for p in self.providers if p.name.lower() == provider_name.lower()]
             if not providers_to_try:
                 raise ValueError(f"Provider '{provider_name}' not found")
         else:
