@@ -9,7 +9,7 @@ import logging
 
 from ..database import get_db
 from ..models import Contact, User
-from .. import auth_utils
+from ..core import auth as auth_utils
 from ..integrations.label_studio import (
     LabelStudioService,
     TrainingService,
