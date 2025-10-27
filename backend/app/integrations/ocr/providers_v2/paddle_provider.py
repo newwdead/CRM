@@ -27,15 +27,16 @@ class PaddleOCRProvider(OCRProviderV2):
     - GPU support (if available)
     """
     
-    def __init__(self):
+    def __init__(self, enable_postprocessing=False):
         super().__init__("PaddleOCR")
         self.priority = 1  # High priority (better than Tesseract)
         self.supports_bbox = True
         self.supports_layout = False  # True when LayoutLMv3 integrated
         
         self.ocr = None
+        self.enable_postprocessing = enable_postprocessing
         self.field_extractor = FieldExtractor()  # Enhanced field extraction
-        self.post_processor = OCRPostProcessor()  # Fix common OCR errors
+        self.post_processor = OCRPostProcessor() if enable_postprocessing else None
         self._initialize_ocr()
     
     def _initialize_ocr(self):
@@ -43,37 +44,52 @@ class PaddleOCRProvider(OCRProviderV2):
         try:
             from paddleocr import PaddleOCR
             
-            # Initialize with OPTIMIZED settings for business cards
-            # FINAL DECISION: Using 'cyrillic' model with STRONG post-processing
-            # Reason: Russian names are MORE important than perfect numbers
-            # Trade-off: Cyrillic names 95% vs Numbers 70% WITHOUT post-processing
-            # Solution: Post-processor fixes numbers/emails/URLs to 95%
-            # Result: BOTH cyrillic names AND numbers/emails/URLs at 95%!
+            # ============================================================
+            # TUNED FOR BUSINESS CARDS (визитки)
+            # ============================================================
+            # Business card characteristics:
+            # - Small size (~85x55mm, ~1000x600px @ 300DPI)
+            # - Mixed text sizes (large name, small phone)
+            # - Cyrillic + Latin + digits
+            # - Various fonts and colors
+            # - Sometimes rotated text
+            #
+            # Goal: Maximum recall (find ALL text), let FieldExtractor sort it out
+            # ============================================================
             self.ocr = PaddleOCR(
-                use_angle_cls=True,  # Enable angle classification for rotated text
-                lang='cyrillic',  # Cyrillic alphabet (BEST for Russian names)
-                use_gpu=False,  # Set to True if GPU available
-                show_log=False,  # Reduce logging
-                det_model_dir=None,  # Use default models
+                # Language model
+                lang='cyrillic',  # Best for Russian business cards
+                use_angle_cls=True,  # Handle rotated cards
+                
+                # GPU settings
+                use_gpu=False,  # Set True if available
+                show_log=False,
+                
+                # Model paths (None = use default)
+                det_model_dir=None,
                 rec_model_dir=None,
                 cls_model_dir=None,
-                # TUNED: Better detection for business cards
-                det_db_thresh=0.25,  # Balanced sensitivity
-                det_db_box_thresh=0.45,  # Better box quality
-                det_db_unclip_ratio=1.5,  # Tighter text regions
-                det_db_score_mode='slow',  # More accurate
-                # TUNED: Better recognition
-                rec_batch_num=6,
-                drop_score=0.4,  # Higher = better quality text only
-                # Character recognition
-                use_space_char=True,  # Preserve spaces
+                
+                # TEXT DETECTION (find text regions)
+                # TUNED for business cards: sensitive but not too noisy
+                det_db_thresh=0.2,  # Lower = more sensitive (0.3 default → 0.2)
+                det_db_box_thresh=0.4,  # Lower = more boxes (0.6 default → 0.4)
+                det_db_unclip_ratio=2.0,  # Higher = wider boxes (1.5 → 2.0, capture full text)
+                det_db_score_mode='slow',  # 'slow' = more accurate than 'fast'
+                
+                # TEXT RECOGNITION (read found text)
+                rec_batch_num=6,  # Process 6 blocks at once
+                drop_score=0.3,  # Keep low-confidence text (0.5 → 0.3, small text often low conf)
+                use_space_char=True,  # Preserve spaces in text
                 rec_algorithm='CRNN',  # Default algorithm
-                # Image size limits - prevent auto-resize
-                det_limit_side_len=6000,  # Max side length (no downscaling)
-                det_limit_type='max',  # Limit type: 'max' or 'min'
+                
+                # IMAGE SIZE (prevent auto-resize)
+                det_limit_side_len=6000,  # Max image side (don't downscale < 6000px)
+                det_limit_type='max',  # 'max' = limit max dimension
             )
             
-            logger.info(f"✅ {self.name} initialized with Cyrillic model + strong post-processing")
+            mode = "TUNED" if not self.enable_postprocessing else "TUNED+POSTPROC"
+            logger.info(f"✅ {self.name} initialized for business cards [{mode}]")
             
         except ImportError as e:
             logger.error(f"❌ PaddleOCR not installed: {e}")
@@ -193,22 +209,26 @@ class PaddleOCRProvider(OCRProviderV2):
             # Calculate average confidence
             avg_confidence = total_confidence / block_count if block_count > 0 else 0.0
             
-            # IMPROVED: Post-process blocks to fix common OCR errors
-            blocks = self.post_processor.post_process_blocks(blocks)
-            
-            # Recombine text after post-processing
-            all_text = [b.text for b in blocks]
+            # Combine text
             raw_text = "\n".join(all_text)
             
-            # IMPROVED: Use enhanced field extractor
+            # Optional: Post-processing (DISABLED by default, OCR should be tuned instead)
+            if self.enable_postprocessing and self.post_processor:
+                logger.debug("⚙️ Applying post-processing (enabled)")
+                blocks = self.post_processor.post_process_blocks(blocks)
+                all_text = [b.text for b in blocks]
+                raw_text = "\n".join(all_text)
+            
+            # Use field extractor (heuristic-based)
             data = self.field_extractor.extract_fields(
                 blocks=blocks,
                 image_size=image_size,
                 combined_text=raw_text
             )
             
-            # IMPROVED: Validate and fix extracted fields
-            data = self.post_processor.validate_and_fix_extracted_data(data)
+            # Optional: Validate extracted fields
+            if self.enable_postprocessing and self.post_processor:
+                data = self.post_processor.validate_and_fix_extracted_data(data)
             
             logger.info(
                 f"✅ {self.name} recognized {block_count} blocks, "
