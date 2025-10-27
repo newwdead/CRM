@@ -211,23 +211,31 @@ async def get_ocr_processing_stats(db: Session) -> Dict[str, Any]:
             Contact.created_at >= yesterday
         ).scalar() or 0
         
-        # Scans with recognition method
+        # Scans with OCR data (has ocr_raw or photo)
         ocr_scans = db.query(func.count(Contact.id)).filter(
             Contact.created_at >= yesterday,
-            Contact.recognition_method.isnot(None)
+            (Contact.ocr_raw.isnot(None)) | (Contact.photo_path.isnot(None))
         ).scalar() or 0
         
-        # Scans by recognition method
-        method_stats = db.query(
-            Contact.recognition_method,
-            func.count(Contact.id).label('count')
-        ).filter(
-            Contact.created_at >= yesterday
-        ).group_by(Contact.recognition_method).all()
+        # Scans by method (QR vs OCR)
+        qr_scans = db.query(func.count(Contact.id)).filter(
+            Contact.created_at >= yesterday,
+            Contact.has_qr_code == 1
+        ).scalar() or 0
         
-        methods_breakdown = {
-            method: count for method, count in method_stats if method
-        }
+        photo_scans = db.query(func.count(Contact.id)).filter(
+            Contact.created_at >= yesterday,
+            Contact.photo_path.isnot(None)
+        ).scalar() or 0
+        
+        methods_breakdown = {}
+        if qr_scans > 0:
+            methods_breakdown['QR Code'] = qr_scans
+        if photo_scans > 0:
+            methods_breakdown['OCR (Photo)'] = photo_scans
+        manual_scans = total_scans - qr_scans - photo_scans
+        if manual_scans > 0:
+            methods_breakdown['Manual Entry'] = manual_scans
         
         # Average confidence (if available)
         # Note: You might need to add a confidence field to Contact model
@@ -260,11 +268,21 @@ async def get_recent_scans(db: Session, limit: int = 20) -> List[Dict[str, Any]]
         
         scans = []
         for contact in recent_contacts:
+            # Determine recognition method based on available data
+            if contact.has_qr_code == 1:
+                recognition_method = "QR Code"
+            elif contact.photo_path:
+                recognition_method = "OCR (Photo)"
+            elif contact.ocr_raw:
+                recognition_method = "OCR"
+            else:
+                recognition_method = "Manual Entry"
+            
             scans.append({
                 "id": contact.id,
                 "full_name": contact.full_name or "Unknown",
                 "company": contact.company or "",
-                "recognition_method": contact.recognition_method or "unknown",
+                "recognition_method": recognition_method,
                 "created_at": contact.created_at.isoformat() if contact.created_at else None,
                 "has_photo": bool(contact.photo_path),
                 "fields_count": sum([
