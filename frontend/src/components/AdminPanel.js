@@ -7,6 +7,7 @@ import UserManagement from './admin/UserManagement';
 import BackupManagement from './admin/BackupManagement';
 import SystemResources from './admin/SystemResources';
 import MonitoringDashboard from './MonitoringDashboard';
+import { SelfLearningPanel } from './admin';
 
 /**
  * Admin Panel - Main Admin Dashboard
@@ -32,6 +33,7 @@ function AdminPanel({ t, lang }) {
   const tabs = [
     { id: 'users', icon: '👥', label: t('adminTabUsers') },
     { id: 'monitoring', icon: '📊', label: lang === 'ru' ? 'Мониторинг' : 'Monitoring' },
+    { id: 'self-learning', icon: '🎓', label: lang === 'ru' ? 'Самообучение' : 'Self-Learning' },
     { id: 'settings', icon: '🔌', label: t('adminTabIntegrations') },
     { id: 'backups', icon: '💾', label: t('adminTabBackups') },
     { id: 'resources', icon: '🔗', label: t('adminTabResources') },
@@ -68,6 +70,7 @@ function AdminPanel({ t, lang }) {
       <div className="admin-tab-content">
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'monitoring' && <MonitoringDashboard lang={lang} />}
+        {activeTab === 'self-learning' && <SelfLearningPanel />}
         {activeTab === 'settings' && <SystemSettings lang={lang} />}
         {activeTab === 'backups' && <BackupManagement lang={lang} />}
         {activeTab === 'resources' && <SystemResources lang={lang} />}

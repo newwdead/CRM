@@ -19,6 +19,7 @@ from .whatsapp import router as whatsapp_router
 from .exports import router as exports_router
 from .services import router as services_router
 from .monitoring import router as monitoring_router
+from .self_learning import router as self_learning_router
 
 # Create main API router
 api_router = APIRouter()
@@ -44,6 +45,7 @@ api_router.include_router(telegram_router, prefix="", tags=["Telegram"])  # Abso
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 api_router.include_router(services_router, prefix="", tags=["Services"])  # No prefix - /services/*
 api_router.include_router(monitoring_router, prefix="/monitoring", tags=["Monitoring"])  # OCR v2.0 monitoring
+api_router.include_router(self_learning_router, prefix="", tags=["Self-Learning"])  # Self-learning OCR system
 
 __all__ = [
     'api_router',

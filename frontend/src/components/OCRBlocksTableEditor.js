@@ -180,9 +180,9 @@ const OCRBlocksTableEditor = ({ contact, onSave, onClose }) => {
   const handleSave = async () => {
     try {
       setSaving(true);
+      const token = localStorage.getItem('token');
       
       // Save blocks
-      const token = localStorage.getItem('token');
       await fetch(`/api/contacts/${contact.id}/save-ocr-blocks`, {
         method: 'POST',
         headers: {
@@ -194,6 +194,30 @@ const OCRBlocksTableEditor = ({ contact, onSave, onClose }) => {
           image_width: imageSize.width,
           image_height: imageSize.height
         })
+      });
+      
+      // Send feedback for self-learning (async, don't wait)
+      fetch(`/api/self-learning/feedback/${contact.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          blocks: blocks,
+          image_width: imageSize.width,
+          image_height: imageSize.height
+        })
+      }).then(res => {
+        if (res.ok) {
+          res.json().then(data => {
+            if (data.corrections_count > 0) {
+              console.log(`💡 Sent ${data.corrections_count} corrections for training`);
+            }
+          });
+        }
+      }).catch(err => {
+        console.warn('Failed to send feedback:', err);
       });
       
       // Save contact data
