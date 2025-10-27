@@ -226,9 +226,22 @@ class OCRManagerV2:
             logger.error(f"❌ LayoutLMv3 classification failed: {e}", exc_info=True)
             return ocr_result
     
-    def get_available_providers(self) -> List[Dict[str, Any]]:
-        """Get list of available providers with metadata"""
-        return [provider.get_metadata() for provider in self.providers]
+    def get_available_providers(self) -> List[str]:
+        """Get list of available provider names"""
+        return [provider.name for provider in self.providers]
+    
+    def get_provider_info(self) -> List[Dict[str, Any]]:
+        """Get detailed information about all providers"""
+        return [
+            {
+                "name": provider.name,
+                "priority": provider.priority,
+                "available": provider.is_available(),
+                "supports_bbox": provider.supports_bbox,
+                "supports_layout": provider.supports_layout,
+            }
+            for provider in sorted(self.providers, key=lambda x: x.priority)
+        ]
     
     def initialize_layoutlm(self, model_path: Optional[str] = None):
         """

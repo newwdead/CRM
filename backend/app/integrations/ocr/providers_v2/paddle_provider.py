@@ -42,7 +42,7 @@ class PaddleOCRProvider(OCRProviderV2):
             # Initialize with optimal settings for business cards
             self.ocr = PaddleOCR(
                 use_angle_cls=True,  # Enable angle classification for rotated text
-                lang='russian',  # Russian language (better for Cyrillic)
+                lang='cyrillic',  # Cyrillic alphabet (Russian + other Cyrillic languages)
                 use_gpu=False,  # Set to True if GPU available
                 show_log=False,  # Reduce logging
                 det_model_dir=None,  # Use default models

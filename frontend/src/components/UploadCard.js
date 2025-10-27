@@ -256,13 +256,24 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
           style={{ maxWidth: '400px' }}
         >
           <option value="auto">{t.auto}</option>
-          <option value="tesseract">Tesseract</option>
-          {availableProviders.includes('Parsio') && (
-            <option value="parsio">Parsio</option>
-          )}
-          {availableProviders.includes('Google Vision') && (
-            <option value="google">Google Vision</option>
-          )}
+          
+          {/* OCR v2.0 providers */}
+          <optgroup label={lang === 'ru' ? '🤖 OCR v2.0 (Рекомендуется)' : '🤖 OCR v2.0 (Recommended)'}>
+            {availableProviders.includes('PaddleOCR') && (
+              <option value="paddleocr">PaddleOCR (AI + Russian)</option>
+            )}
+          </optgroup>
+          
+          {/* OCR v1.0 providers */}
+          <optgroup label={lang === 'ru' ? '🔤 OCR v1.0 (Классический)' : '🔤 OCR v1.0 (Classic)'}>
+            <option value="tesseract">Tesseract</option>
+            {availableProviders.includes('Parsio') && (
+              <option value="parsio">Parsio</option>
+            )}
+            {availableProviders.includes('Google Vision') && (
+              <option value="google">Google Vision</option>
+            )}
+          </optgroup>
         </select>
       </div>
 
