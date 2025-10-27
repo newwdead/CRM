@@ -10,6 +10,7 @@ import numpy as np
 
 from .base import OCRProviderV2, TextBlock, BoundingBox
 from ..field_extractor import FieldExtractor
+from ..ocr_postprocessor import OCRPostProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class PaddleOCRProvider(OCRProviderV2):
         
         self.ocr = None
         self.field_extractor = FieldExtractor()  # Enhanced field extraction
+        self.post_processor = OCRPostProcessor()  # Fix common OCR errors
         self._initialize_ocr()
     
     def _initialize_ocr(self):
@@ -42,9 +44,13 @@ class PaddleOCRProvider(OCRProviderV2):
             from paddleocr import PaddleOCR
             
             # Initialize with OPTIMIZED settings for business cards
+            # CHANGED: Using 'en' (Latin) model instead of 'cyrillic'
+            # Reason: Business cards have mixed content (Latin emails/URLs + Cyrillic names)
+            # Latin model is better with: numbers, emails, URLs, special chars
+            # Post-processor will handle any recognition errors
             self.ocr = PaddleOCR(
                 use_angle_cls=True,  # Enable angle classification for rotated text
-                lang='cyrillic',  # Cyrillic alphabet (Russian + other Cyrillic languages)
+                lang='en',  # English/Latin alphabet (better for numbers, emails, URLs)
                 use_gpu=False,  # Set to True if GPU available
                 show_log=False,  # Reduce logging
                 det_model_dir=None,  # Use default models
@@ -63,7 +69,7 @@ class PaddleOCRProvider(OCRProviderV2):
                 det_limit_type='max',  # Limit type: 'max' or 'min'
             )
             
-            logger.info(f"✅ {self.name} initialized successfully")
+            logger.info(f"✅ {self.name} initialized with 'en' (Latin) model for better numbers/emails/URLs")
             
         except ImportError as e:
             logger.error(f"❌ PaddleOCR not installed: {e}")
@@ -183,7 +189,11 @@ class PaddleOCRProvider(OCRProviderV2):
             # Calculate average confidence
             avg_confidence = total_confidence / block_count if block_count > 0 else 0.0
             
-            # Combine text
+            # IMPROVED: Post-process blocks to fix common OCR errors
+            blocks = self.post_processor.post_process_blocks(blocks)
+            
+            # Recombine text after post-processing
+            all_text = [b.text for b in blocks]
             raw_text = "\n".join(all_text)
             
             # IMPROVED: Use enhanced field extractor
@@ -192,6 +202,9 @@ class PaddleOCRProvider(OCRProviderV2):
                 image_size=image_size,
                 combined_text=raw_text
             )
+            
+            # IMPROVED: Validate and fix extracted fields
+            data = self.post_processor.validate_and_fix_extracted_data(data)
             
             logger.info(
                 f"✅ {self.name} recognized {block_count} blocks, "
