@@ -872,10 +872,10 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                   alt="Business Card"
                   style={{
                     display: 'block',
+                    width: `${ocrBlocks.image_width * imageScale}px`,
+                    height: `${ocrBlocks.image_height * imageScale}px`,
                     maxWidth: '100%',
-                    maxHeight: '100%',
-                    transform: `scale(${imageScale})`,
-                    transformOrigin: 'top left'
+                    maxHeight: '100%'
                   }}
                 />
                 
