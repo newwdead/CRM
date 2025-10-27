@@ -260,7 +260,7 @@ export default function UploadCard({ lang = 'ru', defaultProvider = 'auto' }) {
           {/* OCR v2.0 providers */}
           <optgroup label={lang === 'ru' ? '🤖 OCR v2.0 (Рекомендуется)' : '🤖 OCR v2.0 (Recommended)'}>
             {availableProviders.includes('PaddleOCR') && (
-              <option value="paddleocr">PaddleOCR (AI + Russian)</option>
+              <option value="paddleocr">PaddleOCR (AI + Cyrillic)</option>
             )}
           </optgroup>
           
