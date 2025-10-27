@@ -45,6 +45,17 @@ class TextBlock:
     confidence: float
     block_id: Optional[int] = None
     field_type: Optional[str] = None  # For LayoutLMv3 classification
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert TextBlock to dictionary for JSON serialization"""
+        return {
+            'text': self.text,
+            'box': self.bbox.to_dict(),  # Use 'box' key to match frontend expectations
+            'bbox': self.bbox.to_dict(),  # Also include 'bbox' for compatibility
+            'confidence': self.confidence,
+            'block_id': self.block_id,
+            'field_type': self.field_type,
+        }
 
 
 class OCRProviderV2(ABC):

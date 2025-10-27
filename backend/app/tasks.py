@@ -139,6 +139,18 @@ def _process_card_sync(
             else:
                 recognition_method += " v1.0"
             
+            # Convert blocks to dict if they exist
+            blocks_data = []
+            if 'blocks' in ocr_result and ocr_result['blocks']:
+                for block in ocr_result['blocks']:
+                    if hasattr(block, 'to_dict'):
+                        blocks_data.append(block.to_dict())
+                    elif isinstance(block, dict):
+                        blocks_data.append(block)
+            
+            # Get image dimensions for blocks
+            image_size = ocr_result.get('image_size', (0, 0))
+            
             raw_json = json.dumps({
                 'method': f'ocr_{ocr_version}',
                 'provider': ocr_result['provider'],
@@ -148,6 +160,9 @@ def _process_card_sync(
                 'layoutlm_used': ocr_result.get('layoutlm_used', False),
                 'layoutlm_confidence': ocr_result.get('layoutlm_confidence'),
                 'validation': ocr_result.get('validation', {}),
+                'blocks': blocks_data,  # ✅ Add blocks for editor
+                'image_width': image_size[0],
+                'image_height': image_size[1],
             }, ensure_ascii=False)
             
             logger.info(
@@ -319,6 +334,18 @@ def process_single_card(
             else:
                 recognition_method += " v1.0"
             
+            # Convert blocks to dict if they exist
+            blocks_data = []
+            if 'blocks' in ocr_result and ocr_result['blocks']:
+                for block in ocr_result['blocks']:
+                    if hasattr(block, 'to_dict'):
+                        blocks_data.append(block.to_dict())
+                    elif isinstance(block, dict):
+                        blocks_data.append(block)
+            
+            # Get image dimensions for blocks
+            image_size = ocr_result.get('image_size', (0, 0))
+            
             raw_json = json.dumps({
                 'method': f'ocr_{ocr_version}',
                 'provider': ocr_result['provider'],
@@ -327,6 +354,9 @@ def process_single_card(
                 'raw_text': ocr_result.get('raw_text'),
                 'layoutlm_used': ocr_result.get('layoutlm_used', False),
                 'validation': ocr_result.get('validation', {}),
+                'blocks': blocks_data,  # ✅ Add blocks for editor
+                'image_width': image_size[0],
+                'image_height': image_size[1],
             }, ensure_ascii=False)
             
             logger.info(f"✅ OCR {ocr_version} completed for {filename} with {recognition_method}")

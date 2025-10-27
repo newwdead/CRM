@@ -152,6 +152,18 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
                 except Exception as val_error:
                     logger.warning(f"⚠️ Validator failed (non-critical): {val_error}")
                 
+                # Convert blocks to dict if they exist
+                blocks_data = []
+                if 'blocks' in ocr_result and ocr_result['blocks']:
+                    for block in ocr_result['blocks']:
+                        if hasattr(block, 'to_dict'):
+                            blocks_data.append(block.to_dict())
+                        elif isinstance(block, dict):
+                            blocks_data.append(block)
+                
+                # Get image dimensions for blocks
+                image_size = ocr_result.get('image_size', (0, 0))
+                
                 raw_json = json.dumps({
                     'method': 'ocr',
                     'provider': ocr_result['provider'],
@@ -161,6 +173,10 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
                     'layoutlm_used': ocr_result.get('layoutlm_used', False),
                     'layoutlm_confidence': ocr_result.get('layoutlm_confidence', 0),
                     'validation_applied': 'validated_data' in locals(),
+                    'blocks': blocks_data,  # ✅ Add blocks for editor
+                    'image_width': image_size[0],
+                    'image_height': image_size[1],
+                    'block_count': len(blocks_data),
                 }, ensure_ascii=False)
                 
                 logger.info(f"OCR successful with {used_provider}, confidence: {ocr_result.get('confidence', 0)}")

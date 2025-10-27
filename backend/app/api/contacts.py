@@ -233,25 +233,31 @@ def get_contact_ocr_blocks(
         with open(image_path, 'rb') as f:
             image_bytes = f.read()
         
-        # Check if contact has saved OCR blocks (user-modified)
+        # Check if contact has saved OCR blocks (user-modified or from OCR v2.0)
         import json
         saved_blocks = None
+        image_width = 0
+        image_height = 0
+        
         if contact.ocr_raw:
             try:
                 ocr_data = json.loads(contact.ocr_raw)
                 if isinstance(ocr_data, dict) and 'blocks' in ocr_data:
                     saved_blocks = ocr_data['blocks']
-            except:
+                    image_width = ocr_data.get('image_width', 0)
+                    image_height = ocr_data.get('image_height', 0)
+                    logger.info(f"📦 Using saved blocks: {len(saved_blocks)} blocks")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to parse saved blocks: {e}")
                 pass
         
         # If we have saved blocks, use them; otherwise extract from image
         if saved_blocks:
-            # Use saved blocks from previous edit/reprocess
+            # Use saved blocks from previous edit/reprocess or OCR v2.0
             lines = saved_blocks
-            image_width = saved_blocks[0].get('image_width', 0) if saved_blocks else 0
-            image_height = saved_blocks[0].get('image_height', 0) if saved_blocks else 0
         else:
-            # Extract blocks from image using Tesseract
+            # Extract blocks from image using Tesseract as fallback
+            logger.info("🔍 No saved blocks found, extracting with Tesseract...")
             tesseract_langs = get_setting(db, 'TESSERACT_LANGS', 'rus+eng')
             result = tesseract_boxes.get_text_blocks(image_bytes, lang=tesseract_langs)
             lines = tesseract_boxes.group_blocks_by_line(result['blocks'])
