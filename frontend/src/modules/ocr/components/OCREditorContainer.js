@@ -41,6 +41,9 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
 
   // Image controls hook
   const { imageRef, imageScale, calculateImageScale } = useImageControls();
+  
+  // Block scale factor state (for coordinate transformation)
+  const [blockScaleFactor, setBlockScaleFactor] = useState(1);
 
   // OCR blocks hook
   const {
@@ -49,6 +52,7 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
     loading,
     reprocessing,
     reprocessOCR,
+    saveOCRBlocks,
     saveOCRCorrections
   } = useOCRBlocks(
     contact.id,
@@ -83,11 +87,17 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
     editBlockMode,
     setEditBlockMode,
     draggingBlock,
+    dragPosition,
+    resizingBlock,
+    resizeBox,
     isAddingBlock,
     editingBlockText,
     startBlockDrag,
     handleBlockDrag,
     endBlockDrag,
+    startBlockResize,
+    handleBlockResize,
+    endBlockResize,
     deleteBlock,
     startAddingBlock,
     handleNewBlockMouseDown,
@@ -101,11 +111,13 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
     setOcrBlocks,
     imageRef,
     imageScale,
+    blockScaleFactor,
     language
   );
 
   // Initialize edited data from contact
   useEffect(() => {
+    console.log('🟢 OCREditorContainer mounted for contact:', contact.id);
     const initial = {};
     editableFields.forEach(field => {
       initial[field] = contact[field] || '';
@@ -113,12 +125,28 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
     setEditedData(initial);
   }, [contact]);
 
-  // Handle dragging
+  // Handle dragging and resizing
   useEffect(() => {
-    if (!draggingBlock || !editBlockMode) return;
+    const isDragging = draggingBlock && editBlockMode;
+    const isResizing = resizingBlock && editBlockMode;
+    
+    if (!isDragging && !isResizing) return;
 
-    const handleMouseMove = (e) => handleBlockDrag(e);
-    const handleMouseUp = () => endBlockDrag();
+    const handleMouseMove = (e) => {
+      if (isDragging) {
+        handleBlockDrag(e);
+      } else if (isResizing) {
+        handleBlockResize(e);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      if (isDragging) {
+        endBlockDrag();
+      } else if (isResizing) {
+        endBlockResize();
+      }
+    };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
@@ -127,24 +155,42 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingBlock, editBlockMode, handleBlockDrag, endBlockDrag]);
+  }, [draggingBlock, resizingBlock, editBlockMode, handleBlockDrag, endBlockDrag, handleBlockResize, endBlockResize]);
 
   // Handle save
   const handleSave = async () => {
-    // Check for changes
-    const hasChanges = editableFields.some(
-      field => editedData[field] !== (contact[field] || '')
-    );
-
-    if (!hasChanges) {
-      toast.info(translations.messages?.noChanges || 'No changes to save');
-      return;
-    }
-
     setSaving(true);
+    
     try {
-      await onSave(editedData);
-      // Success handled by parent
+      // Step 1: Save OCR blocks (positions and sizes) if they exist
+      if (ocrBlocks && ocrBlocks.lines && ocrBlocks.lines.length > 0) {
+        console.log('💾 Saving OCR blocks before contact save...');
+        try {
+          await saveOCRBlocks(ocrBlocks);
+          console.log('✅ OCR blocks saved successfully');
+        } catch (blockError) {
+          console.error('❌ Failed to save OCR blocks:', blockError);
+          toast.error('Failed to save block changes');
+          setSaving(false);
+          return;
+        }
+      }
+      
+      // Step 2: Check for contact field changes
+      const hasFieldChanges = editableFields.some(
+        field => editedData[field] !== (contact[field] || '')
+      );
+
+      // Step 3: Save contact data if there are changes
+      if (hasFieldChanges) {
+        await onSave(editedData);
+        // Success handled by parent
+      } else {
+        // No field changes, but blocks were saved
+        toast.success('Changes saved successfully');
+        setSaving(false);
+      }
+      
     } catch (error) {
       console.error('Save error:', error);
       toast.error(translations.messages?.error || 'Failed to save');
@@ -299,11 +345,17 @@ const OCREditorContainer = ({ contact, onSave, onClose }) => {
               ocrBlocks={ocrBlocks}
               selectedBlocks={selectedBlocks}
               editMode={editBlockMode}
+              draggingBlock={draggingBlock}
+              dragPosition={dragPosition}
+              resizingBlock={resizingBlock}
+              resizeBox={resizeBox}
               isAddingBlock={isAddingBlock}
               onBlockClick={handleBlockClick}
               onBlockDragStart={startBlockDrag}
+              onBlockResizeStart={startBlockResize}
               onMouseDown={handleNewBlockMouseDown}
               onMouseUp={handleNewBlockMouseUp}
+              onBlockScaleFactorChange={setBlockScaleFactor}
               translations={translations}
             />
 

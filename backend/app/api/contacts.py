@@ -4,6 +4,7 @@ Contacts API endpoints
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict
+from datetime import datetime
 import uuid
 import logging
 import os
@@ -255,6 +256,7 @@ def get_contact_ocr_blocks(
         if saved_blocks:
             # Use saved blocks from previous edit/reprocess or OCR v2.0
             lines = saved_blocks
+            logger.info(f"✅ Returning {len(lines)} saved blocks to frontend")
         else:
             # Extract blocks from image using Tesseract as fallback
             logger.info("🔍 No saved blocks found, extracting with Tesseract...")
@@ -533,6 +535,103 @@ def reprocess_contact_ocr(
         raise HTTPException(status_code=500, detail=f'Failed to reprocess OCR: {str(e)}')
 
 
+@router.post('/{contact_id}/save-ocr-blocks')
+def save_contact_ocr_blocks(
+    contact_id: int,
+    blocks_data: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_utils.get_current_active_user)
+):
+    """
+    Save modified OCR blocks for a contact.
+    Updates block positions and sizes after user editing.
+    """
+    import json
+    
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail='Contact not found')
+    
+    try:
+        # Get blocks and image dimensions from request
+        blocks = blocks_data.get('blocks', [])
+        image_width = blocks_data.get('image_width', 0)
+        image_height = blocks_data.get('image_height', 0)
+        
+        logger.info(f"💾 Saving {len(blocks)} OCR blocks for contact {contact_id}")
+        logger.info(f"📊 Received blocks_data keys: {list(blocks_data.keys())}")
+        logger.info(f"📐 Image dimensions: {image_width}x{image_height}")
+        
+        if blocks:
+            logger.info(f"📦 First block sample: {blocks[0] if blocks else 'N/A'}")
+            logger.info(f"📦 Last block sample: {blocks[-1] if len(blocks) > 1 else 'N/A'}")
+        
+        # Load existing ocr_raw data
+        existing_data = {}
+        if contact.ocr_raw:
+            try:
+                existing_data = json.loads(contact.ocr_raw)
+            except:
+                pass
+        
+        # Normalize block coordinates (recalculate x2, y2 from x, y, width, height)
+        normalized_blocks = []
+        for i, block in enumerate(blocks):
+            # Deep copy the block to avoid mutations
+            normalized_block = {
+                'text': block.get('text', ''),
+                'confidence': block.get('confidence', 0),
+                'block_id': block.get('block_id'),
+                'field_type': block.get('field_type'),
+                'bbox': block.get('bbox'),
+            }
+            
+            if 'box' in block:
+                box = block['box']
+                # Create NEW box dict with recalculated x2, y2
+                new_box = {
+                    'x': box.get('x', 0),
+                    'y': box.get('y', 0),
+                    'width': box.get('width', 0),
+                    'height': box.get('height', 0),
+                }
+                
+                # Recalculate x2 and y2 based on x, y, width, height
+                new_box['x2'] = new_box['x'] + new_box['width']
+                new_box['y2'] = new_box['y'] + new_box['height']
+                
+                # Log first block transformation
+                if i == 0:
+                    logger.info(f"🔧 Normalizing block[0]: x={new_box['x']:.1f}, width={new_box['width']:.1f}, x2_old={box.get('x2', 0):.1f} → x2_new={new_box['x2']:.1f}")
+                
+                normalized_block['box'] = new_box
+            
+            normalized_blocks.append(normalized_block)
+        
+        # Update blocks while preserving other OCR data
+        existing_data['blocks'] = normalized_blocks
+        existing_data['image_width'] = image_width
+        existing_data['image_height'] = image_height
+        existing_data['blocks_modified'] = True
+        existing_data['blocks_modified_at'] = str(datetime.now())
+        
+        # Save back to database
+        contact.ocr_raw = json.dumps(existing_data, ensure_ascii=False)
+        db.commit()
+        
+        logger.info(f"✅ OCR blocks saved for contact {contact_id}")
+        
+        return {
+            'success': True,
+            'message': f'Saved {len(blocks)} OCR blocks',
+            'blocks_count': len(blocks)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving OCR blocks for contact {contact_id}: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to save OCR blocks: {str(e)}')
+
+
 @router.post('/{contact_id}/rerun-ocr')
 def rerun_contact_ocr(
     contact_id: int,
@@ -546,7 +645,6 @@ def rerun_contact_ocr(
     """
     import json
     import os
-    from datetime import datetime
     
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:

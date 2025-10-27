@@ -26,6 +26,7 @@ export const useOCRBlocks = (contactId, calculateImageScale, editableFields, set
    */
   const loadOCRBlocks = async () => {
     try {
+      console.log('🔵 useOCRBlocks: Loading blocks for contact', contactId);
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/contacts/${contactId}/ocr-blocks`, {
@@ -37,6 +38,10 @@ export const useOCRBlocks = (contactId, calculateImageScale, editableFields, set
       if (!response.ok) throw new Error('Failed to load OCR blocks');
 
       const data = await response.json();
+      console.log('🔵 useOCRBlocks: Loaded blocks:', {
+        lines: data.lines?.length,
+        imageSize: `${data.image_width}x${data.image_height}`
+      });
       setOcrBlocks(data);
       
       // Calculate image scale to fit container
@@ -57,68 +62,105 @@ export const useOCRBlocks = (contactId, calculateImageScale, editableFields, set
   };
 
   /**
-   * Reprocess OCR with current blocks
+   * Reprocess OCR - completely rerun OCR from scratch with OCR v2.0
    */
   const reprocessOCR = async () => {
-    if (!ocrBlocks || !ocrBlocks.lines) {
-      toast.error('No OCR blocks to reprocess');
-      return;
-    }
-
     setReprocessing(true);
     try {
       const token = localStorage.getItem('token');
       
-      // Send updated blocks to backend
-      const response = await fetch(`/api/contacts/${contactId}/reprocess-ocr`, {
+      // Call rerun-ocr endpoint (runs OCR v2.0 from scratch)
+      const response = await fetch(`/api/contacts/${contactId}/rerun-ocr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          blocks: ocrBlocks.lines.map(line => ({
-            text: line.text,
-            box: line.box,
-            confidence: line.confidence
-          }))
-        })
+        }
       });
 
-      if (!response.ok) throw new Error('Failed to reprocess OCR');
+      if (!response.ok) throw new Error('Failed to rerun OCR');
 
-      const data = await response.json();
+      const result = await response.json();
+      
+      console.log('🔄 OCR rerun result:', result);
       
       // Update contact data with new OCR results
-      if (editableFields && setEditedData) {
-        Object.keys(data).forEach(key => {
+      if (result.contact && editableFields && setEditedData) {
+        Object.keys(result.contact).forEach(key => {
           if (editableFields.includes(key)) {
             setEditedData(prev => ({
               ...prev,
-              [key]: data[key] || prev[key]
+              [key]: result.contact[key] || prev[key]
             }));
           }
         });
       }
       
-      if (translations && translations.reprocessSuccess) {
-        toast.success(translations.reprocessSuccess);
-      } else {
-        toast.success('OCR reprocessed successfully');
-      }
+      const successMessage = translations?.reprocessSuccess || 
+        `OCR rerun successful: ${result.blocks_count} blocks detected with ${result.provider}`;
+      toast.success(successMessage);
       
       // Reload OCR blocks
       await loadOCRBlocks();
       
     } catch (error) {
-      console.error('Error reprocessing OCR:', error);
+      console.error('Error rerunning OCR:', error);
       if (translations && translations.reprocessError) {
         toast.error(translations.reprocessError);
       } else {
-        toast.error('Failed to reprocess OCR');
+        toast.error('Failed to rerun OCR');
       }
     } finally {
       setReprocessing(false);
+    }
+  };
+
+  /**
+   * Save modified OCR blocks (positions and sizes)
+   */
+  const saveOCRBlocks = async (blocks) => {
+    if (!blocks || !blocks.lines || blocks.lines.length === 0) {
+      console.warn('⚠️ No blocks to save');
+      return false;
+    }
+
+    try {
+      console.log('💾 Saving OCR blocks:', {
+        count: blocks.lines.length,
+        imageSize: `${blocks.image_width}x${blocks.image_height}`,
+        firstBlock: blocks.lines[0],
+        allBlocks: blocks.lines.map((b, i) => `${i}: ${b.text?.substring(0, 20)}`)
+      });
+
+      const payload = {
+        blocks: blocks.lines,
+        image_width: blocks.image_width,
+        image_height: blocks.image_height
+      };
+      
+      console.log('📤 Payload being sent:', JSON.stringify(payload).substring(0, 500) + '...');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/contacts/${contactId}/save-ocr-blocks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save blocks');
+      }
+
+      const result = await response.json();
+      console.log('✅ OCR blocks saved:', result);
+      return true;
+    } catch (error) {
+      console.error('❌ Error saving OCR blocks:', error);
+      throw error;
     }
   };
 
@@ -170,6 +212,7 @@ export const useOCRBlocks = (contactId, calculateImageScale, editableFields, set
     reprocessing,
     loadOCRBlocks,
     reprocessOCR,
+    saveOCRBlocks,
     saveOCRCorrections
   };
 };

@@ -168,6 +168,7 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   };
 
   useEffect(() => {
+    console.log('🟢 OCR Editor mounted for contact:', contact.id);
     // Initialize edited data
     const initial = {};
     editableFields.forEach(field => {
@@ -204,6 +205,7 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
 
   const loadOCRBlocks = async () => {
     try {
+      console.log('🔵 Loading OCR blocks for contact:', contact.id);
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/contacts/${contact.id}/ocr-blocks`, {
@@ -215,6 +217,10 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
       if (!response.ok) throw new Error('Failed to load OCR blocks');
 
       const data = await response.json();
+      console.log('🔵 OCR blocks loaded:', { 
+        lines: data.lines?.length, 
+        imageSize: `${data.image_width}x${data.image_height}` 
+      });
       setOcrBlocks(data);
       
       // Calculate image scale to fit container
@@ -244,11 +250,19 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
 
   // Handle image load to get real dimensions
   const handleImageLoad = () => {
-    if (!imageRef.current || !ocrBlocks) return;
+    console.log('🔵 handleImageLoad called!');
+    if (!imageRef.current || !ocrBlocks) {
+      console.log('⚠️ handleImageLoad: missing imageRef or ocrBlocks', { 
+        hasImageRef: !!imageRef.current, 
+        hasOcrBlocks: !!ocrBlocks 
+      });
+      return;
+    }
     
     const img = imageRef.current;
     const realWidth = img.naturalWidth;
     const realHeight = img.naturalHeight;
+    console.log('🔵 Image dimensions:', { realWidth, realHeight });
     
     setRealImageSize({ width: realWidth, height: realHeight });
     

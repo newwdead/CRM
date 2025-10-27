@@ -1,0 +1,237 @@
+/* OCR Table Editor Styles */
+
+.ocr-table-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8fafc;
+}
+
+.ocr-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.ocr-editor-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #1e293b;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ocr-table-content {
+  display: grid;
+  grid-template-columns: 45% 55%;
+  gap: 20px;
+  padding: 20px;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+.image-preview-panel,
+.blocks-table-panel {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: auto;
+}
+
+.image-preview-panel h3,
+.blocks-table-panel h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #475569;
+}
+
+.image-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.image-container img {
+  display: block;
+}
+
+.blocks-table-wrapper {
+  overflow-x: auto;
+}
+
+.blocks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.blocks-table thead {
+  background: #f1f5f9;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.blocks-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.blocks-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.blocks-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.blocks-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.blocks-table tbody tr.selected {
+  background-color: #eff6ff;
+}
+
+.block-text-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.block-text-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.block-field-select {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.block-field-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-delete-small {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  transition: transform 0.2s;
+}
+
+.btn-delete-small:hover {
+  transform: scale(1.2);
+}
+
+.btn-primary {
+  padding: 10px 20px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-primary:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: white;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ocr-editor-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 18px;
+  color: #64748b;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+.no-blocks {
+  text-align: center;
+  padding: 40px;
+  color: #94a3b8;
+  font-size: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1200px) {
+  .ocr-table-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .image-preview-panel {
+    max-height: 400px;
+  }
+}
+

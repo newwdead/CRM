@@ -28,16 +28,68 @@ const ImageCanvas = ({
   ocrBlocks,
   selectedBlocks = [],
   editMode,
+  draggingBlock,
+  dragPosition,
+  resizingBlock,
+  resizeBox,
   isAddingBlock,
   onBlockClick,
   onBlockDragStart,
+  onBlockResizeStart,
   onMouseDown,
   onMouseUp,
+  onBlockScaleFactorChange,
   translations
 }) => {
   const t = translations || {};
+  const [realImageSize, setRealImageSize] = React.useState(null);
+  const [blockScaleFactor, setBlockScaleFactor] = React.useState(1);
+
+  console.log('🔵 ImageCanvas render:', {
+    hasImage: !!imageUrl,
+    hasBlocks: !!ocrBlocks,
+    imageScale,
+    blocksCount: ocrBlocks?.lines?.length,
+    realImageSize,
+    blockScaleFactor
+  });
+
+  const handleImageLoad = (e) => {
+    const img = e.target;
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+    
+    // Get ACTUAL displayed size (after browser applies maxWidth/maxHeight)
+    const displayedWidth = img.clientWidth;
+    const displayedHeight = img.clientHeight;
+    
+    setRealImageSize({ width: displayedWidth, height: displayedHeight });
+    
+    // Calculate block scale factor based on displayed size vs OCR coordinates
+    if (ocrBlocks && ocrBlocks.image_width && ocrBlocks.image_height) {
+      const scaleX = displayedWidth / ocrBlocks.image_width;
+      const scaleY = displayedHeight / ocrBlocks.image_height;
+      const scaleFactor = (scaleX + scaleY) / 2;
+      setBlockScaleFactor(scaleFactor);
+      
+      // Notify parent component
+      if (onBlockScaleFactorChange) {
+        onBlockScaleFactorChange(scaleFactor);
+      }
+      
+      console.log('📸 Image loaded in Canvas:', {
+        naturalSize: `${naturalWidth}x${naturalHeight}`,
+        displayedSize: `${displayedWidth}x${displayedHeight}`,
+        dbSize: `${ocrBlocks.image_width}x${ocrBlocks.image_height}`,
+        displayScale: imageScale,
+        blockScaleFactor: scaleFactor.toFixed(3),
+        mismatch: (naturalWidth !== ocrBlocks.image_width || naturalHeight !== ocrBlocks.image_height) ? '⚠️ SIZE MISMATCH!' : '✅ MATCH'
+      });
+    }
+  };
 
   if (!imageUrl || !ocrBlocks) {
+    console.log('⚠️ ImageCanvas: Missing data', { imageUrl: !!imageUrl, ocrBlocks: !!ocrBlocks });
     return (
       <div style={{
         flex: 1,
@@ -76,12 +128,11 @@ const ImageCanvas = ({
           ref={imageRef}
           src={imageUrl}
           alt="Business Card"
+          onLoad={handleImageLoad}
           style={{
             display: 'block',
             maxWidth: '100%',
             maxHeight: '100%',
-            transform: `scale(${imageScale})`,
-            transformOrigin: 'top left',
             userSelect: 'none'
           }}
           draggable={false}
@@ -95,8 +146,8 @@ const ImageCanvas = ({
             position: 'absolute',
             top: 0,
             left: 0,
-            width: `${(ocrBlocks.image_width || 0) * imageScale}px`,
-            height: `${(ocrBlocks.image_height || 0) * imageScale}px`,
+            width: realImageSize ? `${realImageSize.width * imageScale}px` : `${(ocrBlocks?.image_width || 0) * imageScale}px`,
+            height: realImageSize ? `${realImageSize.height * imageScale}px` : `${(ocrBlocks?.image_height || 0) * imageScale}px`,
             pointerEvents: 'auto',
             cursor: isAddingBlock ? 'crosshair' : 'default'
           }}
@@ -105,6 +156,10 @@ const ImageCanvas = ({
           {ocrBlocks.lines && ocrBlocks.lines.map((line, idx) => {
             const isSelected = selectedBlocks.includes(line);
             const selectionIndex = selectedBlocks.indexOf(line);
+            const isDragging = draggingBlock === line;
+            const tempPosition = isDragging ? dragPosition : null;
+            const isResizing = resizingBlock === line;
+            const tempBox = isResizing ? resizeBox : null;
             
             return (
               <BlockOverlay
@@ -115,8 +170,14 @@ const ImageCanvas = ({
                 selectionIndex={selectionIndex}
                 editMode={editMode}
                 imageScale={imageScale}
+                blockScaleFactor={blockScaleFactor}
+                isDragging={isDragging}
+                tempPosition={tempPosition}
+                isResizing={isResizing}
+                tempBox={tempBox}
                 onClick={(e) => !editMode && onBlockClick && onBlockClick(line, e)}
                 onDragStart={(e) => editMode && onBlockDragStart && onBlockDragStart(line, e)}
+                onResizeStart={(handle, e) => editMode && onBlockResizeStart && onBlockResizeStart(line, handle, e)}
               />
             );
           })}

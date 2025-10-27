@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { OCREditorContainer } from '../../modules/ocr';
+import OCRBlocksTableEditor from '../OCRBlocksTableEditor';
 import toast from 'react-hot-toast';
 
 /**
@@ -142,50 +142,13 @@ const OCREditorPage = () => {
     );
   }
 
-  // Main OCR Editor
+  // Main OCR Editor - Using New Simple Table Editor
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={handleClose}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-              title="Вернуться назад"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">
-                Редактор OCR блоков
-              </h1>
-              <p className="text-sm text-gray-500">
-                {contact.full_name || 'Без имени'} 
-                {contact.company && ` - ${contact.company}`}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              ID: {contact.id}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* OCR Editor Container */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <OCREditorContainer
-          contact={contact}
-          onSave={handleSave}
-          onClose={handleClose}
-        />
-      </div>
-    </div>
+    <OCRBlocksTableEditor
+      contact={contact}
+      onSave={handleSave}
+      onClose={handleClose}
+    />
   );
 };
 

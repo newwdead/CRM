@@ -16,12 +16,18 @@ import toast from 'react-hot-toast';
  * @param {function} setOcrBlocks - Setter for OCR blocks
  * @param {object} imageRef - Ref to image container
  * @param {number} imageScale - Current image scale
+ * @param {number} blockScaleFactor - Block coordinate scale factor
  * @param {string} language - Current language (ru/en)
  * @returns {object} Block manipulation state and operations
  */
-export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageScale, language = 'en') => {
+export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageScale, blockScaleFactor = 1, language = 'en') => {
   const [draggingBlock, setDraggingBlock] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState(null); // Temporary position during drag
   const [resizingBlock, setResizingBlock] = useState(null);
+  const [resizeHandle, setResizeHandle] = useState(null); // Which handle is being dragged
+  const [resizeStart, setResizeStart] = useState(null); // Start position and size
+  const [resizeBox, setResizeBox] = useState(null); // Temporary box during resize
   const [editingBlockText, setEditingBlockText] = useState(null);
   const [isAddingBlock, setIsAddingBlock] = useState(null);
   const [newBlockStart, setNewBlockStart] = useState(null);
@@ -31,9 +37,33 @@ export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageSca
    * Start dragging a block
    */
   const startBlockDrag = (block, event) => {
-    if (!editBlockMode) return;
+    if (!editBlockMode || !imageRef.current) return;
     event.stopPropagation();
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    
+    // Calculate mouse position in displayed image coordinates
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
+    
+    // Calculate block position in displayed coordinates
+    const scaledBlockX = block.box.x * blockScaleFactor;
+    const scaledBlockY = block.box.y * blockScaleFactor;
+    
+    // Store offset between mouse and block top-left corner
+    setDragOffset({
+      x: mouseX - scaledBlockX,
+      y: mouseY - scaledBlockY
+    });
+    
     setDraggingBlock(block);
+    
+    console.log('🔵 Drag start:', {
+      mouse: `${mouseX.toFixed(0)}, ${mouseY.toFixed(0)}`,
+      blockScaled: `${scaledBlockX.toFixed(0)}, ${scaledBlockY.toFixed(0)}`,
+      offset: `${(mouseX - scaledBlockX).toFixed(0)}, ${(mouseY - scaledBlockY).toFixed(0)}`,
+      blockScaleFactor
+    });
   };
 
   /**
@@ -44,33 +74,169 @@ export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageSca
     
     const rect = imageRef.current.getBoundingClientRect();
     
-    // Calculate new position relative to image
-    const x = (event.clientX - rect.left) / imageScale;
-    const y = (event.clientY - rect.top) / imageScale;
+    // Calculate mouse position in displayed image coordinates
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
     
-    // Update block position (keeping width and height)
-    setOcrBlocks(prev => ({
-      ...prev,
-      lines: prev.lines.map(line => 
-        line === draggingBlock
-          ? { 
-              ...line, 
-              box: { 
-                ...line.box, 
-                x: Math.max(0, Math.min(x, prev.image_width - line.box.width)),
-                y: Math.max(0, Math.min(y, prev.image_height - line.box.height))
-              } 
-            }
-          : line
-      )
-    }));
+    // Calculate new block position (subtract offset)
+    const newScaledX = mouseX - dragOffset.x;
+    const newScaledY = mouseY - dragOffset.y;
+    
+    // Convert back to OCR coordinate space
+    const newX = newScaledX / blockScaleFactor;
+    const newY = newScaledY / blockScaleFactor;
+    
+    // Store temporary position for rendering
+    setDragPosition({ x: newX, y: newY });
   };
 
   /**
    * End block drag
    */
   const endBlockDrag = () => {
+    if (draggingBlock && dragPosition) {
+      // Apply final position to state
+      setOcrBlocks(prev => {
+        const maxWidth = prev.image_width;
+        const maxHeight = prev.image_height;
+        
+        return {
+          ...prev,
+          lines: prev.lines.map(line => 
+            line === draggingBlock
+              ? { 
+                  ...line, 
+                  box: { 
+                    ...line.box, 
+                    x: Math.max(0, Math.min(dragPosition.x, maxWidth - line.box.width)),
+                    y: Math.max(0, Math.min(dragPosition.y, maxHeight - line.box.height))
+                  } 
+                }
+              : line
+          )
+        };
+      });
+    }
+    
     setDraggingBlock(null);
+    setDragPosition(null);
+  };
+
+  /**
+   * Start resizing a block
+   */
+  const startBlockResize = (block, handle, event) => {
+    if (!editBlockMode || !imageRef.current) return;
+    event.stopPropagation();
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
+    
+    setResizingBlock(block);
+    setResizeHandle(handle);
+    setResizeStart({
+      mouseX,
+      mouseY,
+      box: { ...block.box }
+    });
+    
+    console.log('🔵 Resize start:', { handle, box: block.box });
+  };
+
+  /**
+   * Handle block resize movement
+   */
+  const handleBlockResize = (event) => {
+    if (!resizingBlock || !resizeStart || !imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
+    
+    // Calculate delta in scaled coordinates
+    const deltaX = (mouseX - resizeStart.mouseX) / blockScaleFactor;
+    const deltaY = (mouseY - resizeStart.mouseY) / blockScaleFactor;
+    
+    const startBox = resizeStart.box;
+    let newBox = { ...startBox };
+    
+    // Apply delta based on which handle is being dragged
+    switch (resizeHandle) {
+      case 'se': // Bottom-right corner
+        newBox.width = Math.max(20, startBox.width + deltaX);
+        newBox.height = Math.max(20, startBox.height + deltaY);
+        break;
+      case 'sw': // Bottom-left corner
+        newBox.x = startBox.x + deltaX;
+        newBox.width = Math.max(20, startBox.width - deltaX);
+        newBox.height = Math.max(20, startBox.height + deltaY);
+        break;
+      case 'ne': // Top-right corner
+        newBox.y = startBox.y + deltaY;
+        newBox.width = Math.max(20, startBox.width + deltaX);
+        newBox.height = Math.max(20, startBox.height - deltaY);
+        break;
+      case 'nw': // Top-left corner
+        newBox.x = startBox.x + deltaX;
+        newBox.y = startBox.y + deltaY;
+        newBox.width = Math.max(20, startBox.width - deltaX);
+        newBox.height = Math.max(20, startBox.height - deltaY);
+        break;
+      case 'e': // Right edge
+        newBox.width = Math.max(20, startBox.width + deltaX);
+        break;
+      case 'w': // Left edge
+        newBox.x = startBox.x + deltaX;
+        newBox.width = Math.max(20, startBox.width - deltaX);
+        break;
+      case 'n': // Top edge
+        newBox.y = startBox.y + deltaY;
+        newBox.height = Math.max(20, startBox.height - deltaY);
+        break;
+      case 's': // Bottom edge
+        newBox.height = Math.max(20, startBox.height + deltaY);
+        break;
+    }
+    
+    // Store temporary box for rendering
+    setResizeBox(newBox);
+  };
+
+  /**
+   * End block resize
+   */
+  const endBlockResize = () => {
+    if (resizingBlock && resizeBox) {
+      // Apply final size to state
+      setOcrBlocks(prev => {
+        const maxWidth = prev.image_width;
+        const maxHeight = prev.image_height;
+        
+        return {
+          ...prev,
+          lines: prev.lines.map(line => 
+            line === resizingBlock
+              ? { 
+                  ...line, 
+                  box: { 
+                    ...resizeBox,
+                    x: Math.max(0, Math.min(resizeBox.x, maxWidth - resizeBox.width)),
+                    y: Math.max(0, Math.min(resizeBox.y, maxHeight - resizeBox.height)),
+                    width: Math.min(resizeBox.width, maxWidth - resizeBox.x),
+                    height: Math.min(resizeBox.height, maxHeight - resizeBox.y)
+                  } 
+                }
+              : line
+          )
+        };
+      });
+    }
+    
+    setResizingBlock(null);
+    setResizeHandle(null);
+    setResizeStart(null);
+    setResizeBox(null);
   };
 
   /**
@@ -251,7 +417,9 @@ export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageSca
   return {
     // State
     draggingBlock,
+    dragPosition,
     resizingBlock,
+    resizeBox,
     editingBlockText,
     isAddingBlock,
     newBlockStart,
@@ -265,6 +433,11 @@ export const useBlockManipulation = (ocrBlocks, setOcrBlocks, imageRef, imageSca
     startBlockDrag,
     handleBlockDrag,
     endBlockDrag,
+    
+    // Resize
+    startBlockResize,
+    handleBlockResize,
+    endBlockResize,
     
     // Add/delete
     deleteBlock,

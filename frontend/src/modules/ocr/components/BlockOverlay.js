@@ -13,6 +13,7 @@ import { calculateBlockPosition } from '../utils/blockUtils';
  * @param {number} props.selectionIndex - Index in selection (-1 if not selected)
  * @param {boolean} props.editMode - Whether edit mode is enabled
  * @param {number} props.imageScale - Image scale factor
+ * @param {number} props.blockScaleFactor - Block scale factor (for coordinate transformation)
  * @param {function} props.onClick - Click handler
  * @param {function} props.onDragStart - Drag start handler
  * @param {string} props.fieldColor - Field color if assigned
@@ -24,18 +25,45 @@ const BlockOverlay = ({
   selectionIndex = -1,
   editMode,
   imageScale,
+  blockScaleFactor = 1,
+  isDragging,
+  tempPosition,
+  isResizing,
+  tempBox,
   onClick,
   onDragStart,
+  onResizeStart,
   fieldColor
 }) => {
   if (!block || !block.box) return null;
 
   const box = block.box;
+  
+  // Use tempPosition if dragging, tempBox if resizing, otherwise use block's actual position
+  let x, y, width, height;
+  
+  if (isResizing && tempBox) {
+    x = tempBox.x;
+    y = tempBox.y;
+    width = tempBox.width;
+    height = tempBox.height;
+  } else if (isDragging && tempPosition) {
+    x = tempPosition.x;
+    y = tempPosition.y;
+    width = box.width;
+    height = box.height;
+  } else {
+    x = box.x;
+    y = box.y;
+    width = box.width;
+    height = box.height;
+  }
+  
   const scaledBox = {
-    x: box.x * imageScale,
-    y: box.y * imageScale,
-    width: box.width * imageScale,
-    height: box.height * imageScale
+    x: x * blockScaleFactor * imageScale,
+    y: y * blockScaleFactor * imageScale,
+    width: width * blockScaleFactor * imageScale,
+    height: height * blockScaleFactor * imageScale
   };
 
   // Determine fill and stroke based on state
@@ -113,6 +141,95 @@ const BlockOverlay = ({
         >
           {Math.round(block.confidence)}%
         </text>
+      )}
+      
+      {/* Resize handles (only in edit mode and not while dragging) */}
+      {editMode && !isDragging && onResizeStart && (
+        <>
+          {/* Corner handles */}
+          <circle
+            cx={scaledBox.x}
+            cy={scaledBox.y}
+            r="6"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'nw-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('nw', e)}
+          />
+          <circle
+            cx={scaledBox.x + scaledBox.width}
+            cy={scaledBox.y}
+            r="6"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'ne-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('ne', e)}
+          />
+          <circle
+            cx={scaledBox.x}
+            cy={scaledBox.y + scaledBox.height}
+            r="6"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'sw-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('sw', e)}
+          />
+          <circle
+            cx={scaledBox.x + scaledBox.width}
+            cy={scaledBox.y + scaledBox.height}
+            r="6"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'se-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('se', e)}
+          />
+          
+          {/* Edge handles (midpoints) */}
+          <circle
+            cx={scaledBox.x + scaledBox.width / 2}
+            cy={scaledBox.y}
+            r="5"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'n-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('n', e)}
+          />
+          <circle
+            cx={scaledBox.x + scaledBox.width / 2}
+            cy={scaledBox.y + scaledBox.height}
+            r="5"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 's-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('s', e)}
+          />
+          <circle
+            cx={scaledBox.x}
+            cy={scaledBox.y + scaledBox.height / 2}
+            r="5"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'w-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('w', e)}
+          />
+          <circle
+            cx={scaledBox.x + scaledBox.width}
+            cy={scaledBox.y + scaledBox.height / 2}
+            r="5"
+            fill="#fff"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            style={{ cursor: 'e-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => onResizeStart('e', e)}
+          />
+        </>
       )}
     </g>
   );
