@@ -17,6 +17,7 @@ from .telegram import router as telegram_router
 from .whatsapp import router as whatsapp_router
 from .exports import router as exports_router
 from .services import router as services_router
+from .monitoring import router as monitoring_router
 
 # Create main API router
 api_router = APIRouter()
@@ -40,6 +41,7 @@ api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])
 api_router.include_router(telegram_router, prefix="", tags=["Telegram"])  # Absolute paths preserved
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 api_router.include_router(services_router, prefix="", tags=["Services"])  # No prefix - /services/*
+api_router.include_router(monitoring_router, prefix="/monitoring", tags=["Monitoring"])  # OCR v2.0 monitoring
 
 __all__ = [
     'api_router',
