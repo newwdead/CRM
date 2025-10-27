@@ -57,14 +57,17 @@ class PaddleOCRProvider(OCRProviderV2):
                 det_model_dir=None,  # Use default models
                 rec_model_dir=None,
                 cls_model_dir=None,
-                # IMPROVED: Text detection parameters for MAXIMUM sensitivity
-                det_db_thresh=0.2,  # Lower = more sensitive (was 0.3, now 0.2)
-                det_db_box_thresh=0.4,  # Lower = catch more boxes (was 0.5, now 0.4)
-                det_db_unclip_ratio=1.8,  # Higher = larger text regions (was 1.6, now 1.8)
-                det_db_score_mode='slow',  # 'slow' is more accurate than 'fast'
-                # IMPROVED: Recognition parameters
-                rec_batch_num=6,  # Process more blocks at once
-                drop_score=0.3,  # Lower threshold to keep low-confidence text (was 0.5)
+                # TUNED: Better detection for business cards
+                det_db_thresh=0.25,  # Balanced sensitivity
+                det_db_box_thresh=0.45,  # Better box quality
+                det_db_unclip_ratio=1.5,  # Tighter text regions
+                det_db_score_mode='slow',  # More accurate
+                # TUNED: Better recognition
+                rec_batch_num=6,
+                drop_score=0.4,  # Higher = better quality text only
+                # Character recognition
+                use_space_char=True,  # Preserve spaces
+                rec_algorithm='CRNN',  # Default algorithm
                 # Image size limits - prevent auto-resize
                 det_limit_side_len=6000,  # Max side length (no downscaling)
                 det_limit_type='max',  # Limit type: 'max' or 'min'

@@ -46,6 +46,14 @@ class OCRPostProcessor:
             'ђ': '6',
         }
         
+        # Word to number replacements (for phone numbers)
+        self.word_to_digit = {
+            'ПО': '3',   # "ПО" часто распознаётся вместо 3
+            'по': '3',
+            'РО': '3',
+            'ро': '3',
+        }
+        
         # URL/Email fixes
         self.url_fixes = {
             'httpsI': 'https://',
@@ -73,6 +81,10 @@ class OCRPostProcessor:
         
         # Remove spaces and common separators
         cleaned = text.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('.', '')
+        
+        # FIRST: Replace word patterns (ПО → 3)
+        for word, digit in self.word_to_digit.items():
+            cleaned = cleaned.replace(word, digit)
         
         # AGGRESSIVE: Apply character fixes to EVERYTHING
         fixed = ''
@@ -161,7 +173,7 @@ class OCRPostProcessor:
         
         # Check for @ or potential @ patterns
         # Cyrillic model might recognize @ as: а, о, с, е, ©, ®, etc.
-        potential_at_chars = ['@', '©', '®', 'Ⓒ', 'а', 'о']
+        potential_at_chars = ['@', '©', '®', 'Ⓒ', 'а', 'о', 'О', 'с', 'С', 'е', 'Е', 'ѳ', 'Ѳ']
         has_at = any(c in text for c in potential_at_chars)
         
         # AGGRESSIVE: Even without @, check if looks like email pattern
