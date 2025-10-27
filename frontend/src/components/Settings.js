@@ -202,19 +202,59 @@ export default function Settings({ lang = 'ru', defaultProvider = 'auto', onChan
             onBlur={(e) => e.target.style.borderColor = '#e1e4e8'}
           >
             <option value="auto">{t.auto}</option>
-            <option value="tesseract">Tesseract</option>
-            <option value="parsio">Parsio</option>
-            <option value="google">Google Vision</option>
+            <optgroup label={language === 'ru' ? '🤖 OCR v2.0 (Рекомендуется)' : '🤖 OCR v2.0 (Recommended)'}>
+              <option value="paddleocr">PaddleOCR (AI)</option>
+              <option value="paddleocr+layoutlm">PaddleOCR + LayoutLMv3 (Best)</option>
+            </optgroup>
+            <optgroup label={language === 'ru' ? '🔤 OCR v1.0 (Классический)' : '🔤 OCR v1.0 (Classic)'}>
+              <option value="tesseract">Tesseract</option>
+              <option value="parsio">Parsio</option>
+              <option value="google">Google Vision</option>
+            </optgroup>
           </select>
           <div style={{
             marginTop: '12px',
             padding: '10px',
-            backgroundColor: '#e7f3ff',
+            backgroundColor: provider.includes('paddleocr') ? '#d1fae5' : '#e7f3ff',
             borderRadius: '6px',
             fontSize: '12px',
-            color: '#004085'
+            color: provider.includes('paddleocr') ? '#065f46' : '#004085'
           }}>
-            ℹ️ {t.ocrNote}
+            {provider.includes('paddleocr') ? '🚀' : 'ℹ️'}{' '}
+            {provider.includes('paddleocr') 
+              ? (language === 'ru' 
+                  ? 'Используется OCR v2.0 с AI-классификацией полей' 
+                  : 'Using OCR v2.0 with AI field classification')
+              : t.ocrNote}
+          </div>
+          {/* Admin link for OCR version toggle */}
+          <div style={{
+            marginTop: '8px',
+            padding: '8px',
+            backgroundColor: '#fff3cd',
+            borderRadius: '6px',
+            fontSize: '11px',
+            color: '#856404',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>🎛️</span>
+            <span>
+              {language === 'ru' 
+                ? 'Для переключения версии OCR (v1.0 ↔ v2.0) перейдите в' 
+                : 'To toggle OCR version (v1.0 ↔ v2.0) go to'}{' '}
+              <a 
+                href="/admin?tab=settings" 
+                style={{ 
+                  color: '#856404', 
+                  fontWeight: 'bold',
+                  textDecoration: 'underline'
+                }}
+              >
+                {language === 'ru' ? 'Админ Панель → Настройки' : 'Admin Panel → Settings'}
+              </a>
+            </span>
           </div>
         </motion.div>
 

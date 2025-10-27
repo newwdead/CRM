@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { OCRVersionToggle } from './admin';
 
 const SystemSettings = () => {
   const [integrations, setIntegrations] = useState([]);
@@ -290,11 +291,15 @@ const SystemSettings = () => {
         </motion.button>
       </div>
 
+      {/* OCR Version Toggle */}
+      <OCRVersionToggle lang={language} />
+
       {/* Integration Cards Grid */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-        gap: '20px'
+        gap: '20px',
+        marginTop: '24px'
       }}>
         {integrations.map((integration) => {
           const badge = getStatusBadge(integration);

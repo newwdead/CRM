@@ -17,6 +17,7 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [editBlockMode, setEditBlockMode] = useState(false);
   const [draggingBlock, setDraggingBlock] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [resizingBlock, setResizingBlock] = useState(null);
   const [reprocessing, setReprocessing] = useState(false);
   const [editingBlockText, setEditingBlockText] = useState(null);
@@ -359,6 +360,21 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
   const handleBlockDragStart = (block, event) => {
     if (!editBlockMode) return;
     event.stopPropagation();
+    
+    const container = imageRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    
+    // Calculate offset from mouse to block's top-left corner
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
+    
+    setDragOffset({
+      x: mouseX - block.box.x,
+      y: mouseY - block.box.y
+    });
+    
     setDraggingBlock(block);
   };
 
@@ -370,9 +386,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
     
     const rect = container.getBoundingClientRect();
     
-    // Calculate new position relative to image
-    const x = (event.clientX - rect.left) / imageScale;
-    const y = (event.clientY - rect.top) / imageScale;
+    // Calculate new position relative to image (accounting for initial offset)
+    const mouseX = (event.clientX - rect.left) / imageScale;
+    const mouseY = (event.clientY - rect.top) / imageScale;
+    
+    const newX = mouseX - dragOffset.x;
+    const newY = mouseY - dragOffset.y;
     
     // Update block position (keeping width and height)
     setOcrBlocks(prev => ({
@@ -383,8 +402,8 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
               ...line, 
               box: { 
                 ...line.box, 
-                x: Math.max(0, Math.min(x, prev.image_width - line.box.width)),
-                y: Math.max(0, Math.min(y, prev.image_height - line.box.height))
+                x: Math.max(0, Math.min(newX, prev.image_width - line.box.width)),
+                y: Math.max(0, Math.min(newY, prev.image_height - line.box.height))
               } 
             }
           : line
@@ -863,7 +882,12 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                 {/* Render bounding boxes */}
                 <svg
                   onMouseDown={handleImageMouseDown}
-                  onMouseUp={handleImageMouseUp}
+                  onMouseMove={handleBlockDrag}
+                  onMouseUp={(e) => {
+                    handleImageMouseUp(e);
+                    handleBlockDragEnd();
+                  }}
+                  onMouseLeave={handleBlockDragEnd}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -871,7 +895,7 @@ const OCREditorWithBlocks = ({ contact, onSave, onClose }) => {
                     width: `${ocrBlocks.image_width * imageScale}px`,
                     height: `${ocrBlocks.image_height * imageScale}px`,
                     pointerEvents: 'auto',
-                    cursor: isAddingBlock ? 'crosshair' : 'default'
+                    cursor: isAddingBlock ? 'crosshair' : draggingBlock ? 'move' : 'default'
                   }}
                 >
                   {ocrBlocks.lines.map((line, idx) => {

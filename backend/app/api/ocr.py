@@ -13,15 +13,20 @@ import logging
 from ..database import get_db
 from ..models import Contact, User
 from ..core import auth as auth_utils
-from ..integrations.ocr.providers import OCRManager
+from ..integrations.ocr.providers import OCRManager  # OCR v1.0 (fallback)
+from ..integrations.ocr.providers_v2 import OCRManagerV2  # OCR v2.0 (primary)
 
-# Initialize OCR Manager
-ocr_manager = OCRManager()
+# Initialize OCR Managers
+ocr_manager_v1 = OCRManager()  # Fallback to Tesseract if v2 fails
+ocr_manager_v2 = OCRManagerV2(enable_layoutlm=True)  # Primary: PaddleOCR + LayoutLMv3
+ocr_manager = ocr_manager_v2  # Use v2.0 by default
 from ..integrations.ocr import utils as ocr_utils
 from ..core import qr as qr_utils
 from ..integrations.ocr import image_processing
 from ..integrations.ocr.image_utils import create_thumbnail, downscale_image_bytes
 from ..core.file_security import validate_and_secure_file, sanitize_filename
+from ..services.storage_service import StorageService
+from ..services.validator_service import ValidatorService
 
 # Prometheus metrics
 from ..core.metrics import (
@@ -92,27 +97,70 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
             
             try:
                 start_time = time.time()
-                ocr_result = ocr_manager.recognize(
-                    ocr_input,
-                    filename=filename,
-                    preferred_provider=preferred
-                )
+                
+                # Check OCR version setting
+                from ..core.utils import get_setting
+                ocr_version = get_setting(db, "ocr_version", "v2.0")
+                
+                # OCR v2.0: PaddleOCR + LayoutLMv3 with fallback to v1.0
+                if ocr_version == "v2.0":
+                    try:
+                        logger.info("🚀 Using OCR v2.0 (PaddleOCR + LayoutLMv3)...")
+                        ocr_result = ocr_manager_v2.recognize(
+                            image_data=ocr_input,
+                            provider_name=preferred if preferred != 'auto' else None,
+                            use_layout=True  # Enable LayoutLMv3 classification
+                        )
+                        logger.info(f"✅ OCR v2.0 successful: {ocr_result.get('provider', 'PaddleOCR')}")
+                    except Exception as v2_error:
+                        logger.warning(f"⚠️ OCR v2.0 failed: {v2_error}, falling back to v1.0...")
+                        ocr_result = ocr_manager_v1.recognize(
+                            ocr_input,
+                            filename=filename,
+                            preferred_provider=preferred
+                        )
+                        logger.info("✅ OCR v1.0 (Tesseract) fallback successful")
+                else:
+                    # Use v1.0 directly
+                    logger.info("🔧 Using OCR v1.0 (Tesseract) by settings...")
+                    ocr_result = ocr_manager_v1.recognize(
+                        ocr_input,
+                        filename=filename,
+                        preferred_provider=preferred
+                    )
+                    logger.info(f"✅ OCR v1.0 successful: Tesseract")
+                
                 processing_time = time.time() - start_time
                 
                 # Update metrics
-                used_provider = ocr_result['provider']
+                used_provider = ocr_result.get('provider', 'unknown')
                 ocr_processing_time.labels(provider=used_provider).observe(processing_time)
                 ocr_processing_counter.labels(provider=used_provider, status='success').inc()
                 
                 data = ocr_result['data']
                 recognition_method = ocr_result['provider']
                 raw_text = ocr_result.get('raw_text', '')
+                
+                # OCR v2.0: Auto-validation and correction
+                try:
+                    logger.info("🔍 Applying Validator Service for auto-correction...")
+                    validator = ValidatorService()
+                    validated_data = validator.validate_and_correct(data)
+                    if validated_data:
+                        data = validated_data
+                        logger.info("✅ Data validated and corrected")
+                except Exception as val_error:
+                    logger.warning(f"⚠️ Validator failed (non-critical): {val_error}")
+                
                 raw_json = json.dumps({
                     'method': 'ocr',
                     'provider': ocr_result['provider'],
                     'confidence': ocr_result.get('confidence', 0),
                     'raw_data': ocr_result.get('raw_data'),
                     'raw_text': raw_text,
+                    'layoutlm_used': ocr_result.get('layoutlm_used', False),
+                    'layoutlm_confidence': ocr_result.get('layoutlm_confidence', 0),
+                    'validation_applied': 'validated_data' in locals(),
                 }, ensure_ascii=False)
                 
                 logger.info(f"OCR successful with {used_provider}, confidence: {ocr_result.get('confidence', 0)}")
@@ -143,6 +191,41 @@ def process_single_card(card_bytes: bytes, safe_name: str, thumbnail_name: str,
         contact = contact_repo.create(data)
         contact_repo.commit()
         db.refresh(contact)
+        
+        # Save image to MinIO (OCR v2.0)
+        try:
+            storage_service = StorageService(db)
+            minio_path = storage_service.save_business_card_image(
+                contact_id=contact.id,
+                image_data=card_bytes,
+                filename=filename,
+                metadata={
+                    'original_filename': filename,
+                    'safe_filename': safe_name,
+                    'recognition_method': recognition_method,
+                    'contact_uid': contact.uid
+                }
+            )
+            if minio_path:
+                logger.info(f"✅ Image saved to MinIO: {minio_path}")
+            else:
+                logger.warning("⚠️ MinIO image save failed (not critical)")
+        except Exception as minio_error:
+            logger.error(f"❌ MinIO image error: {minio_error}")
+            # Continue - MinIO failure is not critical
+        
+        # Save OCR results to MinIO (OCR v2.0)
+        try:
+            storage_service = StorageService(db)
+            ocr_result_path = storage_service.save_ocr_result(
+                contact_id=contact.id,
+                result_data=json.loads(raw_json)
+            )
+            if ocr_result_path:
+                logger.info(f"✅ OCR result saved to MinIO: {ocr_result_path}")
+        except Exception as ocr_minio_error:
+            logger.error(f"❌ MinIO OCR result error: {ocr_minio_error}")
+            # Continue - MinIO failure is not critical
         
         # Convert to dict for response
         contact_dict = {

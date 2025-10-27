@@ -118,7 +118,8 @@ services:
     image: heartexlabs/label-studio:latest
     container_name: bizcard-label-studio
     environment:
-      - LABEL_STUDIO_HOST=http://localhost:8081
+      - LABEL_STUDIO_HOST=https://ibbase.ru
+      - LABEL_STUDIO_BASE_URL=/label-studio
       - LABEL_STUDIO_USERNAME=${LABEL_STUDIO_USERNAME:-admin@ibbase.ru}
       - LABEL_STUDIO_PASSWORD=${LABEL_STUDIO_PASSWORD:?LABEL_STUDIO_PASSWORD must be set in .env file}
       - LABEL_STUDIO_USER_TOKEN=${LABEL_STUDIO_TOKEN:-}
@@ -138,6 +139,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123456}
+      # Let MinIO Console handle paths internally
+      MINIO_BROWSER_REDIRECT: "on"
     volumes:
       - minio_data:/data
     ports:
