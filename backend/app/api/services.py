@@ -73,12 +73,14 @@ async def get_services_status(
                 
                 # Categorize service
                 category = 'other'
-                if service_name in ['backend', 'frontend', 'postgres', 'redis']:
+                if service_name in ['backend', 'frontend', 'db', 'postgres', 'redis']:
                     category = 'core'
-                elif service_name in ['celery', 'celery-beat']:
+                elif service_name in ['celery', 'celery-worker', 'celery-beat']:
                     category = 'processing'
-                elif service_name in ['prometheus', 'grafana']:
+                elif service_name in ['prometheus', 'grafana', 'redis-exporter', 'node-exporter', 'postgres-exporter']:
                     category = 'monitoring'
+                elif service_name in ['minio', 'label-studio']:
+                    category = 'ml-storage'  # OCR v2.0 services
                 
                 # Format ports properly
                 publishers = service_data.get('Publishers', [])
