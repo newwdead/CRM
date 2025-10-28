@@ -25,6 +25,8 @@ from .integrations.ocr.image_utils import downscale_image_bytes, create_thumbnai
 from .services.layoutlm_service import get_layoutlm_service
 from .services.validator_service import ValidatorService
 from .services.storage_service import StorageService
+from .integrations.label_studio.service import LabelStudioService
+from .integrations.label_studio.active_learning import ActiveLearningService
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -34,10 +36,14 @@ ocr_manager_v1 = OCRManager()  # Old Tesseract-based (fallback)
 ocr_manager_v2 = OCRManagerV2(enable_layoutlm=True)  # NEW PaddleOCR + LayoutLMv3
 layoutlm_service = get_layoutlm_service()
 
+# Initialize Label Studio and Active Learning
+label_studio_service = LabelStudioService()
+active_learning_service = ActiveLearningService()
+
 # Use v2.0 by default
 ocr_manager = ocr_manager_v2  # PRIMARY: Use OCR v2.0 for all new cards
 
-logger.info("🚀 OCR v2.0 initialized: PaddleOCR + LayoutLMv3 + Validator ready")
+logger.info("🚀 OCR v2.0 initialized: PaddleOCR + LayoutLMv3 + Validator + Label Studio ready")
 
 
 def _process_card_sync(
@@ -386,6 +392,35 @@ def process_single_card(
         
         logger.info(f"Contact created: {contact.id} ({filename})")
         
+        # 🤖 Active Learning: Check if this card should be sent to Label Studio
+        try:
+            if label_studio_service.is_available() and recognition_method and 'ocr' in recognition_method:
+                should_annotate = active_learning_service.should_send_for_annotation(
+                    contact_id=contact.id,
+                    confidence=ocr_result.get('confidence', 0) if 'ocr_result' in locals() else 0,
+                    ocr_data=data
+                )
+                
+                if should_annotate:
+                    # Get image URL for Label Studio
+                    image_url = f"http://backend:8000/uploads/{safe_name}"
+                    
+                    # Send to Label Studio
+                    task_id = label_studio_service.upload_task(
+                        image_url=image_url,
+                        contact_id=contact.id,
+                        ocr_predictions={
+                            'blocks': blocks_data if 'blocks_data' in locals() else [],
+                            'data': data
+                        }
+                    )
+                    
+                    if task_id:
+                        logger.info(f"📝 Contact {contact.id} sent to Label Studio (task {task_id})")
+        except Exception as e:
+            # Non-critical error, don't fail the whole task
+            logger.warning(f"⚠️ Failed to send to Label Studio: {e}")
+        
         return {
             'success': True,
             'contact_id': contact.id,
@@ -567,4 +602,89 @@ def cleanup_old_results():
     except Exception as e:
         logger.error(f"Cleanup task failed: {e}")
         return {'error': str(e)}
+
+
+@celery_app.task(name='app.tasks.train_ocr_models')
+def train_ocr_models():
+    """
+    Train OCR models using annotated data from Label Studio.
+    Triggered manually or on schedule.
+    """
+    try:
+        from .integrations.label_studio.training import ModelTrainer
+        
+        logger.info("🎓 Starting OCR model training...")
+        
+        trainer = ModelTrainer()
+        
+        # Export annotations from Label Studio
+        annotations = label_studio_service.export_annotations()
+        
+        if not annotations:
+            logger.warning("⚠️ No annotations found in Label Studio")
+            return {
+                'success': False,
+                'error': 'No training data available'
+            }
+        
+        # Convert to training format
+        training_data = trainer.prepare_training_data(annotations)
+        
+        if len(training_data) < 10:
+            logger.warning(f"⚠️ Insufficient training data: {len(training_data)} samples (need 10+)")
+            return {
+                'success': False,
+                'error': f'Insufficient training data: {len(training_data)} samples'
+            }
+        
+        # Train PaddleOCR (if enabled)
+        paddle_result = trainer.finetune_paddleocr(training_data)
+        
+        # Train LayoutLMv3 (if enabled)
+        layoutlm_result = trainer.finetune_layoutlm(training_data)
+        
+        logger.info("✅ OCR model training completed")
+        
+        return {
+            'success': True,
+            'paddle_result': paddle_result,
+            'layoutlm_result': layoutlm_result,
+            'training_samples': len(training_data)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Model training failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@celery_app.task(name='app.tasks.sync_feedback_to_label_studio')
+def sync_feedback_to_label_studio():
+    """
+    Sync user feedback from OCR editor to Label Studio.
+    Runs periodically to collect corrections.
+    """
+    try:
+        from .integrations.label_studio.training import ModelTrainer
+        
+        logger.info("🔄 Syncing feedback to Label Studio...")
+        
+        trainer = ModelTrainer()
+        synced_count = trainer.sync_user_corrections()
+        
+        logger.info(f"✅ Synced {synced_count} corrections to Label Studio")
+        
+        return {
+            'success': True,
+            'synced_count': synced_count
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Feedback sync failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e)
+        }
 

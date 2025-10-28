@@ -31,7 +31,7 @@ class PaddleOCRProvider(OCRProviderV2):
         super().__init__("PaddleOCR")
         self.priority = 1  # High priority (better than Tesseract)
         self.supports_bbox = True
-        self.supports_layout = False  # True when LayoutLMv3 integrated
+        self.supports_layout = True  # LayoutLMv3 integration enabled
         
         self.ocr = None
         self.enable_postprocessing = enable_postprocessing

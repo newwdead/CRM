@@ -41,10 +41,24 @@ celery_app.conf.update(
 
 # Beat schedule (for periodic tasks, if needed)
 celery_app.conf.beat_schedule = {
-    # Example: clean up old results every hour
+    # Clean up old results every hour
     'cleanup-results': {
         'task': 'app.tasks.cleanup_old_results',
         'schedule': 3600.0,  # Every hour
+    },
+    # Sync user corrections to Label Studio every 6 hours
+    'sync-feedback': {
+        'task': 'app.tasks.sync_feedback_to_label_studio',
+        'schedule': 21600.0,  # Every 6 hours
+    },
+    # Train models weekly (on Sunday at 3 AM)
+    'train-models': {
+        'task': 'app.tasks.train_ocr_models',
+        'schedule': {
+            'hour': 3,
+            'minute': 0,
+            'day_of_week': 0,  # Sunday
+        },
     },
 }
 

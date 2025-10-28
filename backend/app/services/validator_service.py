@@ -1,13 +1,14 @@
 """
 Validator Service
 High-level service for validating and correcting OCR results
+Now uses the new validator system: Regex + spaCy + GPT
 """
 import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from .base import BaseService
-from .validators import FieldValidator, ValidationResult
+from ..integrations.validator import ValidatorService as NewValidatorService
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +24,16 @@ class ValidatorService(BaseService):
     - Validation reports
     """
     
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, use_gpt: bool = False):
         """
         Initialize validator service
         
         Args:
             db: SQLAlchemy database session
+            use_gpt: Enable GPT validator (requires OPENAI_API_KEY)
         """
         super().__init__(db)
-        self.field_validator = FieldValidator()
+        self.validator = NewValidatorService(use_gpt=use_gpt)
     
     def validate_ocr_result(
         self,
@@ -39,7 +41,7 @@ class ValidatorService(BaseService):
         auto_correct: bool = True
     ) -> Dict[str, Any]:
         """
-        Validate and optionally correct OCR result
+        Validate and optionally correct OCR result using new validator system
         
         Args:
             ocr_data: OCR result dictionary with 'data' field
@@ -56,34 +58,21 @@ class ValidatorService(BaseService):
                 logger.warning("⚠️ No data to validate in OCR result")
                 return ocr_data
             
-            # Validate all fields
-            validation_results = self.field_validator.validate_all(data)
-            
-            # Get summary
-            summary = self.field_validator.get_validation_summary(data)
+            # Validate using new validator service
+            validation_result = self.validator.validate_all(data)
             
             # Apply corrections if requested
             if auto_correct:
-                corrected_data = self.field_validator.get_corrected_data(data)
-                ocr_data['data'] = corrected_data
+                ocr_data['data'] = validation_result['validated']
                 logger.info(
-                    f"✅ Validated OCR data: {summary['valid_fields']}/{summary['total_fields']} valid, "
-                    f"{summary['corrected_fields']} corrected, "
-                    f"confidence: {summary['avg_confidence']:.2f}"
-                )
-            else:
-                logger.info(
-                    f"✅ Validated OCR data: {summary['valid_fields']}/{summary['total_fields']} valid, "
-                    f"confidence: {summary['avg_confidence']:.2f}"
+                    f"✅ Validated OCR data: {len(validation_result['corrections'])} corrections, "
+                    f"confidence: {validation_result['overall_confidence']:.2f}"
                 )
             
             # Add validation info to OCR result
             ocr_data['validation'] = {
-                'summary': summary,
-                'results': {
-                    field: result.to_dict()
-                    for field, result in validation_results.items()
-                },
+                'corrections': validation_result['corrections'],
+                'overall_confidence': validation_result['overall_confidence'],
                 'auto_corrected': auto_correct,
             }
             
@@ -91,10 +80,10 @@ class ValidatorService(BaseService):
             if 'confidence' in ocr_data:
                 # Combine OCR confidence with validation confidence
                 ocr_confidence = ocr_data['confidence']
-                validation_confidence = summary['avg_confidence']
+                validation_confidence = validation_result['overall_confidence']
                 ocr_data['confidence'] = (ocr_confidence + validation_confidence) / 2
             else:
-                ocr_data['confidence'] = summary['avg_confidence']
+                ocr_data['confidence'] = validation_result['overall_confidence']
             
             return ocr_data
             
@@ -107,7 +96,7 @@ class ValidatorService(BaseService):
         self,
         value: str,
         field_name: str
-    ) -> ValidationResult:
+    ) -> Dict[str, Any]:
         """
         Validate a single field
         
@@ -116,9 +105,9 @@ class ValidatorService(BaseService):
             field_name: Field name
         
         Returns:
-            ValidationResult
+            Validation result dict
         """
-        return self.field_validator.validate(value, field_name)
+        return self.validator.validate_field({}, field_name, value)
     
     def suggest_corrections(
         self,
@@ -133,20 +122,8 @@ class ValidatorService(BaseService):
         Returns:
             Dictionary of field_name -> suggestions
         """
-        validation_results = self.field_validator.validate_all(data)
-        
-        suggestions = {}
-        for field_name, result in validation_results.items():
-            if not result.is_valid or result.corrected_value:
-                suggestions[field_name] = {
-                    'original': result.original_value,
-                    'corrected': result.corrected_value,
-                    'confidence': result.confidence,
-                    'error': result.error_message,
-                    'suggestions': result.suggestions,
-                }
-        
-        return suggestions
+        validation_result = self.validator.validate_all(data)
+        return validation_result.get('corrections', {})
     
     def get_data_quality_score(self, data: Dict[str, str]) -> float:
         """
@@ -158,16 +135,5 @@ class ValidatorService(BaseService):
         Returns:
             Quality score between 0 and 1
         """
-        summary = self.field_validator.get_validation_summary(data)
-        
-        # Weighted score calculation
-        validity_score = summary['valid_fields'] / summary['total_fields'] if summary['total_fields'] > 0 else 0
-        confidence_score = summary['avg_confidence']
-        
-        # Penalty for corrections needed
-        correction_penalty = summary['corrected_fields'] * 0.05
-        
-        quality_score = (validity_score * 0.6 + confidence_score * 0.4) - correction_penalty
-        quality_score = max(0.0, min(1.0, quality_score))  # Clamp to [0, 1]
-        
-        return round(quality_score, 2)
+        validation_result = self.validator.validate_all(data)
+        return round(validation_result.get('overall_confidence', 0.5), 2)
