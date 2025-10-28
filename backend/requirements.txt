@@ -20,7 +20,7 @@ openpyxl==3.1.5
 # OCR & Image Processing
 pytesseract==0.3.13
 Pillow==11.0.0
-opencv-python-headless==4.10.0.84
+opencv-python-headless>=4.8.0.76  # Headless version - no GUI, compatible with PaddleOCR
 pyzbar==0.1.9
 
 # PaddleOCR (OCR v2.0)

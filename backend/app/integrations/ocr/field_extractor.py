@@ -123,11 +123,38 @@ class FieldExtractor:
         return data
     
     def _extract_email(self, text: str) -> Optional[str]:
-        """Extract email with improved pattern"""
-        # More comprehensive email pattern
+        """Extract email with AGGRESSIVE pattern matching"""
+        # Pattern 1: Standard email
         pattern = r'\b[a-zA-Z0-9][\w\.-]*@[\w\.-]+\.[a-zA-Z]{2,}\b'
         match = re.search(pattern, text, re.IGNORECASE)
-        return match.group(0).lower() if match else None
+        if match:
+            return match.group(0).lower()
+        
+        # Pattern 2: Email without @ (try to reconstruct)
+        # Example: "info mail.ru" → "info@mail.ru"
+        pattern_no_at = r'\b([a-z0-9]+)[\s\._]+((?:[a-z0-9-]+\.)+[a-z]{2,})\b'
+        match = re.search(pattern_no_at, text, re.IGNORECASE)
+        if match:
+            username, domain = match.groups()
+            reconstructed = f"{username}@{domain}"
+            logger.debug(f"📧 Reconstructed email: {text} → {reconstructed}")
+            return reconstructed.lower()
+        
+        # Pattern 3: Look for domain indicators and try to find nearby username
+        if any(domain in text.lower() for domain in ['.ru', '.com', '.org', '.net', 'mail', 'gmail', 'yandex']):
+            # Try to extract domain
+            domain_match = re.search(r'([a-z0-9-]+\.(?:ru|com|org|net|io))', text, re.IGNORECASE)
+            if domain_match:
+                domain = domain_match.group(1)
+                # Look for username nearby (before domain)
+                username_match = re.search(r'([a-z0-9_]+)\s*' + re.escape(domain), text, re.IGNORECASE)
+                if username_match:
+                    username = username_match.group(1)
+                    reconstructed = f"{username}@{domain}"
+                    logger.debug(f"📧 Reconstructed email (domain-based): {reconstructed}")
+                    return reconstructed.lower()
+        
+        return None
     
     def _extract_phones(
         self,
@@ -135,58 +162,84 @@ class FieldExtractor:
         blocks: List
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
-        Extract all phone numbers and classify them
+        Extract and normalize phone numbers (AGGRESSIVE mode)
         
         Returns: (main_phone, mobile, work)
         """
-        # Enhanced phone patterns for Russian formats
+        # AGGRESSIVE phone patterns - find EVERYTHING that looks like a phone
         patterns = [
-            # International format
-            r'\+7[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}',
-            r'\+7[\s\-]?\d{3}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}',
-            r'\+\d{1,3}[\s\-]?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{2,4}',
+            # International formats
+            r'\+7[\s\-\.\(\)]?\d{3}[\s\-\.\)\(]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}',
+            r'\+\d{1,3}[\s\-\.\(\)]?\d{2,4}[\s\-\.\)\(]?\d{3,4}[\s\-\.]?\d{2,4}',
             # Russian 8-format
-            r'8[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}',
-            # Short format with parentheses
-            r'\(\d{3}\)[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}',
-            # Just numbers
-            r'\d{3}[\s\-]\d{3}[\s\-]\d{2}[\s\-]\d{2}',
+            r'8[\s\-\.\(\)]?\d{3}[\s\-\.\)\(]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}',
+            # 7-start (without +)
+            r'7[\s\-\.\(\)]?\d{3}[\s\-\.\)\(]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}',
+            # With parentheses
+            r'\(?\d{3}\)?[\s\-\.]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}',
+            # Compact format
+            r'\d{10,11}',  # 10 or 11 digits in a row
         ]
         
         phones = []
         for pattern in patterns:
             for match in re.finditer(pattern, text):
                 phone = match.group(0).strip()
-                # Normalize
-                phone = re.sub(r'[\s\-\(\)]', '', phone)
-                if phone not in phones and len(phone) >= 10:
-                    phones.append(phone)
+                # Normalize: remove all non-digits except leading +
+                normalized = phone[0] if phone.startswith('+') else ''
+                normalized += ''.join(c for c in phone if c.isdigit())
+                
+                # Validate length
+                if len(normalized.replace('+', '')) < 10:
+                    continue
+                
+                # Normalize Russian numbers
+                if normalized.startswith('8') and len(normalized) == 11:
+                    normalized = '+7' + normalized[1:]  # 8XXX → +7XXX
+                elif normalized.startswith('7') and len(normalized) == 11:
+                    normalized = '+' + normalized  # 7XXX → +7XXX
+                elif len(normalized) == 10:
+                    normalized = '+7' + normalized  # XXX → +7XXX
+                
+                # Deduplicate
+                if normalized not in phones:
+                    phones.append(normalized)
+                    logger.debug(f"📞 Found phone: {phone} → {normalized}")
         
         if not phones:
             return (None, None, None)
         
-        # Classify phones by context
+        # Classify by context (check each block)
         mobile = None
         work = None
         main = phones[0] if phones else None
         
-        # Try to find mobile/work keywords near phone numbers
         for block in blocks:
             block_text = block.text.lower()
-            if any(kw in block_text for kw in ['моб', 'mobile', 'cell', 'сот']):
-                # Find phone in this block
-                for phone in phones:
-                    if phone in block.text.replace(' ', '').replace('-', ''):
+            block_normalized = ''.join(c for c in block.text if c.isdigit())
+            
+            # Check if this block contains a phone
+            for phone in phones:
+                phone_digits = phone.replace('+', '')
+                if phone_digits in block_normalized or block_normalized in phone_digits:
+                    # Found phone in this block, check context
+                    if any(kw in block_text for kw in ['моб', 'mobile', 'cell', 'сот', 'мобильный']):
                         mobile = phone
-            elif any(kw in block_text for kw in ['раб', 'work', 'office', 'тел']):
-                for phone in phones:
-                    if phone in block.text.replace(' ', '').replace('-', ''):
+                        logger.debug(f"📱 Mobile: {phone}")
+                    elif any(kw in block_text for kw in ['раб', 'work', 'office', 'тел', 'рабочий']):
                         work = phone
+                        logger.debug(f"💼 Work: {phone}")
         
-        # If we have multiple phones but no classification, assume first is mobile, second is work
-        if len(phones) > 1 and not mobile and not work:
-            mobile = phones[0]
-            work = phones[1] if len(phones) > 1 else None
+        # Fallback: if multiple phones but no classification
+        if len(phones) > 1:
+            if not mobile:
+                mobile = phones[0]
+            if not work and len(phones) > 1:
+                work = phones[1]
+        
+        # Ensure main is set
+        if not main and phones:
+            main = phones[0]
         
         return (main, mobile, work)
     

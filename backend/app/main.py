@@ -210,9 +210,9 @@ else:
         "https://api.ibbase.ru",
         # Development (only if not production)
         *([
-            "http://localhost:3000",
-            "http://localhost:80",
-            "http://127.0.0.1:3000"
+        "http://localhost:3000",
+        "http://localhost:80", 
+        "http://127.0.0.1:3000"
         ] if os.getenv("ENVIRONMENT") != "production" else [])
     ]
 
